@@ -1,4 +1,4 @@
-import { getStatusLabel, getStepBadge } from '../i18n';
+import { getStatusLabel, t } from '../i18n';
 
 interface HeaderProps {
   status: string;
@@ -27,7 +27,7 @@ export default function Header({ status }: HeaderProps) {
         <div>
           <h1 className="title">Codebase</h1>
           <div className="subtitle-row">
-            <p className="subtitle">ChatGPT 자동블로깅</p>
+            <p className="subtitle">{t('brand_subtitle')}</p>
           </div>
         </div>
       </div>

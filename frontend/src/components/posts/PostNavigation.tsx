@@ -34,18 +34,18 @@ export default function PostNavigation({
               <button
                 onClick={onEdit}
                 className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                title="수정"
+                title="Edit"
               >
                 <FiEdit3 className="mr-1 w-3 h-3" />
-                수정
+                Edit
               </button>
               <button
                 onClick={onDelete}
                 className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                title="삭제"
+                title="Delete"
               >
                 <FiTrash2 className="mr-1 w-3 h-3" />
-                삭제
+                Delete
               </button>
             </div>
           )}

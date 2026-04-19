@@ -39,7 +39,7 @@ export default function UpdatesPage() {
              </h1>
              
              <p className="mt-6 max-w-3xl text-[16px] leading-[1.8] text-[#5f6368] dark:text-[#9aa0a6]">
-               제품의 새로운 기능과 개선, 버그 수정 내역을 한곳에서 모아봅니다. 모든 업데이트는 사용자가 체감하는 가치를 기준으로 작성됩니다.
+               Track product releases, improvements, and fixes in one place. Every entry focuses on visible product changes that matter in actual use.
              </p>
           </div>
         </section>
@@ -145,7 +145,7 @@ export default function UpdatesPage() {
                     <div>
                       <span className="block text-[16px] font-medium text-[#202124] dark:text-white">Docs</span>
                       <span className="mt-1 block text-[13px] leading-6 text-[#5f6368] dark:text-[#9aa0a6]">
-                        연결 방식과 설정 흐름을 먼저 확인합니다.
+                        Review connection steps and setup flow before changing your configuration.
                       </span>
                     </div>
                     <ArrowRight className="h-5 w-5 shrink-0 text-[#5f6368] transition-transform group-hover:translate-x-1 dark:text-[#9aa0a6]" />
@@ -157,7 +157,7 @@ export default function UpdatesPage() {
                     <div>
                       <span className="block text-[16px] font-medium text-[#202124] dark:text-white">Support</span>
                       <span className="mt-1 block text-[13px] leading-6 text-[#5f6368] dark:text-[#9aa0a6]">
-                        설정 이후 막히는 문제를 바로 해결합니다.
+                        Use support when you are blocked after setup and need the fastest next step.
                       </span>
                     </div>
                     <ArrowRight className="h-5 w-5 shrink-0 text-[#5f6368] transition-transform group-hover:translate-x-1 dark:text-[#9aa0a6]" />

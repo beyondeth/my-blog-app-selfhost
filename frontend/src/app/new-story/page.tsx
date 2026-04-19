@@ -95,17 +95,17 @@ const MemoizedBlogSimpleEditor = React.memo(BlogSimpleEditor);
 // Zod 스키마 정의
 const categoriesSchema = z.array(
   z.string()
-    .min(1, '카테고리는 최소 1글자 이상이어야 합니다.')
-    .max(15, '카테고리는 최대 15글자까지 입력 가능합니다.')
+    .min(1, 'Category must be at least 1 character.')
+    .max(15, 'Category must be 15 characters or fewer.')
     .refine((value) => !value.includes('/'), {
-      message: '카테고리에 슬래시(/)를 포함할 수 없습니다.',
+      message: 'Category cannot include a slash (/).',
     })
-).max(2, '카테고리는 최대 2개까지만 입력 가능합니다.');
+).max(2, 'You can add up to 2 categories.');
 
 const postSchema = z.object({
-  title: z.string().min(1, '제목을 입력해주세요.'),
+  title: z.string().min(1, 'Enter a title.'),
   categories: categoriesSchema.optional(),
-  content: z.string().min(1, '내용을 입력해주세요.'),
+  content: z.string().min(1, 'Enter some content.'),
   tags: z.array(z.string()).optional(),
   githubUrl: z.string().optional(),
   githubDescription: z.string().optional(),
@@ -180,10 +180,10 @@ export default function NewStoryPage() {
   const videoUploadStatusText = useMemo(() => {
     for (const upload of videoUploads.values()) {
       if (upload.stage === 'uploading') {
-        return '비디오를 업로드 중입니다. 완료될 때까지 기다려주세요.';
+        return 'Uploading video. Please wait until it finishes.';
       }
       if (upload.stage === 'processing') {
-        return '비디오를 처리 중입니다. 썸네일 생성까지 잠시만 기다려주세요.';
+        return 'Processing video. Please wait while the thumbnail is generated.';
       }
     }
     return null;
@@ -467,7 +467,7 @@ export default function NewStoryPage() {
     const currentFileIds = form.getValues('fileIds') || [];
     const index = currentFileIds.indexOf(fileId);
     if (index === -1) {
-      toast.warning('썸네일로 지정할 이미지를 찾을 수 없습니다.');
+      toast.warning('Could not find that image to use as the thumbnail.');
       return;
     }
     handleThumbnailChange(index);
@@ -479,7 +479,7 @@ export default function NewStoryPage() {
     }
     setSelectedYouTubeThumbnailId(videoId);
     handleThumbnailChange(-1);
-    toast.success('YouTube 영상을 썸네일로 지정했습니다.');
+    toast.success('Selected the YouTube video as the thumbnail.');
   }, [handleThumbnailChange]);
 
   const syncMarkdownImages = useCallback(
@@ -652,7 +652,7 @@ export default function NewStoryPage() {
       const hasContent = (parsed.data.title && parsed.data.title.trim().length > 0) ||
                          (parsed.data.content && parsed.data.content.trim().length > 0);
       if (hasContent) {
-        toast.info('임시 저장된 초안을 불러왔습니다.');
+        toast.info('Restored your saved draft.');
       }
       
       latestDraftRef.current = {
@@ -840,7 +840,7 @@ export default function NewStoryPage() {
         } else {
           const issues = getRichEditorCompatibilityIssues(currentContent);
           if (issues.length > 0) {
-            toast.error(`리치 편집기로 안전하게 전환할 수 없는 요소가 있습니다: ${issues.join(', ')}`);
+            toast.error(`Some content cannot be safely converted to the rich editor: ${issues.join(', ')}`);
             return;
           }
           const html = convertMarkdownToHtml(currentContent);
@@ -855,7 +855,7 @@ export default function NewStoryPage() {
         scheduleDraftSave(true);
       } catch (error) {
         console.error('Failed to switch editor mode', error);
-        toast.error('편집 모드를 전환하지 못했습니다.');
+        toast.error('Could not switch the editor mode.');
       } finally {
         setIsSwitchingEditorMode(false);
         setIsConfirmDialogOpen(false);
@@ -884,7 +884,7 @@ export default function NewStoryPage() {
   // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
   useEffect(() => {
     if (!isUserLoading && !user) {
-      toast.error('로그인이 필요합니다.');
+      toast.error('Please sign in first.');
       router.push('/login?redirect=/new-story');
     }
   }, [user, isUserLoading, router]);
@@ -893,14 +893,14 @@ export default function NewStoryPage() {
   useEffect(() => {
     if (!isBlogsLoading && user && !blog) {
       // 블로그가 없으면 홈으로 리다이렉트 (또는 블로그 생성 페이지로)
-      toast.error('블로그를 먼저 생성해주세요.');
+      toast.error('Create your blog before publishing a post.');
       router.push('/');
     }
   }, [blog, isBlogsLoading, user, router]);
 
   const handleMarkdownImageFile = useCallback(async (file: File) => {
     if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
-      toast.error('SVG 이미지는 업로드할 수 없습니다.');
+      toast.error('SVG files are not supported for uploads.');
       return;
     }
     setIsMarkdownImageUploading(true);
@@ -914,7 +914,7 @@ export default function NewStoryPage() {
       const imageUrl = normalizeImageUrl(result.accessUrl || result.fileUrl || '');
 
       if (!fileId || !imageUrl) {
-        throw new Error('이미지 업로드 결과가 올바르지 않습니다.');
+        throw new Error('The uploaded image response was invalid.');
       }
 
       fileMetadataRef.current.set(fileId, { url: imageUrl, name: file.name || 'image' });
@@ -937,9 +937,9 @@ export default function NewStoryPage() {
         handleThumbnailChange(insertedIndex);
       }
 
-      toast.success('이미지를 본문에 삽입했습니다.');
+      toast.success('Inserted the image into the post.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다.';
+      const message = error instanceof Error ? error.message : 'Failed to upload the image.';
       toast.error(message);
     } finally {
       setIsMarkdownImageUploading(false);
@@ -962,10 +962,10 @@ export default function NewStoryPage() {
       const result = await uploadMarkdownVideo(file);
       if (result && result.success && result.url) {
         insertMarkdownSnippet(`<video controls src="${result.url}" data-video-id="${result.videoId}"></video>`);
-        toast.success('비디오를 본문에 추가했습니다.');
+        toast.success('Added the video to the post.');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '비디오 업로드에 실패했습니다.';
+      const message = error instanceof Error ? error.message : 'Failed to upload the video.';
       toast.error(message);
     } finally {
       setIsMarkdownVideoUploading(false);
@@ -974,16 +974,16 @@ export default function NewStoryPage() {
 
   const markdownVideoStatusMessage = useMemo(() => {
     if (markdownVideoState.stage === 'uploading') {
-      return `비디오 업로드 중 (${Math.round(markdownVideoState.uploadProgress)}%)`;
+      return `Uploading video (${Math.round(markdownVideoState.uploadProgress)}%)`;
     }
     if (markdownVideoState.stage === 'processing') {
-      return '서버에서 비디오를 처리하고 있습니다...';
+      return 'The server is processing the video...';
     }
     if (markdownVideoState.stage === 'complete') {
-      return '비디오 업로드가 완료되었습니다.';
+      return 'Video upload completed.';
     }
     if (markdownVideoState.stage === 'error') {
-      return markdownVideoState.error ?? '비디오 업로드 오류가 발생했습니다.';
+      return markdownVideoState.error ?? 'A video upload error occurred.';
     }
     return null;
   }, [markdownVideoState]);
@@ -992,13 +992,13 @@ export default function NewStoryPage() {
   const onSubmit = async (data: PostFormData) => {
     // 발행 대상이 없으면 제출 불가
     if (!publishTarget) {
-      toast.error('발행 대상을 선택해주세요.');
+      toast.error('Choose where to publish this post.');
       return;
     }
     
     // 제목 유효성 검사
     if (!data.title || data.title.trim().length === 0) {
-      setTitleError('제목을 입력해주세요.');
+      setTitleError('Enter a title.');
       return;
     }
     // 이전 제목 에러 초기화
@@ -1041,7 +1041,7 @@ export default function NewStoryPage() {
       if (publishTarget.type === 'blog') {
         const categories = data.categories ?? [];
         if (categories.length === 0) {
-          setCategoryError('카테고리를 최소 1개 입력해주세요.');
+          setCategoryError('Add at least 1 category.');
           isSubmittingRef.current = false;
           setIsSubmitting(false);
           return;
@@ -1077,7 +1077,7 @@ export default function NewStoryPage() {
         // 판매 상품 유효성 검증
         if (isSellMode) {
           if (!sellPrice || Number(sellPrice) < 100) {
-            toast.error('상품 가격은 최소 100원 이상이어야 합니다');
+            toast.error('Product price must be at least KRW 100.');
             return;
           }
         }
@@ -1160,7 +1160,7 @@ export default function NewStoryPage() {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
       console.error('Failed to create post:', error);
-      toast.error('포스트 저장에 실패했습니다.');
+      toast.error('Failed to save the post.');
     }
     // 성공 시 페이지가 이동되므로 finally 블록 불필요
   };
@@ -1179,11 +1179,11 @@ export default function NewStoryPage() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center max-w-md mx-auto">
           <AlertCircle className="w-12 h-12 mx-auto text-red-500 mb-4" />
-          <h1 className="text-xl font-semibold mb-2">커뮤니티를 불러올 수 없습니다</h1>
+          <h1 className="text-xl font-semibold mb-2">Could not load the community</h1>
           <p className="text-gray-500 mb-4">
-            존재하지 않거나 접근할 수 없는 커뮤니티입니다.
+            This community does not exist or you do not have access to it.
           </p>
-          <Button onClick={() => router.push('/')}>홈으로 이동</Button>
+          <Button onClick={() => router.push('/')}>Go home</Button>
         </div>
       </div>
     );
@@ -1222,17 +1222,17 @@ export default function NewStoryPage() {
         <div className="text-center max-w-md mx-auto px-4">
           <AlertCircle className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            게시물 작성 권한이 없습니다
+            You do not have permission to post here
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
-            이 커뮤니티에 가입한 멤버만 게시물을 작성할 수 있습니다.
+            Only joined members can create posts in this community.
           </p>
           <div className="flex gap-3 justify-center">
             <Button variant="outline" onClick={() => router.back()}>
-              뒤로 가기
+              Go back
             </Button>
             <Button onClick={() => router.push(`/c/${selectedCommunity.slug}`)}>
-              커뮤니티로 이동
+              Open community
             </Button>
           </div>
         </div>
@@ -1246,7 +1246,7 @@ export default function NewStoryPage() {
       {blog && publishTarget && (
         <div className="mb-3 pt-8">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-700 dark:text-gray-100">발행 위치:</span>
+            <span className="text-sm text-gray-700 dark:text-gray-100">Publish to:</span>
             <PublishTargetSelector
               value={publishTarget}
               onChange={setPublishTarget}
@@ -1269,7 +1269,7 @@ export default function NewStoryPage() {
           <Card className="border-0 shadow-none bg-transparent">
             <CardContent className={`space-y-4 ${blog && publishTarget ? '' : 'pt-12'} px-4`}>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                작성 중인 내용은 자동으로 임시 저장됩니다.
+                Your draft is saved automatically while you write.
               </p>
               {/* 제목 */}
               <FormField
@@ -1281,8 +1281,8 @@ export default function NewStoryPage() {
                       <FloatingTitleField
                         field={field}
                         disabled={isMutationPending}
-                        label="제목"
-                        placeholder="당신의 이야기를 들려주세요..."
+                        label="Title"
+                        placeholder="Give your post a clear headline..."
                       />
                     </FormControl>
                     {/* 제목 에러 인라인 표시 (FormMessage 대체) */}
@@ -1299,7 +1299,7 @@ export default function NewStoryPage() {
                             setTitleError(null);
                           }}
                           className="p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                          aria-label="닫기"
+                          aria-label="Close"
                         >
                           <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                         </button>
@@ -1334,7 +1334,7 @@ export default function NewStoryPage() {
                                 setCategoryError(null);
                               }}
                               className="p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                              aria-label="닫기"
+                              aria-label="Close"
                             >
                               <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                             </button>
@@ -1350,21 +1350,21 @@ export default function NewStoryPage() {
                 <div className="space-y-4">
                   {availableCommunityFlairs.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">말머리 (선택)</Label>
+                      <Label className="text-sm font-medium">Flair (optional)</Label>
                       <Select
                         value={selectedFlairId || '__none__'}
                         onValueChange={(value) => setSelectedFlairId(value === '__none__' ? null : value)}
                         disabled={isMutationPending}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="말머리 선택">
+                          <SelectValue placeholder="Choose flair">
                             {selectedCommunityFlair && (
                               <FlairBadge flair={selectedCommunityFlair} size="sm" />
                             )}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__none__">말머리 없음</SelectItem>
+                          <SelectItem value="__none__">No flair</SelectItem>
                           {availableCommunityFlairs.map((flair) => (
                             <SelectItem key={flair.id} value={flair.id}>
                               <FlairBadge flair={flair} size="sm" />
@@ -1380,7 +1380,7 @@ export default function NewStoryPage() {
                       <div>
                         <Label className="text-sm font-medium">NSFW</Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          성인용 또는 민감한 콘텐츠입니다
+                          Adult or sensitive content
                         </p>
                       </div>
                       <Switch
@@ -1391,9 +1391,9 @@ export default function NewStoryPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <Label className="text-sm font-medium">스포일러</Label>
+                        <Label className="text-sm font-medium">Spoiler</Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          스포일러가 포함된 콘텐츠입니다
+                          This post contains spoilers
                         </p>
                       </div>
                       <Switch
@@ -1413,7 +1413,7 @@ export default function NewStoryPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <TagInputField field={field} disabled={isMutationPending} label="태그" />
+                      <TagInputField field={field} disabled={isMutationPending} label="Tags" />
                     </FormControl>
                     {/* 태그 에러 인라인 표시 (FormMessage 대체) */}
                     {form.formState.errors.tags && (
@@ -1426,7 +1426,7 @@ export default function NewStoryPage() {
                           type="button"
                           onClick={() => form.clearErrors('tags')}
                           className="p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                          aria-label="닫기"
+                          aria-label="Close"
                         >
                           <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                         </button>
@@ -1440,10 +1440,10 @@ export default function NewStoryPage() {
                   <div className="flex items-center justify-end gap-2">
                     <Label className="text-xs font-medium leading-none">
                       {isPublicTransitionLocked
-                        ? '포스트 비공개(잠금)'
+                        ? 'Private post (locked)'
                         : postVisibility === 'public'
-                          ? '포스트 공개'
-                          : '포스트 비공개'}
+                          ? 'Public post'
+                          : 'Private post'}
                     </Label>
                     <Switch
                       checked={postVisibility === 'public'}
@@ -1454,13 +1454,13 @@ export default function NewStoryPage() {
                         setPostVisibility(checked ? 'public' : 'private');
                       }}
                       disabled={isMutationPending || isPublicTransitionLocked}
-                      title={isPublicTransitionLocked ? '전체 비공개 잠금' : undefined}
+                      title={isPublicTransitionLocked ? 'Locked by blog privacy setting' : undefined}
                       className="focus-visible:ring-gray-400 data-[state=checked]:bg-gray-500 dark:data-[state=checked]:bg-gray-500 [&>span:first-child]:bg-gray-500 dark:[&>span:first-child]:bg-gray-500"
                     />
                   </div>
                   {isPublicTransitionLocked && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      TIP. 공개로 변경하려면 '블로그 설정'에서 전체 공개로 바꿔주세요.
+                      Tip: switch the blog itself to public in Blog Settings before making this post public.
                     </p>
                   )}
                 </div>
@@ -1471,7 +1471,7 @@ export default function NewStoryPage() {
                 <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-medium leading-none text-gray-700 dark:text-zinc-300">
-                      상품으로 판매
+                      Sell as a product
                     </Label>
                     <Switch
                       checked={isSellMode}
@@ -1485,33 +1485,33 @@ export default function NewStoryPage() {
                       {/* 가격 입력 */}
                       <div>
                         <label className="block text-xs text-gray-500 dark:text-zinc-400 mb-1">
-                          가격 (원)
+                          Price (KRW)
                         </label>
                         <input
                           type="number"
                           min={100}
                           value={sellPrice}
                           onChange={(e) => setSellPrice(e.target.value ? Number(e.target.value) : '')}
-                          placeholder="최소 100원"
+                          placeholder="Minimum KRW 100"
                           className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-gray-300 dark:focus:ring-zinc-600"
                         />
                       </div>
                       {/* 상품 카테고리 */}
                       <div>
                         <label className="block text-xs text-gray-500 dark:text-zinc-400 mb-1">
-                          상품 카테고리
+                          Product category
                         </label>
                         <select
                           value={sellCategory}
                           onChange={(e) => setSellCategory(e.target.value)}
                           className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none"
                         >
-                          <option value="ai_prompts">AI 프롬프트</option>
-                          <option value="coding_templates">코딩 템플릿</option>
-                          <option value="tech_guides">기술 가이드</option>
-                          <option value="ai_workflows">AI 스킬/워크플로</option>
-                          <option value="data_analytics">데이터/분석</option>
-                          <option value="others">기타</option>
+                          <option value="ai_prompts">AI prompts</option>
+                          <option value="coding_templates">Coding templates</option>
+                          <option value="tech_guides">Tech guides</option>
+                          <option value="ai_workflows">AI workflows</option>
+                          <option value="data_analytics">Data analytics</option>
+                          <option value="others">Other</option>
                         </select>
                       </div>
                     </div>
@@ -1532,14 +1532,14 @@ export default function NewStoryPage() {
                   const previewContent =
                     field.value && field.value.trim().length > 0
                       ? field.value
-                      : '미리보기 내용이 여기에 표시됩니다.';
+                      : 'The preview will appear here.';
 
                   return (
                     <FormItem>
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
                           <Plus className="h-3 w-3" />
-                          <span>본문 작성</span>
+                          <span>Write your post</span>
                         </div>
                         <div className="inline-flex rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1 text-xs font-medium">
                           {(['rich', 'markdown'] as EditorMode[]).map((mode) => (
@@ -1554,12 +1554,12 @@ export default function NewStoryPage() {
                               }`}
                               disabled={editorMode === mode || isSwitchingEditorMode}
                             >
-                              {mode === 'rich' ? '리치 텍스트' : 'Markdown'}
+                              {mode === 'rich' ? 'Rich text' : 'Markdown'}
                             </button>
                           ))}
                           {isSwitchingEditorMode && (
                             <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
-                              전환 중...
+                              Switching...
                             </span>
                           )}
                         </div>
@@ -1591,7 +1591,7 @@ export default function NewStoryPage() {
                                 disabled={isMarkdownImageUploading}
                               >
                                 <ImageIcon className="h-4 w-4 mr-1.5" />
-                                이미지 업로드
+                                Upload image
                               </Button>
                               <Button
                                 type="button"
@@ -1601,7 +1601,7 @@ export default function NewStoryPage() {
                                 disabled={isMarkdownVideoUploading}
                               >
                                 <Film className="h-4 w-4 mr-1.5" />
-                                영상 업로드
+                                Upload video
                               </Button>
                               <GithubResourcePopover
                                 githubUrl={form.watch('githubUrl') ?? ''}
@@ -1614,14 +1614,14 @@ export default function NewStoryPage() {
                                   variant="outline"
                                   size="sm"
                                   className="px-2.5"
-                                  title="GitHub 리소스"
+                                  title="GitHub resource"
                                 >
                                   <Github className="h-4 w-4" />
                                 </Button>
                               </GithubResourcePopover>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 업로드 중...
+                                  Uploading image...
                                 </span>
                               )}
                               {markdownVideoStatusMessage && (
@@ -1630,7 +1630,7 @@ export default function NewStoryPage() {
                                 </span>
                               )}
                               <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                업로드 시 아래 목록에서 썸네일을 고를 수 있어요.
+                                After uploading, you can choose a thumbnail from the list below.
                               </span>
                             </div>
                             <div className="space-y-4">
@@ -1640,22 +1640,22 @@ export default function NewStoryPage() {
                                   ref={markdownEditorRef}
                                   content={field.value}
                                   onChange={(value) => field.onChange(value)}
-                                  placeholder="Markdown 문법으로 본문을 작성하세요..."
+                                  placeholder="Write your post in Markdown..."
                                   className="min-h-[260px] lg:min-h-[360px] resize-y"
                                 />
                               </div>
                               <div className="space-y-1">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  기본 Markdown 문법을 지원하며, 저장 시 서버에서 안전하게 HTML로 변환됩니다.
+                                  Standard Markdown syntax is supported and safely converted to HTML when you save.
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 링크를 붙여넣으면 자동으로 <code>![이미지]</code> 형식으로 바뀝니다.
+                                  Pasted image links are automatically converted to <code>![image]</code> format.
                                 </p>
                               </div>
                               <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 lg:p-6 bg-white dark:bg-gray-900">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between">
-                                  <span>실시간 미리보기</span>
-                                  <span className="text-[11px] text-gray-400 dark:text-gray-500">이미지, 표, 코드까지 즉시 반영돼요.</span>
+                                  <span>Live preview</span>
+                                  <span className="text-[11px] text-gray-400 dark:text-gray-500">Images, tables, and code update instantly.</span>
                                 </p>
                                 <HtmlContentRenderer
                                   content={convertMarkdownToHtml(previewContent)}
@@ -1667,15 +1667,15 @@ export default function NewStoryPage() {
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  업로드한 이미지
+                                  Uploaded images
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  썸네일은 업로드한 이미지 또는 YouTube 영상에서 선택됩니다.
+                                  Thumbnails can be selected from uploaded images or YouTube videos.
                                 </span>
                               </div>
                               {isResolvingFileMetadata && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 정보를 불러오는 중입니다...
+                                  Loading image details...
                                 </p>
                               )}
                               {markdownImages.length > 0 ? (
@@ -1691,17 +1691,17 @@ export default function NewStoryPage() {
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  업로드한 이미지가 없습니다. 위의 버튼으로 이미지를 추가하면 여기에서 미리보고 썸네일을 지정할 수 있어요.
+                                  No uploaded images yet. Add one above to preview it here and use it as the thumbnail.
                                 </p>
                               )}
                             </div>
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  본문 내 YouTube
+                                  YouTube in this post
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  YouTube 링크가 있으면 여기서 썸네일로 선택할 수 있어요.
+                                  If the post contains a YouTube link, you can choose it as the thumbnail here.
                                 </span>
                               </div>
                               {markdownYouTubeIds.length > 0 ? (
@@ -1717,7 +1717,7 @@ export default function NewStoryPage() {
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  본문에 YouTube 링크를 추가하면 목록에 표시됩니다.
+                                  Add a YouTube link to the post and it will appear here.
                                 </p>
                               )}
                             </div>
@@ -1748,7 +1748,7 @@ export default function NewStoryPage() {
                                 key="blog-editor-stable"
                                 content={field.value}
                                 onChange={field.onChange}
-                                placeholder=" 내용을 입력하세요..."
+                                placeholder="Start writing..."
                                 initialThumbnailIndex={thumbnailIndex}
                                 onThumbnailIndexChange={handleThumbnailChange}
                                 onFileIdsChange={handleFileIdsChange}
@@ -1772,7 +1772,7 @@ export default function NewStoryPage() {
                             type="button"
                             onClick={() => form.clearErrors('content')}
                             className="p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                            aria-label="닫기"
+                            aria-label="Close"
                           >
                             <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                           </button>
@@ -1791,20 +1791,20 @@ export default function NewStoryPage() {
               <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                  외부 이미지 사용 불가
+                  External images are not allowed
                 </p>
                 <p className="text-sm text-red-700 dark:text-red-300 mt-1">
                   {contentSecurityError}
                 </p>
                 <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-2">
-                  이미지를 직접 업로드하거나, 허용된 도메인의 이미지만 사용해주세요.
+                  Upload the image directly or use images from an allowed domain.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setContentSecurityError(null)}
                 className="p-1 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                aria-label="닫기"
+                aria-label="Close"
               >
                 <X className="h-4 w-4 text-red-600 dark:text-red-400" />
               </button>
@@ -1815,7 +1815,7 @@ export default function NewStoryPage() {
           {hasPendingVideoUploads && (
             <p className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 pt-2">
               <AlertCircle className="h-4 w-4" />
-              <span>{videoUploadStatusText ?? '비디오 업로드와 처리가 완료될 때까지 기다려주세요.'}</span>
+              <span>{videoUploadStatusText ?? 'Please wait for video uploads and processing to finish.'}</span>
             </p>
           )}
 
@@ -1826,7 +1826,7 @@ export default function NewStoryPage() {
               onClick={() => router.back()}
               disabled={isMutationPending}
             >
-              취소
+              Cancel
             </Button>
             <Button
               type="button"
@@ -1836,7 +1836,7 @@ export default function NewStoryPage() {
                 // 임시저장 (isPublished: false로 저장)
                 const data = form.getValues();
                 if (!data.title?.trim()) {
-                  setTitleError('제목을 입력해주세요.');
+                  setTitleError('Enter a title.');
                   return;
                 }
                 setTitleError(null);
@@ -1859,7 +1859,7 @@ export default function NewStoryPage() {
                     
                     const postData: any = {
                       title: data.title,
-                      category: categoryString || '기타',
+                      category: categoryString || 'other',
                       tags: data.tags,
                       githubUrl: data.githubUrl?.trim() ?? '',
                       githubDescription: data.githubDescription?.trim() ?? '',
@@ -1897,11 +1897,11 @@ export default function NewStoryPage() {
                   }
                   
                   clearDraft();
-                  toast.success('초안이 저장되었습니다.');
+                  toast.success('Draft saved.');
                   router.push('/drafts');
                 } catch (error) {
                   console.error('Failed to save draft:', error);
-                  toast.error('초안 저장에 실패했습니다.');
+                  toast.error('Failed to save the draft.');
                 } finally {
                   isSubmittingRef.current = false;
                   setIsSubmitting(false);
@@ -1910,7 +1910,7 @@ export default function NewStoryPage() {
               className="flex items-center justify-center gap-1.5"
             >
               <FileText className="h-4 w-4" />
-              임시저장
+              Save draft
             </Button>
             <Button
               type="submit"
@@ -1921,19 +1921,19 @@ export default function NewStoryPage() {
                   e.preventDefault();
                   e.stopPropagation();
                   if (hasPendingVideoUploads) {
-                    toast.warning('비디오 업로드/처리가 끝난 후에 저장할 수 있습니다.');
+                    toast.warning('You can save after video upload and processing finish.');
                   }
                 }
               }}
               className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 min-w-[88px] text-[13px] font-semibold rounded-md bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-gray-100 shadow-lg"
-              aria-label={isSaving ? "저장 중" : "저장"}
+              aria-label={isSaving ? "Saving" : "Save"}
             >
               {isSaving ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  저장
+                  Save
                 </>
               )}
             </Button>
@@ -1952,9 +1952,9 @@ export default function NewStoryPage() {
             executeEditorModeChange(pendingEditorMode);
           }
         }}
-        title="편집 모드 변경"
-        description="편집 모드를 변경하면 일부 서식이 변환되거나 유실될 수 있습니다. 계속하시겠습니까?"
-        confirmText="계속하기"
+        title="Change editor mode"
+        description="Switching editor mode may convert or remove some formatting. Do you want to continue?"
+        confirmText="Continue"
       />
     </div>
   );
@@ -1979,7 +1979,7 @@ function BlogCategoryField({ field, disabled = false }: BlogCategoryFieldProps) 
     const trimmed = value.trim().replace(/,/g, '');
     if (!trimmed) return;
     if (trimmed.length > 15) {
-      toast.error('카테고리는 최대 15글자까지 입력 가능합니다.');
+      toast.error('Category must be 15 characters or fewer.');
       return;
     }
     if (categories.length < 2 && !categories.includes(trimmed) && !trimmed.includes('/')) {
@@ -2020,16 +2020,16 @@ function BlogCategoryField({ field, disabled = false }: BlogCategoryFieldProps) 
       {showLabel && (
         <>
           <div className="mb-2 lg:hidden">
-            <span className="text-xs text-gray-700 dark:text-gray-100">카테고리</span>
-            <div className="text-[11px] text-gray-500 dark:text-gray-400">(필수)</div>
+            <span className="text-xs text-gray-700 dark:text-gray-100">Category</span>
+            <div className="text-[11px] text-gray-500 dark:text-gray-400">(Required)</div>
           </div>
           <div className="hidden lg:block absolute -left-24 top-3">
             <div className="flex flex-col text-gray-700 dark:text-gray-100">
               <div className="flex items-center gap-2 text-sm whitespace-nowrap">
                 <Plus className="h-3 w-3" />
-                <span>카테고리</span>
+                <span>Category</span>
               </div>
-              <div className="ml-5 text-[11px] text-gray-500 dark:text-gray-400">(필수)</div>
+              <div className="ml-5 text-[11px] text-gray-500 dark:text-gray-400">(Required)</div>
             </div>
           </div>
         </>
@@ -2049,8 +2049,8 @@ function BlogCategoryField({ field, disabled = false }: BlogCategoryFieldProps) 
               className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm"
             >
               <span>{category}</span>
-              {index === 0 && <span className="text-xs text-gray-500 dark:text-gray-400">(메인)</span>}
-              {index === 1 && <span className="text-xs text-gray-500 dark:text-gray-400">(서브)</span>}
+              {index === 0 && <span className="text-xs text-gray-500 dark:text-gray-400">(Primary)</span>}
+              {index === 1 && <span className="text-xs text-gray-500 dark:text-gray-400">(Secondary)</span>}
               <button
                 type="button"
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -2074,18 +2074,18 @@ function BlogCategoryField({ field, disabled = false }: BlogCategoryFieldProps) 
           onFocus={() => setIsFocused(true)}
           onBlur={handleBlur}
           disabled={disabled || isMaxReached}
-          placeholder={isMaxReached ? '최대 2개까지 입력 가능합니다' : '입력 후 엔터 또는 콤마로 구분'}
+          placeholder={isMaxReached ? 'You can add up to 2 categories' : 'Press Enter or use commas to add categories'}
           className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[280px] !bg-transparent !rounded-none placeholder:text-gray-500 dark:placeholder:text-gray-300 text-gray-900 dark:text-gray-50"
           style={{ width: inputValue ? `${Math.max(280, inputValue.length * 14)}px` : '280px' }}
         />
         {!inputValue && categories.length === 0 && (
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-1">
-            최대 2개 입력 가능 (메인, 서브)
+            Up to 2 categories (primary and secondary)
           </p>
         )}
         {isMaxReached && (
           <p className="text-xs text-orange-500 dark:text-orange-400 mt-1 pl-1">
-            카테고리는 최대 2개까지만 입력 가능합니다
+            You can add up to 2 categories
           </p>
         )}
       </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { FiBell } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 /**
  * 프로모션 캐러셀 섹션 컴포넌트
@@ -15,18 +16,20 @@ import SidebarSection from './SidebarSection';
  * - 데스크톱 전용 (lg 이상)
  */
 const PromoCarouselSection = React.memo(function PromoCarouselSection() {
+  const { locale, href } = useLocaleContext();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
   // 슬라이드 데이터
-  const slides = [
+  const slides = locale === 'ko'
+    ? [
     {
       id: 'mcp-auto-posting',
       icon: FiBell,
       title: 'MCP 자동 포스팅',
       description: 'AI 와 MCP 를 연결하여 Idea 를 자동으로 포스팅 할 수 있습니다.',
       ctaText: 'MCP 알아보기',
-      ctaLink: '/product',
+      ctaLink: href('/product'),
       styles: [] as { name: string; emoji: string; color: string }[],
     },
     {
@@ -35,7 +38,43 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
       title: 'Writing Styles',
       description: '현재 제공 중인 8개 스타일 가이드와 예시 프롬프트를 확인할 수 있습니다.',
       ctaText: '스타일 가이드 보기',
-      ctaLink: '/docs/writing-styles',
+      ctaLink: href('/docs/writing-styles'),
+      styles: [
+        {
+          name: 'Novel',
+          emoji: '📖',
+          color: 'bg-transparent text-[#4B5563] border border-[#D9E0EA] dark:border-[#4B5563] dark:text-[#C7D1DD]'
+        },
+        {
+          name: 'PM',
+          emoji: '🧭',
+          color: 'bg-transparent text-[#4B5563] border border-[#D9E0EA] dark:border-[#4B5563] dark:text-[#C7D1DD]'
+        },
+        {
+          name: 'Marketer',
+          emoji: '📈',
+          color: 'bg-transparent text-[#4B5563] border border-[#D9E0EA] dark:border-[#4B5563] dark:text-[#C7D1DD]'
+        },
+      ],
+    },
+  ]
+    : [
+    {
+      id: 'mcp-auto-posting',
+      icon: FiBell,
+      title: 'MCP publishing',
+      description: 'Connect AI tools to MCP and turn ideas into published posts automatically.',
+      ctaText: 'Learn about MCP',
+      ctaLink: href('/product'),
+      styles: [] as { name: string; emoji: string; color: string }[],
+    },
+    {
+      id: 'writing-styles',
+      icon: FiBell,
+      title: 'Writing Styles',
+      description: 'Browse the 8 available style guides and example prompts.',
+      ctaText: 'View style guides',
+      ctaLink: href('/docs/writing-styles'),
       styles: [
         {
           name: 'Novel',
@@ -156,7 +195,7 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
                     ? 'w-6 h-2 bg-[#264653] dark:bg-[#6CC3B2]'
                     : 'w-2 h-2 bg-[#D9E0EA] dark:bg-[#2A3645] hover:bg-[#C9D3E0] dark:hover:bg-[#223040]'
                 }`}
-                aria-label={`슬라이드 ${index + 1}로 이동`}
+                aria-label={locale === 'ko' ? `슬라이드 ${index + 1}로 이동` : `Go to slide ${index + 1}`}
               />
             ))}
           </div>

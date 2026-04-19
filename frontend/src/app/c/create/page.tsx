@@ -124,10 +124,10 @@ export default function CreateCommunityPage() {
   // 슬러그 유효성 검사
   const slugError = useMemo(() => {
     if (!slug) return null;
-    if (slug.length < 3) return '슬러그는 3자 이상이어야 합니다.';
-    if (slug.length > 30) return '슬러그는 30자 이하여야 합니다.';
-    if (!SLUG_REGEX.test(slug)) return '소문자, 숫자, 언더스코어만 사용 가능합니다.';
-    if (RESERVED_SLUGS.includes(slug)) return '사용할 수 없는 슬러그입니다.';
+    if (slug.length < 3) return 'Slug must be at least 3 characters.';
+    if (slug.length > 30) return 'Slug must be 30 characters or fewer.';
+    if (!SLUG_REGEX.test(slug)) return 'Use lowercase letters, numbers, and underscores only.';
+    if (RESERVED_SLUGS.includes(slug)) return 'This slug is reserved.';
     return null;
   }, [slug]);
 
@@ -137,7 +137,7 @@ export default function CreateCommunityPage() {
     if (file) {
       // 파일 크기 검사 (최대 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setErrors((prev) => ({ ...prev, icon: '이미지 크기는 5MB 이하여야 합니다.' }));
+        setErrors((prev) => ({ ...prev, icon: 'Image size must be 5MB or less.' }));
         return;
       }
       setIconFile(file);
@@ -152,7 +152,7 @@ export default function CreateCommunityPage() {
     if (file) {
       // 파일 크기 검사 (최대 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        setErrors((prev) => ({ ...prev, banner: '이미지 크기는 10MB 이하여야 합니다.' }));
+        setErrors((prev) => ({ ...prev, banner: 'Image size must be 10MB or less.' }));
         return;
       }
       setBannerFile(file);
@@ -194,11 +194,11 @@ export default function CreateCommunityPage() {
     // 유효성 검사
     const newErrors: Record<string, string> = {};
     if (!name.trim()) {
-      newErrors.name = '커뮤니티 이름을 입력해주세요.';
+      newErrors.name = 'Enter a community name.';
     } else if (name.length < 3) {
-      newErrors.name = '이름은 3자 이상이어야 합니다.';
+      newErrors.name = 'Name must be at least 3 characters.';
     } else if (name.length > 50) {
-      newErrors.name = '이름은 50자 이하여야 합니다.';
+      newErrors.name = 'Name must be 50 characters or fewer.';
     }
 
     if (slugError) {
@@ -274,26 +274,26 @@ export default function CreateCommunityPage() {
           const failedUploads = uploadResults.filter(r => !r.success);
           if (failedUploads.length > 0) {
             const failedTypes = failedUploads
-              .map(f => f.type === 'icon' ? '아이콘' : '배너')
+              .map(f => f.type === 'icon' ? 'icon' : 'banner')
               .join(', ');
             const errorDetails = failedUploads
               .map(f => `${f.type}: ${f.error}`)
               .join('\n');
 
-            console.error('이미지 업로드 실패:', errorDetails);
+            console.error('Image upload failed:', errorDetails);
 
             // 사용자에게 알림 (커뮤니티는 생성됨)
             alert(
-              `${failedTypes} 이미지 업로드에 실패했습니다.\n` +
-              `커뮤니티 설정에서 다시 업로드해주세요.\n\n` +
-              `오류 상세:\n${errorDetails}`
+              `Failed to upload the following images: ${failedTypes}.\n` +
+              `You can upload them again from community settings.\n\n` +
+              `Error details:\n${errorDetails}`
             );
           }
         } catch (uploadError) {
           // 예상치 못한 에러 처리
-          const errorMessage = uploadError instanceof Error ? uploadError.message : '알 수 없는 오류';
-          console.error('이미지 업로드 중 예외 발생:', errorMessage);
-          alert(`이미지 업로드 중 오류가 발생했습니다: ${errorMessage}`);
+          const errorMessage = uploadError instanceof Error ? uploadError.message : 'Unknown error';
+          console.error('Unexpected error during image upload:', errorMessage);
+          alert(`An error occurred while uploading images: ${errorMessage}`);
         } finally {
           setIsUploadingImages(false);
         }
@@ -310,20 +310,20 @@ export default function CreateCommunityPage() {
   const joinPolicyOptions = [
     {
       value: JoinPolicy.OPEN,
-      label: '공개',
-      description: '누구나 자유롭게 가입할 수 있습니다.',
+      label: 'Open',
+      description: 'Anyone can join instantly.',
       icon: Globe,
     },
     {
       value: JoinPolicy.RESTRICTED,
-      label: '제한',
-      description: '매니저의 승인이 필요합니다.',
+      label: 'Restricted',
+      description: 'New members must be approved by moderators.',
       icon: Shield,
     },
     {
       value: JoinPolicy.PRIVATE,
-      label: '비공개',
-      description: '초대를 받은 사용자만 가입할 수 있습니다.',
+      label: 'Private',
+      description: 'Only invited users can join.',
       icon: Lock,
     },
   ];
@@ -360,7 +360,7 @@ export default function CreateCommunityPage() {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                커뮤니티 만들기
+                Create community
               </h1>
             </div>
             <Button
@@ -370,10 +370,10 @@ export default function CreateCommunityPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  생성 중...
+                  Creating...
                 </>
               ) : (
-                '만들기'
+                'Create'
               )}
             </Button>
           </div>
@@ -385,7 +385,7 @@ export default function CreateCommunityPage() {
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* 배너 이미지 */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">배너 이미지</Label>
+            <Label className="text-sm font-medium">Banner image</Label>
             <div className="relative">
               <div
                 className={cn(
@@ -399,7 +399,7 @@ export default function CreateCommunityPage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={bannerPreview}
-                      alt="배너 미리보기"
+                      alt="Banner preview"
                       className="w-full h-full object-cover"
                     />
                     <button
@@ -416,8 +416,8 @@ export default function CreateCommunityPage() {
                 ) : (
                   <div className="text-center">
                     <Camera className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-500">배너 이미지 추가</p>
-                    <p className="text-xs text-gray-400">권장: 1500x500px</p>
+                    <p className="text-sm text-gray-500">Add a banner image</p>
+                    <p className="text-xs text-gray-400">Recommended: 1500x500px</p>
                   </div>
                 )}
               </div>
@@ -436,7 +436,7 @@ export default function CreateCommunityPage() {
 
           {/* 아이콘 이미지 */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">아이콘</Label>
+            <Label className="text-sm font-medium">Icon</Label>
             <div className="flex items-center gap-4">
               <div
                 className={cn(
@@ -450,7 +450,7 @@ export default function CreateCommunityPage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={iconPreview}
-                      alt="아이콘 미리보기"
+                      alt="Icon preview"
                       className="w-full h-full object-cover"
                     />
                     <button
@@ -475,9 +475,9 @@ export default function CreateCommunityPage() {
                   size="sm"
                   onClick={() => document.getElementById('icon-input')?.click()}
                 >
-                  {iconPreview ? '변경' : '업로드'}
+                  {iconPreview ? 'Change' : 'Upload'}
                 </Button>
-                <p className="text-xs text-gray-400 mt-1">권장: 256x256px</p>
+                <p className="text-xs text-gray-400 mt-1">Recommended: 256x256px</p>
               </div>
               <input
                 id="icon-input"
@@ -495,13 +495,13 @@ export default function CreateCommunityPage() {
           {/* 이름 */}
           <div className="space-y-2">
             <Label htmlFor="name" className="text-sm font-medium">
-              커뮤니티 이름 <span className="text-red-500">*</span>
+              Community name <span className="text-red-500">*</span>
             </Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="예: 프로그래밍 토론방"
+              placeholder="e.g. builders_hub"
               maxLength={50}
               className={cn(errors.name && 'border-red-500')}
               disabled={isSubmitting}
@@ -510,7 +510,7 @@ export default function CreateCommunityPage() {
               {errors.name ? (
                 <span className="text-red-500">{errors.name}</span>
               ) : (
-                <span className="text-gray-400">커뮤니티의 표시 이름</span>
+                <span className="text-gray-400">This is the public display name.</span>
               )}
               <span className="text-gray-400">{name.length}/50</span>
             </div>
@@ -519,7 +519,7 @@ export default function CreateCommunityPage() {
           {/* 슬러그 */}
           <div className="space-y-2">
             <Label htmlFor="slug" className="text-sm font-medium">
-              슬러그 (URL) <span className="text-red-500">*</span>
+              Slug (URL) <span className="text-red-500">*</span>
             </Label>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-500 dark:text-gray-400">c/</span>
@@ -552,9 +552,9 @@ export default function CreateCommunityPage() {
               {errors.slug || slugError ? (
                 <span className="text-red-500">{errors.slug || slugError}</span>
               ) : isSlugAvailable === false ? (
-                <span className="text-red-500">이미 사용 중인 슬러그입니다.</span>
+                <span className="text-red-500">That slug is already taken.</span>
               ) : (
-                <span className="text-gray-400">소문자, 숫자, 언더스코어만 사용 가능</span>
+                <span className="text-gray-400">Lowercase letters, numbers, and underscores only.</span>
               )}
               <span className="text-gray-400">{slug.length}/30</span>
             </div>
@@ -563,13 +563,13 @@ export default function CreateCommunityPage() {
           {/* 설명 */}
           <div className="space-y-2">
             <Label htmlFor="description" className="text-sm font-medium">
-              설명
+              Description
             </Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="이 커뮤니티에 대해 설명해주세요..."
+              placeholder="What is this community about?"
               maxLength={500}
               rows={4}
               className="resize-none"
@@ -582,7 +582,7 @@ export default function CreateCommunityPage() {
 
           {/* 가입 정책 */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">가입 정책</Label>
+            <Label className="text-sm font-medium">Join policy</Label>
             <div className="grid gap-3">
               {joinPolicyOptions.map((option) => {
                 const Icon = option.icon;
@@ -634,9 +634,9 @@ export default function CreateCommunityPage() {
           <div className="space-y-4 bg-white dark:bg-[rgb(38,38,38)] border border-gray-200 dark:border-gray-700 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-sm font-medium">NSFW 커뮤니티</Label>
+                <Label className="text-sm font-medium">NSFW community</Label>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  성인용 또는 민감한 콘텐츠를 다루는 커뮤니티
+                  For adult or sensitive content.
                 </p>
               </div>
               <Switch
@@ -647,9 +647,9 @@ export default function CreateCommunityPage() {
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-sm font-medium">커뮤니티 목록/검색 노출</Label>
+                <Label className="text-sm font-medium">Show community in lists and search</Label>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  커뮤니티 목록과 검색 결과에 표시됩니다. 끄면 링크로만 접근할 수 있습니다.
+                  If disabled, people can only access it with a direct link.
                 </p>
               </div>
               <Switch
@@ -660,9 +660,9 @@ export default function CreateCommunityPage() {
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-sm font-medium">커뮤니티 게시물 노출</Label>
+                <Label className="text-sm font-medium">Show posts across discovery surfaces</Label>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  홈피드, 검색, 트렌딩 영역에 게시물이 표시됩니다.
+                  Posts can appear on the home feed, search, and trending surfaces.
                 </p>
               </div>
               <Switch
@@ -673,7 +673,7 @@ export default function CreateCommunityPage() {
             </div>
             {isVisibilityLocked && (
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                비공개 커뮤니티는 멤버만 접근할 수 있어 노출 설정이 비활성화됩니다.
+                Private communities are member-only, so discovery toggles are disabled.
               </p>
             )}
           </div>
@@ -687,14 +687,14 @@ export default function CreateCommunityPage() {
               className="flex-1"
               disabled={isSubmitting}
             >
-              취소
+              Cancel
             </Button>
             <Button
               type="submit"
               className="flex-1"
               disabled={isSubmitting || !name.trim() || !slug || !!slugError}
             >
-              {isSubmitting ? '생성 중...' : '만들기'}
+              {isSubmitting ? 'Creating...' : 'Create'}
             </Button>
           </div>
         </form>

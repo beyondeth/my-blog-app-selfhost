@@ -10,25 +10,31 @@ import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
 import { PUBLIC_USE_CASES } from '@/lib/public-site';
 import { usePublicDocsSidebarStore } from '@/stores/publicDocsSidebarStore';
 import { PUBLIC_SITE_HEADER_HEIGHT_CLASS } from './layoutConstants';
+import { useLocaleContext } from '@/providers/LocaleProvider';
+import { FEATURES } from '@/lib/features';
+import { stripLocalePrefix } from '@/lib/i18n/config';
 
 type DropdownKey = 'useCases' | null;
 
 function isActivePath(pathname: string, href: string) {
+  const normalizedPathname = stripLocalePrefix(pathname);
   const [basePath] = href.split('#');
   if (basePath === '/product' || basePath === '/pricing' || basePath === '/docs') {
-    return pathname === basePath;
+    return normalizedPathname === basePath;
   }
-  return pathname.startsWith(basePath);
+  return normalizedPathname.startsWith(basePath);
 }
 
 export default function PublicSiteHeader() {
   const pathname = usePathname();
+  const normalizedPathname = stripLocalePrefix(pathname || '/');
+  const { t, href } = useLocaleContext();
   const { user } = useAuth();
   const { toggleSidebar } = usePublicDocsSidebarStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<DropdownKey>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const isDocsDetailRoute = pathname.startsWith('/docs/');
+  const isDocsDetailRoute = normalizedPathname.startsWith('/docs/');
 
   useEffect(() => {
     setMobileOpen(false);
@@ -46,8 +52,8 @@ export default function PublicSiteHeader() {
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, []);
 
-  const primaryCtaHref = user ? '/' : '/register';
-  const primaryCtaLabel = user ? 'Open app' : '시작하기';
+  const primaryCtaHref = user ? '/' : href('/register');
+  const primaryCtaLabel = user ? t('publicSite.header.openApp') : t('publicSite.header.getStarted');
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-white dark:bg-[#0E141B]">
@@ -61,7 +67,7 @@ export default function PublicSiteHeader() {
               type="button"
               onClick={toggleSidebar}
               className="hidden lg:flex items-center justify-center w-10 h-10 rounded-full border border-[#D9E0EA] bg-white text-[#1B2430] transition-colors hover:bg-[#F7F9FC] dark:border-[#2A3645] dark:bg-[#0E141B] dark:text-[#E6EDF3] dark:hover:bg-[#1A232E]"
-              aria-label="문서 사이드바 토글"
+              aria-label={t('publicSite.header.docsSidebar')}
             >
               <Image
                 src="/assets/left-sidebar/menu.svg"
@@ -75,7 +81,7 @@ export default function PublicSiteHeader() {
             <div className="hidden lg:block w-10 h-10" aria-hidden="true" />
           )}
 
-          <Link href="/product" className="flex shrink-0 items-center space-x-2">
+          <Link href={href('/product')} className="flex shrink-0 items-center space-x-2">
             <div className="flex min-h-[36px] min-w-[36px] items-center justify-center md:min-h-[48px] md:min-w-[48px]">
               <Image
                 src="/assets/logo.svg"
@@ -96,62 +102,76 @@ export default function PublicSiteHeader() {
 
           <nav className="hidden items-center gap-1.5 md:flex">
             <Link
-              href="/product#features"
+              href={href('/product#features')}
               className={`rounded-full px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
-                isActivePath(pathname, '/product#features')
+                isActivePath(pathname || '/', '/product#features')
                   ? 'bg-white/80 text-[#111827] shadow-[inset_0_0_0_1px_rgba(16,24,40,0.07)] dark:bg-white/10 dark:text-white dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
                   : 'text-[#526477] hover:bg-white/70 hover:text-[#111827] dark:text-[#A9B8C8] dark:hover:bg-white/8 dark:hover:text-white'
               }`}
             >
-              Features
+              {t('publicSite.header.features')}
             </Link>
 
             <div className="relative">
-            <button
-              type="button"
-              onClick={() => setOpenDropdown((prev) => (prev === 'useCases' ? null : 'useCases'))}
-              className="inline-flex items-center gap-1 rounded-full px-3.5 py-2.5 text-[13px] font-medium text-[#526477] transition-colors hover:bg-white/70 hover:text-[#111827] dark:text-[#A9B8C8] dark:hover:bg-white/8 dark:hover:text-white"
-            >
-                Use Cases
+              <button
+                type="button"
+                onClick={() => setOpenDropdown((prev) => (prev === 'useCases' ? null : 'useCases'))}
+                className="inline-flex items-center gap-1 rounded-full px-3.5 py-2.5 text-[13px] font-medium text-[#526477] transition-colors hover:bg-white/70 hover:text-[#111827] dark:text-[#A9B8C8] dark:hover:bg-white/8 dark:hover:text-white"
+              >
+                {t('publicSite.header.useCases')}
                 <ChevronDown className={`h-4 w-4 transition-transform ${openDropdown === 'useCases' ? 'rotate-180' : ''}`} />
               </button>
 
-              {openDropdown === 'useCases' && (
+              {openDropdown === 'useCases' ? (
                 <div className="absolute left-0 top-[calc(100%+10px)] w-[320px] rounded-[24px] border border-[#dce5f2] bg-[rgba(255,255,255,0.96)] p-3 shadow-[0_28px_64px_-32px_rgba(16,24,40,0.28)] backdrop-blur dark:border-[#223244] dark:bg-[rgba(15,23,34,0.97)]">
                   {PUBLIC_USE_CASES.map((item) => (
                     <Link
                       key={item.href}
-                      href={item.href}
+                      href={href(item.href)}
                       className="block rounded-2xl px-4 py-3 transition-colors hover:bg-[#F5F8FC] dark:hover:bg-[#162231]"
                     >
-                      <div className="text-sm font-semibold text-[#101828] dark:text-white">{item.label}</div>
-                      <div className="mt-1 text-sm leading-6 text-[#61758A] dark:text-[#9FB2C6]">{item.description}</div>
+                      <div className="text-sm font-semibold text-[#101828] dark:text-white">{t(item.labelKey)}</div>
+                      <div className="mt-1 text-sm leading-6 text-[#61758A] dark:text-[#9FB2C6]">
+                        {item.descriptionKey ? t(item.descriptionKey) : ''}
+                      </div>
                     </Link>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
 
+            {FEATURES.SUBSCRIPTION ? (
+              <Link
+                href={href('/pricing')}
+                className={`rounded-full px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
+                  isActivePath(pathname || '/', '/pricing')
+                    ? 'bg-white/80 text-[#111827] shadow-[inset_0_0_0_1px_rgba(16,24,40,0.07)] dark:bg-white/10 dark:text-white dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                    : 'text-[#526477] hover:bg-white/70 hover:text-[#111827] dark:text-[#A9B8C8] dark:hover:bg-white/8 dark:hover:text-white'
+                }`}
+              >
+                {t('publicSite.header.pricing')}
+              </Link>
+            ) : null}
             <Link
-              href="/pricing"
+              href={href('/c')}
               className={`rounded-full px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
-                isActivePath(pathname, '/pricing')
+                isActivePath(pathname || '/', '/c')
                   ? 'bg-white/80 text-[#111827] shadow-[inset_0_0_0_1px_rgba(16,24,40,0.07)] dark:bg-white/10 dark:text-white dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
                   : 'text-[#526477] hover:bg-white/70 hover:text-[#111827] dark:text-[#A9B8C8] dark:hover:bg-white/8 dark:hover:text-white'
               }`}
             >
-              Pricing
+              {t('publicSite.header.community')}
             </Link>
 
             <Link
-              href="/docs"
+              href={href('/docs')}
               className={`rounded-full px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
-                isActivePath(pathname, '/docs')
+                isActivePath(pathname || '/', '/docs')
                   ? 'bg-white/80 text-[#111827] shadow-[inset_0_0_0_1px_rgba(16,24,40,0.07)] dark:bg-white/10 dark:text-white dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
                   : 'text-[#526477] hover:bg-white/70 hover:text-[#111827] dark:text-[#A9B8C8] dark:hover:bg-white/8 dark:hover:text-white'
               }`}
             >
-              Docs
+              {t('publicSite.header.docs')}
             </Link>
           </nav>
         </div>
@@ -172,32 +192,39 @@ export default function PublicSiteHeader() {
             type="button"
             onClick={() => setMobileOpen((prev) => !prev)}
             className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#D9E0EA] bg-white text-[#1B2430] transition-colors hover:bg-[#F7F9FC] dark:border-[#2A3645] dark:bg-[#0E141B] dark:text-[#E6EDF3] dark:hover:bg-[#1A232E]"
-            aria-label="공개 사이트 메뉴 열기"
+            aria-label={t('publicSite.header.mobileMenu')}
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
 
-      {mobileOpen && (
+      {mobileOpen ? (
         <div className="border-t border-[#E6ECF3] bg-white px-4 py-4 md:hidden dark:border-[#1E2B39] dark:bg-[#0E141B]">
           <div className="space-y-2">
-            <Link href="/product#features" className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
-              Features
+            <Link href={href('/product#features')} className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
+              {t('publicSite.header.features')}
             </Link>
             <div className="rounded-2xl border border-[#E6ECF3] p-3 dark:border-[#223244]">
-              <div className="px-1 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#6A7C90] dark:text-[#8FA5BA]">Use Cases</div>
+              <div className="px-1 pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#6A7C90] dark:text-[#8FA5BA]">
+                {t('publicSite.header.useCases')}
+              </div>
               {PUBLIC_USE_CASES.map((item) => (
-                <Link key={item.href} href={item.href} className="block rounded-2xl px-3 py-2 text-sm text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
-                  {item.label}
+                <Link key={item.href} href={href(item.href)} className="block rounded-2xl px-3 py-2 text-sm text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
+                  {t(item.labelKey)}
                 </Link>
               ))}
             </div>
-            <Link href="/pricing" className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
-              Pricing
+            {FEATURES.SUBSCRIPTION ? (
+              <Link href={href('/pricing')} className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
+                {t('publicSite.header.pricing')}
+              </Link>
+            ) : null}
+            <Link href={href('/c')} className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
+              {t('publicSite.header.community')}
             </Link>
-            <Link href="/docs" className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
-              Docs
+            <Link href={href('/docs')} className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
+              {t('publicSite.header.docs')}
             </Link>
             <Link
               href={primaryCtaHref}
@@ -207,7 +234,7 @@ export default function PublicSiteHeader() {
             </Link>
           </div>
         </div>
-      )}
+      ) : null}
     </header>
   );
 }

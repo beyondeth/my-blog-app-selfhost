@@ -69,7 +69,7 @@ export class WritingStyleService {
    */
   async loadStyle(style: string): Promise<string> {
     if (!this.isPreset(style)) {
-      throw new Error(`유효하지 않은 프리셋 스타일: ${style}. 사용 가능: ${this.PRESETS.join(', ')}`);
+      throw new Error(`Invalid preset style: ${style}. Available presets: ${this.PRESETS.join(', ')}`);
     }
     return await this.loadPresetStyle(style);
   }
@@ -98,13 +98,13 @@ export class WritingStyleService {
 
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      console.log(`✅ [WritingStyle] 프리셋 로드 성공: ${preset}`);
+      console.log(`✅ [WritingStyle] Preset loaded: ${preset}`);
       return content;
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        throw new Error(`프리셋 스타일을 찾을 수 없습니다: ${preset}`);
+        throw new Error(`Preset style not found: ${preset}`);
       }
-      throw new Error(`프리셋 스타일 로드 실패: ${error.message}`);
+      throw new Error(`Failed to load preset style: ${error.message}`);
     }
   }
 
@@ -119,7 +119,7 @@ export class WritingStyleService {
         .map((file) => file.replace('.md', ''));
       return this.PRESETS.filter((preset) => presets.includes(preset));
     } catch (error: any) {
-      console.error(`[WritingStyle] 프리셋 목록 조회 실패: ${error.message}`);
+      console.error(`[WritingStyle] Failed to list presets: ${error.message}`);
       return this.PRESETS; // 기본 프리셋 반환
     }
   }
@@ -165,11 +165,11 @@ export class WritingStyleService {
     try {
       const content = await fs.readFile(commonPath, 'utf-8');
       this.commonInstructionsCache = content;
-      console.log(`✅ [WritingStyle] 공통 지침 로드 완료`);
+      console.log(`✅ [WritingStyle] Common instructions loaded`);
       return content;
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        console.warn(`⚠️ [WritingStyle] _common.md 파일을 찾을 수 없습니다. 스타일별 파일만 사용합니다.`);
+        console.warn(`⚠️ [WritingStyle] _common.md was not found. Continuing with style-specific files only.`);
         return '';
       }
       throw error;
@@ -220,7 +220,7 @@ export class WritingStyleService {
       const writingStyle: WritingStyle = {
         metadata: {
           styleName: metadata.style_name || normalizedStyle,
-          language: metadata.language || 'korean',
+          language: metadata.language || 'english',
           minLength: metadata.min_length || 2000,
           targetLength: metadata.target_length || '3000-5000',
           codeBlockRatio: metadata.code_block_ratio || 0.2,
@@ -231,7 +231,7 @@ export class WritingStyleService {
           metadata.style_name || normalizedStyle,
           {
             styleName: metadata.style_name || normalizedStyle,
-            language: metadata.language || 'korean',
+            language: metadata.language || 'english',
             minLength: metadata.min_length || 2000,
             targetLength: metadata.target_length || '3000-5000',
             codeBlockRatio: metadata.code_block_ratio || 0.2,
@@ -245,17 +245,17 @@ export class WritingStyleService {
         improveMarkdownPrompt: sections['QUALITY CHECKLIST'] || '',
       };
 
-      console.log(`✅ [WritingStyle] 파싱 완료: ${writingStyle.metadata.styleName}`);
+      console.log(`✅ [WritingStyle] Parsed style: ${writingStyle.metadata.styleName}`);
       return writingStyle;
     } catch (error: any) {
-      console.error(`⚠️ [WritingStyle] ${normalizedStyle} 파싱 실패: ${error.message}`);
+      console.error(`⚠️ [WritingStyle] Failed to parse ${normalizedStyle}: ${error.message}`);
 
       // 무한 루프 방지: default 자체가 실패하면 에러 던지기
       if (normalizedStyle === 'default') {
-        throw new Error(`default.md 로드 실패: ${error.message}`);
+        throw new Error(`Failed to load default.md: ${error.message}`);
       }
 
-      console.log('📝 [WritingStyle] Fallback으로 default.md 로드');
+      console.log('📝 [WritingStyle] Falling back to default.md');
       return await this.loadAndParseStyle('default');
     }
   }
@@ -279,7 +279,7 @@ export class WritingStyleService {
       const writingStyle: WritingStyle = {
         metadata: {
           styleName: metadata.style_name || 'Custom Style',
-          language: metadata.language || 'korean',
+          language: metadata.language || 'english',
           minLength: metadata.min_length || 2000,
           targetLength: metadata.target_length || '3000-5000',
           codeBlockRatio: metadata.code_block_ratio || 0.2,
@@ -295,7 +295,7 @@ export class WritingStyleService {
           metadata.style_name || 'Custom Style',
           {
             styleName: metadata.style_name || 'Custom Style',
-            language: metadata.language || 'korean',
+            language: metadata.language || 'english',
             minLength: metadata.min_length || 2000,
             targetLength: metadata.target_length || '3000-5000',
             codeBlockRatio: metadata.code_block_ratio || 0.2,
@@ -312,11 +312,11 @@ export class WritingStyleService {
         improveMarkdownPrompt: sections['QUALITY CHECKLIST'] || '',
       };
 
-      console.log(`✅ [WritingStyle] 커스텀 마크다운 파싱 완료: ${writingStyle.metadata.styleName}`);
+      console.log(`✅ [WritingStyle] Parsed custom markdown style: ${writingStyle.metadata.styleName}`);
       return writingStyle;
     } catch (error: any) {
-      console.error(`⚠️ [WritingStyle] 커스텀 마크다운 파싱 실패: ${error.message}`);
-      console.log('📝 [WritingStyle] Fallback으로 default.md 로드');
+      console.error(`⚠️ [WritingStyle] Failed to parse custom markdown: ${error.message}`);
+      console.log('📝 [WritingStyle] Falling back to default.md');
       return await this.loadAndParseStyle('default');
     }
   }
@@ -441,8 +441,8 @@ export class WritingStyleService {
     fallbackBody?: string
   ): string {
     const aiTagRule = metadata.aiTagRequired
-      ? 'AI 태그를 포함합니다.'
-      : 'AI 태그는 선택 사항입니다.';
+      ? 'Include an AI identification tag.'
+      : 'The AI identification tag is optional.';
     const highlights = this.extractCompactHighlights(
       [
         sections['STYLE OVERVIEW'] || '',
@@ -455,10 +455,10 @@ export class WritingStyleService {
     return [
       '# Writing Style Brief',
       '',
-      `- 스타일: ${styleName}`,
-      `- 언어: ${metadata.language === 'korean' ? '한국어' : metadata.language}`,
+      `- Style: ${styleName}`,
+      `- Language: ${metadata.language}`,
       `- ${aiTagRule}`,
-      '- 아래 원칙을 우선 적용합니다.',
+      '- Prioritize the following rules.',
       ...highlights.map((line) => `- ${line}`),
     ].join('\n');
   }

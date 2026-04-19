@@ -38,31 +38,31 @@ export default function CommunityAdminLayout({
   const menuItems = [
     {
       href: `/c/${slug}/settings`,
-      label: '기본 설정',
+      label: 'General',
       icon: Settings,
       show: canManage,
     },
     {
       href: `/c/${slug}/members`,
-      label: '멤버 관리',
+      label: 'Members',
       icon: Users,
       show: canManageMembers, // ADMIN 이상만
     },
     {
       href: `/c/${slug}/settings/mod-tools`,
-      label: '안전 / 잠금',
+      label: 'Safety & lock',
       icon: ShieldAlert,
       show: canManage,
     },
     {
       href: `/c/${slug}/settings/widgets`,
-      label: '커뮤니티 위젯',
+      label: 'Widgets',
       icon: LayoutPanelLeft,
       show: canManage,
     },
     {
       href: `/c/${slug}/settings/analytics`,
-      label: '분석',
+      label: 'Analytics',
       icon: BarChart3,
       show: canManage,
     },
@@ -92,13 +92,13 @@ export default function CommunityAdminLayout({
         <div className="text-center">
           <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            권한이 없습니다
+            Access denied
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
-            커뮤니티 관리는 매니저 이상의 권한이 필요합니다.
+            Community management requires moderator access or higher.
           </p>
           <Button onClick={() => router.push(`/c/${slug}`)}>
-            커뮤니티로 돌아가기
+            Back to community
           </Button>
         </div>
       </div>
@@ -116,16 +116,16 @@ export default function CommunityAdminLayout({
             className="h-10 w-10 rounded-full border border-gray-200 dark:border-white/10"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">커뮤니티로 돌아가기</span>
+            <span className="sr-only">Back to community</span>
           </Button>
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">커뮤니티 설정</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-300">c/{slug}을 관리하세요</p>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Community settings</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-300">Manage c/{slug}</p>
           </div>
         </div>
 
         <div className="w-full space-y-2">
-          <p className="px-1 text-xs font-medium text-gray-500 dark:text-gray-400">관리 메뉴</p>
+          <p className="px-1 text-xs font-medium text-gray-500 dark:text-gray-400">Management menu</p>
           <div className="rounded-2xl border border-gray-200 bg-[#FAFAFA] p-2 dark:border-[#2F3440] dark:bg-[#161B24]">
             <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(148px,1fr))]">
               {menuItems
@@ -154,7 +154,7 @@ export default function CommunityAdminLayout({
                 onClick={() => router.push(`/c/${slug}`)}
                 className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-center text-sm font-semibold text-gray-700 transition-all hover:border-gray-300 hover:text-gray-900 dark:border-[#2F3440] dark:bg-[#1F2229] dark:text-gray-200 dark:hover:border-[#3A414F] dark:hover:text-white"
               >
-                커뮤니티로 이동
+                Go to community
               </button>
             </div>
           </div>

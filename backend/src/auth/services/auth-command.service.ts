@@ -21,6 +21,8 @@ import { LoginDto } from "../dto/login.dto";
 import { RegisterDto } from "../dto/register.dto";
 import { JwtPayload } from "../interfaces/jwt-payload.interface";
 import { AuthResponse } from "../interfaces/auth-response.interface";
+import { AuditContext, AuditService } from "../../audit/audit.service";
+import { AuditAction } from "../../audit/entities/audit-log.entity";
 import * as crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -41,6 +43,7 @@ export class AuthCommandService {
     private readonly identityService: IdentityService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly auditService: AuditService,
   ) {}
 
   private getJwtIssuer(): string {
@@ -49,6 +52,29 @@ export class AuthCommandService {
 
   private getJwtAudience(): string {
     return this.configService.get<string>("JWT_AUDIENCE", "codebase.blog::api");
+  }
+
+  private formatDate(value: Date): string {
+    return value.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  private formatDateTime(value: Date): string {
+    return value.toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+  }
+
+  private getSuspensionMessage(suspensionEnd: Date): string {
+    return `Your account is suspended until ${this.formatDateTime(suspensionEnd)}.`;
   }
 
   async validateUser(email: string, password: string): Promise<User | null> {
@@ -80,10 +106,10 @@ export class AuthCommandService {
         throw new UnauthorizedException({
           statusCode: 401,
           message:
-            `계정이 삭제되었습니다. 재가입은 삭제 후 30일이 지나야 가능합니다. ` +
+            `This account has been deleted. You can create a new account 30 days after deletion. ` +
             (remainingDays > 0
-              ? `${remainingDays}일 후 재가입 가능합니다.`
-              : `회원가입 페이지에서 재가입해주세요.`),
+              ? `You can register again in ${remainingDays} day(s).`
+              : `Please register again from the sign-up page.`),
           error: "Unauthorized",
           code: "ACCOUNT_DELETED",
           remainingDays,
@@ -93,7 +119,7 @@ export class AuthCommandService {
       if (user.isBanned) {
         throw new UnauthorizedException({
           statusCode: 401,
-          message: "계정이 영구 차단되었습니다. 관리자에게 문의해주세요.",
+          message: "This account has been permanently banned. Contact support for assistance.",
           error: "Unauthorized",
           code: "ACCOUNT_BANNED",
           reason: user.banReason,
@@ -110,7 +136,7 @@ export class AuthCommandService {
         const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
         throw new UnauthorizedException({
           statusCode: 401,
-          message: `계정이 정지되었습니다. ${suspensionEnd.toLocaleString("ko-KR")}까지 로그인할 수 없습니다.`,
+          message: this.getSuspensionMessage(suspensionEnd),
           error: "Unauthorized",
           code: "ACCOUNT_SUSPENDED",
           reason: user.suspensionReason,
@@ -122,7 +148,7 @@ export class AuthCommandService {
       if (!user.isActive) {
         throw new UnauthorizedException({
           statusCode: 401,
-          message: "계정이 비활성화되어 있습니다. 관리자에게 문의해주세요.",
+          message: "This account is inactive. Contact support for assistance.",
           error: "Unauthorized",
           code: "ACCOUNT_INACTIVE",
         });
@@ -159,7 +185,7 @@ export class AuthCommandService {
     const user = await this.validateUser(email, password);
     if (!user) {
       throw new UnauthorizedException(
-        "이메일 또는 비밀번호가 일치하지 않습니다",
+        "The email address or password is incorrect.",
       );
     }
 
@@ -181,7 +207,7 @@ export class AuthCommandService {
 
     if (!emailVerificationToken) {
       throw new BadRequestException(
-        "이메일 인증이 필요합니다. 이메일 인증을 완료해주세요.",
+        "Email verification is required before you can sign up.",
       );
     }
 
@@ -191,7 +217,7 @@ export class AuthCommandService {
     );
     if (!isVerified) {
       throw new BadRequestException(
-        "유효하지 않거나 만료된 이메일 인증 토큰입니다.",
+        "The email verification token is invalid or expired.",
       );
     }
 
@@ -201,7 +227,7 @@ export class AuthCommandService {
     if (existingUser) {
       if (!existingUser.isDeleted) {
         throw new ConflictException(
-          "이미 존재하는 회원입니다. 로그인 페이지에서 로그인해주세요.",
+          "An account with this email already exists. Please sign in instead.",
         );
       }
 
@@ -218,8 +244,8 @@ export class AuthCommandService {
         availableDate.setDate(availableDate.getDate() + WAITING_PERIOD_DAYS);
 
         throw new ConflictException(
-          `계정 삭제 후 ${WAITING_PERIOD_DAYS}일이 지나야 재가입이 가능합니다. ` +
-            `${remainingDays}일 후 (${availableDate.toLocaleDateString("ko-KR")}) 재가입 가능합니다.`,
+          `You can only re-register ${WAITING_PERIOD_DAYS} days after account deletion. ` +
+            `Try again in ${remainingDays} day(s) on ${this.formatDate(availableDate)}.`,
         );
       }
 
@@ -232,7 +258,7 @@ export class AuthCommandService {
     const existingUsername = await this.usersService.findByUsername(username);
     if (existingUsername) {
       throw new ConflictException(
-        `이미 사용 중인 '${username}'입니다. 다른 사용자명을 선택해주세요.`,
+        `'${username}' is already taken. Choose a different username.`,
       );
     }
 
@@ -272,8 +298,8 @@ export class AuthCommandService {
       if (!email) {
         this.logger.error(`OAuth ${provider} failed to get email from profile`);
         throw new BadRequestException(
-          `${provider} 계정에서 이메일을 가져올 수 없습니다. ` +
-            `${provider} 계정 설정에서 이메일 공개를 허용해주세요.`,
+          `We could not read an email address from your ${provider} account. ` +
+            `Make sure email sharing is enabled in your ${provider} settings.`,
         );
       }
 
@@ -297,7 +323,7 @@ export class AuthCommandService {
         if (user.isBanned) {
           throw new UnauthorizedException({
             statusCode: 401,
-            message: "계정이 영구 차단되었습니다. 관리자에게 문의해주세요.",
+            message: "This account has been permanently banned. Contact support for assistance.",
             error: "Unauthorized",
             code: "ACCOUNT_BANNED",
             reason: user.banReason,
@@ -314,7 +340,7 @@ export class AuthCommandService {
           const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
           throw new UnauthorizedException({
             statusCode: 401,
-            message: `계정이 정지되었습니다. ${suspensionEnd.toLocaleString("ko-KR")}까지 로그인할 수 없습니다.`,
+            message: this.getSuspensionMessage(suspensionEnd),
             error: "Unauthorized",
             code: "ACCOUNT_SUSPENDED",
             reason: user.suspensionReason,
@@ -349,10 +375,10 @@ export class AuthCommandService {
           throw new UnauthorizedException({
             statusCode: 401,
             message:
-              `계정이 삭제되었습니다. ` +
+              `This account has been deleted. ` +
               (remainingDays > 0
-                ? `재가입은 삭제 후 30일이 지나야 가능합니다. ${remainingDays}일 후 재가입 가능합니다.`
-                : `재가입을 원하시면 회원가입 페이지에서 진행해주세요.`),
+                ? `You can register again ${remainingDays} day(s) from now.`
+                : `If you want to use Codebase again, please sign up for a new account.`),
             error: "Unauthorized",
             code: "ACCOUNT_DELETED",
             remainingDays,
@@ -386,7 +412,7 @@ export class AuthCommandService {
         if (existingUser.isBanned) {
           throw new UnauthorizedException({
             statusCode: 401,
-            message: "계정이 영구 차단되었습니다. 관리자에게 문의해주세요.",
+            message: "This account has been permanently banned. Contact support for assistance.",
             error: "Unauthorized",
             code: "ACCOUNT_BANNED",
             reason: existingUser.banReason,
@@ -403,7 +429,7 @@ export class AuthCommandService {
           const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
           throw new UnauthorizedException({
             statusCode: 401,
-            message: `계정이 정지되었습니다. ${suspensionEnd.toLocaleString("ko-KR")}까지 로그인할 수 없습니다.`,
+            message: this.getSuspensionMessage(suspensionEnd),
             error: "Unauthorized",
             code: "ACCOUNT_SUSPENDED",
             reason: existingUser.suspensionReason,
@@ -415,7 +441,7 @@ export class AuthCommandService {
         if (!existingUser.isActive && !existingUser.isDeleted) {
           throw new UnauthorizedException({
             statusCode: 401,
-            message: "계정이 비활성화되어 있습니다. 관리자에게 문의해주세요.",
+            message: "This account is inactive. Contact support for assistance.",
             error: "Unauthorized",
             code: "ACCOUNT_INACTIVE",
           });
@@ -439,8 +465,8 @@ export class AuthCommandService {
             throw new UnauthorizedException({
               statusCode: 401,
               message:
-                `계정 삭제 후 ${WAITING_PERIOD_DAYS}일이 지나야 로그인이 가능합니다. ` +
-                `${remainingDays}일 후 (${availableDate.toLocaleDateString("ko-KR")}) 이용 가능합니다.`,
+                `You can only access this account ${WAITING_PERIOD_DAYS} days after deletion. ` +
+                `Try again in ${remainingDays} day(s) on ${this.formatDate(availableDate)}.`,
               error: "Unauthorized",
               code: "ACCOUNT_DELETED",
               remainingDays,
@@ -450,7 +476,7 @@ export class AuthCommandService {
           throw new UnauthorizedException({
             statusCode: 401,
             message:
-              "삭제된 계정입니다. 재가입을 원하시면 회원가입 페이지에서 진행해주세요.",
+              "This account has been deleted. If you want to use Codebase again, please sign up for a new account.",
             error: "Unauthorized",
             code: "ACCOUNT_DELETED",
             remainingDays: 0,
@@ -514,7 +540,7 @@ export class AuthCommandService {
         } else {
           throw new ConflictException({
             code: "MANUAL_LINK_REQUIRED",
-            message: `이 이메일은 이미 등록되어 있습니다. 기존 방법으로 로그인 후 ${provider} 계정을 연결해주세요.`,
+            message: `This email is already registered. Sign in with your existing method first, then connect your ${provider} account.`,
             existingProvider: existingUser.authProvider || "email",
           });
         }
@@ -764,7 +790,7 @@ export class AuthCommandService {
         {
           slug: finalSlug,
           name: user.username || emailPrefix,
-          description: `${user.username || emailPrefix}님의 블로그입니다.`,
+          description: `Posts and resources published by ${user.username || emailPrefix}.`,
         },
         user,
       );
@@ -799,7 +825,7 @@ export class AuthCommandService {
     if (user.authProvider !== AuthProvider.LOCAL) {
       this.logger.log(`Password reset attempted for OAuth user: ${email}`);
       throw new BadRequestException(
-        "소셜 로그인 계정은 비밀번호 재설정이 필요하지 않습니다",
+        "Social sign-in accounts do not use password reset.",
       );
     }
 
@@ -874,7 +900,7 @@ export class AuthCommandService {
         await resetToken.user.validatePassword(newPassword);
       if (isSamePassword) {
         throw new BadRequestException(
-          "기존 비밀번호와 다른 비밀번호를 입력해주세요",
+          "Enter a new password that is different from your current password.",
         );
       }
     }
@@ -926,6 +952,34 @@ export class AuthCommandService {
     this.logger.log(`Consent updated for OAuth user: ${user.email}`);
   }
 
+  async recordCookieConsent(
+    userId: string,
+    consentDto: {
+      analyticsEnabled: boolean;
+      policyVersion: string;
+      source?: string;
+    },
+    context: AuditContext,
+  ): Promise<void> {
+    await this.auditService.log(
+      {
+        action: AuditAction.COOKIE_CONSENT_UPDATED,
+        entityType: "cookie_consent",
+        entityId: userId,
+        newData: {
+          essential: true,
+          analytics: consentDto.analyticsEnabled,
+          policyVersion: consentDto.policyVersion,
+        },
+        metadata: {
+          source: consentDto.source || "klaro",
+          storage: "cookie",
+        },
+      },
+      context,
+    );
+  }
+
   async changePassword(
     userId: string,
     currentPassword: string,
@@ -933,18 +987,18 @@ export class AuthCommandService {
   ): Promise<void> {
     const user = await this.usersService.findById(userId);
     if (!user) {
-      throw new BadRequestException("사용자를 찾을 수 없습니다");
+      throw new BadRequestException("User not found.");
     }
 
     if (user.providerId) {
       throw new BadRequestException(
-        "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다",
+        "Social sign-in accounts cannot change a password.",
       );
     }
 
     const isValid = await this.validateUser(user.email, currentPassword);
     if (!isValid) {
-      throw new UnauthorizedException("현재 비밀번호가 일치하지 않습니다");
+      throw new UnauthorizedException("Your current password is incorrect.");
     }
 
     await this.usersService.updatePassword(userId, newPassword);

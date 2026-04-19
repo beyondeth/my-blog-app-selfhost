@@ -37,34 +37,24 @@ import { CommunityRole } from '@/types/community';
 interface CommunityPostContentProps {
   post: CommunityPost;
   communitySlug: string;
-  /** 현재 사용자의 커뮤니티 역할 */
   userRole?: CommunityRoleType;
-  /** 현재 사용자 ID */
   currentUserId?: string;
-  /** 투표 클릭 핸들러 */
   onVote?: (voteType: 'upvote' | 'downvote') => void;
-  /** 투표 로딩 상태 */
   isVotePending?: boolean;
-  /** 수정 클릭 핸들러 */
   onEditClick?: () => void;
-  /** 삭제 클릭 핸들러 */
   onDeleteClick?: () => void;
-  /** 고정/해제 클릭 핸들러 (MODERATOR+) */
   onTogglePinClick?: (isPinned: boolean) => void;
-  /** 잠금/해제 클릭 핸들러 (MODERATOR+) */
   onToggleLockClick?: (isLocked: boolean) => void;
   onBookmarkClick?: () => void;
   onReportClick?: () => void;
   isBookmarked?: boolean;
-  /** 모더레이션 액션 로딩 상태 */
   isModerationPending?: boolean;
   className?: string;
   variant?: 'card' | 'article';
 }
 
 /**
- * 커뮤니티 게시물 상세 컨텐츠 컴포넌트
- * 게시물 상세 페이지에서 메인 컨텐츠를 표시
+ * Community post detail content
  */
 const CommunityPostContent = React.memo(function CommunityPostContent({
   post,
@@ -84,9 +74,7 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
   className,
   variant = 'card',
 }: CommunityPostContentProps) {
-  // 숫자 포맷팅 (1000 -> 1K)
   const formatCount = (count: number | undefined | null) => {
-    // undefined/null인 경우 0으로 처리
     const safeCount = count ?? 0;
     if (safeCount >= 1000000) {
       return `${(safeCount / 1000000).toFixed(1)}M`;
@@ -98,21 +86,18 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
     return safeCount.toString();
   };
 
-  // 현재 사용자가 작성자인지 확인
   const isAuthor = currentUserId && post.author?.id && String(currentUserId) === String(post.author.id);
 
-  // 수정/삭제 권한 확인 (작성자 또는 매니저/오너)
   const canEdit = isAuthor;
   const canDelete = isAuthor || userRole === CommunityRole.OWNER || userRole === CommunityRole.MODERATOR;
 
-  // 모더레이션 권한 확인 (MODERATOR, ADMIN, OWNER)
   const canModerate =
     userRole === CommunityRole.OWNER ||
     userRole === CommunityRole.ADMIN ||
     userRole === CommunityRole.MODERATOR;
 
   const authorProfileHref = post.author?.username ? `/${post.author.username}` : undefined;
-  const authorDisplayName = post.author?.username || '알 수 없음';
+  const authorDisplayName = post.author?.username || 'Unknown user';
   const communityDisplayName = post.community?.name || post.communityName || communitySlug;
   const communityIconUrl = post.community?.iconUrl;
   const communityLink = `/c/${communitySlug}`;
@@ -125,7 +110,6 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
     return `${siteUrl}/c/${communitySlug}/comments/${post.slug}`;
   };
 
-  // 공유 / 링크 복사
   const handleShare = async () => {
     const url = getPostUrl();
 
@@ -133,7 +117,7 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
       try {
         await navigator.share({
           title: post.title,
-          text: `c/${communitySlug}의 게시물`,
+          text: `Post from c/${communitySlug}`,
           url,
         });
         return;
@@ -155,10 +139,10 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
         document.execCommand('copy');
         document.body.removeChild(textArea);
       }
-      toast.success('게시물 링크를 복사했어요.');
+      toast.success('Post link copied.');
     } catch (error) {
       console.error('Share copy failed:', error);
-      toast.error('링크 복사에 실패했습니다.');
+      toast.error('Failed to copy the link.');
     }
   };
 
@@ -195,10 +179,10 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
         document.execCommand('copy');
         document.body.removeChild(textArea);
       }
-      toast.success('게시물 내용을 복사했습니다.');
+      toast.success('Post content copied.');
     } catch (error) {
       console.error('Copy content failed:', error);
-      toast.error('복사에 실패했습니다.');
+      toast.error('Failed to copy the content.');
     }
   };
 
@@ -224,7 +208,6 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
         className
       )}
     >
-      {/* 상단 영역 */}
       <div className={cn(containerPadding, topPadding)}>
         <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -259,7 +242,7 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
             <button
               onClick={handleShare}
               className="flex items-center justify-center p-1 rounded-full text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors"
-              title="공유"
+              title="Share"
             >
               <FiUpload className="w-5 h-5" />
             </button>
@@ -267,7 +250,7 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
               <button
                 onClick={handleCopyContent}
                 className="flex items-center justify-center p-1 rounded-full text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors"
-                title="포스트 내용 복사"
+                title="Copy post content"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -283,18 +266,18 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={handleShare}>
                   <Share2 className="mr-2 h-4 w-4" />
-                  링크 복사
+                  Copy link
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onBookmarkClick}>
                   <Bookmark className={cn("mr-2 h-4 w-4", isBookmarked && "fill-current")} />
-                  {isBookmarked ? "북마크 해제" : "북마크"}
+                  {isBookmarked ? 'Remove bookmark' : 'Bookmark'}
                 </DropdownMenuItem>
                 {canEdit && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onEditClick}>
                       <Edit className="mr-2 h-4 w-4" />
-                      수정
+                      Edit
                     </DropdownMenuItem>
                   </>
                 )}
@@ -304,7 +287,7 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
                     className="text-red-600 dark:text-red-400"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    삭제
+                    Delete
                   </DropdownMenuItem>
                 )}
                 {canModerate && (
@@ -312,7 +295,7 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
                     <DropdownMenuSeparator />
                     <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1">
                       <Shield className="w-3 h-3" />
-                      모더레이션
+                      Moderation
                     </div>
                     <DropdownMenuItem
                       onClick={() => onTogglePinClick?.(!post.isPinned)}
@@ -321,12 +304,12 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
                       {post.isPinned ? (
                         <>
                           <PinOff className="mr-2 h-4 w-4" />
-                          고정 해제
+                          Unpin post
                         </>
                       ) : (
                         <>
                           <Pin className="mr-2 h-4 w-4" />
-                          게시물 고정
+                          Pin post
                         </>
                       )}
                     </DropdownMenuItem>
@@ -337,12 +320,12 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
                       {post.isLocked ? (
                         <>
                           <Unlock className="mr-2 h-4 w-4" />
-                          댓글 잠금 해제
+                          Unlock comments
                         </>
                       ) : (
                         <>
                           <Lock className="mr-2 h-4 w-4" />
-                          댓글 잠금
+                          Lock comments
                         </>
                       )}
                     </DropdownMenuItem>
@@ -354,7 +337,7 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
                   onClick={onReportClick}
                 >
                   <Flag className="mr-2 h-4 w-4" />
-                  신고
+                  Report
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -366,13 +349,13 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
             {post.isPinned && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">
                 <Pin className="w-3.5 h-3.5" />
-                고정된 게시물
+                Pinned post
               </span>
             )}
             {post.isLocked && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
                 <Lock className="w-3.5 h-3.5" />
-                댓글 잠금
+                Comments locked
               </span>
             )}
             {post.isNsfw && (
@@ -383,7 +366,7 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
             {post.isSpoiler && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded-full">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                스포일러
+                Spoiler
               </span>
             )}
           </div>
@@ -419,7 +402,7 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
                   <button
                     onClick={handleScrollToComments}
                     className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors font-medium"
-                    title="댓글 보기"
+                    title="View comments"
                   >
                     <FiMessageCircle className="w-5 h-5" />
                     <span>{post.commentCount ?? 0}</span>
@@ -430,7 +413,6 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
         </div>
       </div>
 
-      {/* 본문 컨텐츠 */}
       <div className={cn(containerPadding, bodyPadding)}>
         <div
           className="prose prose-gray dark:prose-invert max-w-none
@@ -446,7 +428,6 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
         />
       </div>
 
-      {/* 이미지 갤러리 (썸네일이 있는 경우) */}
       {(post.thumbnailImageUrl || post.thumbnailUrl) && (
         <div className={cn(containerPadding, isArticle ? 'pb-0 pt-4' : 'pb-4')}>
           <div className="relative rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
@@ -460,7 +441,6 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
         </div>
       )}
 
-      {/* 태그 */}
       {post.tags && post.tags.length > 0 && (
         <div className={cn('flex flex-wrap gap-2', containerPadding, tagPadding)}>
           {post.tags.map((tag, index) => (

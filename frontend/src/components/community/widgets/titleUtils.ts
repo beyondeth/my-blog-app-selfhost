@@ -33,7 +33,7 @@ const legacyTitleTypeMap: Partial<Record<string, CommunitySidebarWidgetType>> = 
 };
 
 export function getWidgetLabel(type: CommunitySidebarWidgetType) {
-  return widgetLabelMap[type] ?? '위젯';
+  return widgetLabelMap[type] ?? 'Widget';
 }
 
 export function resolveWidgetTitle(widget: CommunitySidebarWidget) {

@@ -78,7 +78,7 @@ export default function PostHeader({
           </div>
           <div className="flex items-center">
             <FiCalendar className="mr-2 w-4 h-4" />
-            <span>{new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR', {
+            <span>{new Date(post.publishedAt || post.createdAt).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'long',
               day: 'numeric'
@@ -112,7 +112,7 @@ export default function PostHeader({
               className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
             >
               <FiShare2 className="w-3 h-3" />
-              <span>공유</span>
+              <span>Share</span>
             </button>
           )}
           
@@ -120,12 +120,12 @@ export default function PostHeader({
             <button
               onClick={onCopy}
               className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
-              title="포스트 내용 복사"
+              title="Copy post content"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-              <span>복사</span>
+              <span>Copy</span>
             </button>
           )}
         </div>
@@ -137,18 +137,18 @@ export default function PostHeader({
               <button
                 onClick={onEdit}
                 className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                title="수정"
+                title="Edit"
               >
                 <FiEdit3 className="mr-1 w-3 h-3" />
-                수정
+                Edit
               </button>
               <button
                 onClick={onDelete}
                 className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                title="삭제"
+                title="Delete"
               >
                 <FiTrash2 className="mr-1 w-3 h-3" />
-                삭제
+                Delete
               </button>
             </>
           )}

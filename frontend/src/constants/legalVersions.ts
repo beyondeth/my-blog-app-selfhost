@@ -21,7 +21,7 @@ export const LEGAL_VERSIONS = {
  * Cloudflare가 .md 파일 직접 접근을 차단하므로
  * API Route를 통해 서빙 (/api/legal/...)
  */
-export function getLegalFilePath(type: keyof typeof LEGAL_VERSIONS, lang: 'ko' | 'en' = 'ko'): string {
+export function getLegalFilePath(type: keyof typeof LEGAL_VERSIONS, lang: 'ko' | 'en' = 'en'): string {
   const typeMap = {
     PRIVACY: 'privacy-policy',
     TERMS: 'terms-of-service',

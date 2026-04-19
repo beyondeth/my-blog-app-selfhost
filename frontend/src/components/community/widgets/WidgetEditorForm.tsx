@@ -36,14 +36,14 @@ export const widgetTypeOptions: Array<{
   label: string;
   description: string;
 }> = [
-  { type: 'text', label: '텍스트', description: '공지, 가이드라인' },
-  { type: 'buttons', label: '버튼', description: '링크 버튼 최대 10개' },
-  { type: 'bookmarks', label: '북마크', description: '빠른 링크 목록' },
-  { type: 'images', label: '이미지', description: '최대 10장의 이미지' },
-  { type: 'community_list', label: '추천 커뮤니티', description: '다른 커뮤니티 홍보' },
-  { type: 'calendar', label: '캘린더', description: '이벤트 일정' },
-  { type: 'post_flairs', label: '말머리', description: '게시판의 말머리(토픽)를 필터링할 수 있는 위젯입니다.' },
-  { type: 'community_rules', label: '커뮤니티 규칙', description: '규칙을 사이드바 위젯으로 표시' },
+  { type: 'text', label: 'Text', description: 'Notices and guidelines' },
+  { type: 'buttons', label: 'Buttons', description: 'Up to 10 link buttons' },
+  { type: 'bookmarks', label: 'Bookmarks', description: 'Quick link list' },
+  { type: 'images', label: 'Images', description: 'Up to 10 images' },
+  { type: 'community_list', label: 'Featured communities', description: 'Promote other communities' },
+  { type: 'calendar', label: 'Calendar', description: 'Event schedule' },
+  { type: 'post_flairs', label: 'Flairs', description: 'Widget for filtering post flairs.' },
+  { type: 'community_rules', label: 'Community rules', description: 'Show rules in a sidebar widget' },
 ];
 
 interface WidgetEditorFormProps {
@@ -122,7 +122,7 @@ export default function WidgetEditorForm({
       setIsSuccess(true);
       setTimeout(() => setIsSuccess(false), 2000);
     } catch (error: any) {
-      setFormError(error?.message || '위젯을 저장하지 못했습니다.');
+      setFormError(error?.message || 'Failed to save the widget.');
     } finally {
       setIsSaving(false);
     }
@@ -132,14 +132,14 @@ export default function WidgetEditorForm({
     <div className="space-y-4 text-gray-900 dark:text-gray-100">
       <div>
         <div className="flex items-center justify-between mb-1">
-          <Label className="text-xs uppercase tracking-wide text-gray-500 dark:text-white">제목</Label>
+          <Label className="text-xs uppercase tracking-wide text-gray-500 dark:text-white">Title</Label>
           <span className="text-xs text-gray-500">{(draft.title ?? '').length}/30</span>
         </div>
         <Input
           className={cn(SETTINGS_INPUT_CLASS, 'mt-1')}
           value={draft.title ?? ''}
           onChange={(event) => handleFieldChange('title', event.target.value.slice(0, 30))}
-          placeholder="위젯 제목"
+          placeholder="Widget title"
         />
       </div>
 
@@ -168,10 +168,10 @@ export default function WidgetEditorForm({
             />
             <div>
               <Label htmlFor="widget-toggle" className="text-sm font-medium text-gray-900 dark:text-gray-50">
-                이 위젯을 사이드바에 표시
+                Show this widget in the sidebar
               </Label>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                비활성화 시 설정은 유지되지만 사용자에게 보이지 않습니다
+                Disabled widgets keep their settings but stay hidden from users
               </p>
             </div>
           </div>
@@ -192,7 +192,7 @@ export default function WidgetEditorForm({
           ) : isSuccess ? (
             <Check className="mr-2 h-4 w-4" />
           ) : null}
-          {isSuccess ? '저장됨' : '저장'}
+          {isSuccess ? 'Saved' : 'Save'}
         </button>
         </div>
       </div>
@@ -227,7 +227,7 @@ function WidgetTypeSpecificForm({
     case 'text':
       return (
         <div className="space-y-2">
-          <Label className="text-sm font-medium">내용</Label>
+          <Label className="text-sm font-medium">Content</Label>
           <Textarea
             className={cn(SETTINGS_INPUT_CLASS, 'min-h-[180px]')}
             rows={6}
@@ -239,7 +239,7 @@ function WidgetTypeSpecificForm({
                 format: draft.metadata?.format || 'markdown',
               })
             }
-            placeholder="방문자에게 전달할 내용을 입력하세요."
+            placeholder="Enter the message you want visitors to see."
           />
         </div>
       );
@@ -251,10 +251,10 @@ function WidgetTypeSpecificForm({
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-sm font-medium">
-                {widget.type === 'bookmarks' ? '북마크 목록' : '버튼 목록'}
+                {widget.type === 'bookmarks' ? 'Bookmark list' : 'Button list'}
               </Label>
               <p className="text-xs text-gray-500 dark:text-white">
-                최대 {MAX_WIDGET_ITEMS}개까지 추가할 수 있습니다.
+                You can add up to {MAX_WIDGET_ITEMS} items.
               </p>
             </div>
             <Button
@@ -263,7 +263,7 @@ function WidgetTypeSpecificForm({
               disabled={items.length >= MAX_WIDGET_ITEMS}
               onClick={() => onAddItem({ label: '', linkUrl: '' })}
             >
-              추가
+              Add
             </Button>
           </div>
           <div className="space-y-3">
@@ -276,25 +276,25 @@ function WidgetTypeSpecificForm({
                   className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2"
                 >
                   <Label className="text-xs font-semibold text-gray-500 dark:text-white">
-                    표시될 라벨
+                    Display label
                   </Label>
                   <Input
                     className={SETTINGS_INPUT_CLASS}
                   value={labelValue}
                   onChange={(event) => onItemChange(index, { ...item, label: event.target.value })}
-                  placeholder={isBookmark ? `라벨 (최대 ${BOOKMARK_LABEL_MAX}자)` : '버튼 라벨'}
+                  placeholder={isBookmark ? `Label (max ${BOOKMARK_LABEL_MAX} characters)` : 'Button label'}
                   maxLength={isBookmark ? BOOKMARK_LABEL_MAX : undefined}
                 />
                 {isBookmark && (
                   <div className="flex items-center justify-between text-xs text-gray-500 dark:text-white">
-                    <span>최대 {BOOKMARK_LABEL_MAX}자</span>
+                    <span>Max {BOOKMARK_LABEL_MAX} characters</span>
                     <span>
                       {labelValue.length}/{BOOKMARK_LABEL_MAX}
                     </span>
                   </div>
                 )}
                 <Label className="text-xs font-semibold text-gray-500 dark:text-white">
-                  클릭 시 이동할 주소
+                  Destination URL
                 </Label>
                 <Input
                   value={item.linkUrl ?? ''}
@@ -319,25 +319,25 @@ function WidgetTypeSpecificForm({
                       : 'text-gray-500 dark:text-white',
                   )}
                 >
-                  https:// 로 시작하는 전체 주소만 허용됩니다.
+                  Only full URLs starting with `https://` are allowed.
                 </p>
                 <Textarea
                   className={cn(SETTINGS_INPUT_CLASS, 'min-h-[90px]')}
                   value={bodyValue}
                   onChange={(event) => onItemChange(index, { ...item, body: event.target.value })}
-                  placeholder="사이드바에 표시할 짧은 소개 (선택)"
+                  placeholder="Short description shown in the sidebar (optional)"
                   maxLength={isBookmark ? BOOKMARK_BODY_MAX : undefined}
                 />
                 {isBookmark && (
                   <p className="text-xs text-gray-500 dark:text-white">
-                    최대 {BOOKMARK_BODY_MAX}자 · 사이드바에는 최대 {BOOKMARK_BODY_PREVIEW_MAX}자만 표시
+                    Max {BOOKMARK_BODY_MAX} characters. Only the first {BOOKMARK_BODY_PREVIEW_MAX} show in the sidebar.
                     <span className="ml-2">
                       {bodyValue.length}/{BOOKMARK_BODY_MAX}
                     </span>
                   </p>
                 )}
                   <Button variant="ghost" size="sm" className="text-red-500" onClick={() => onRemoveItem(index)}>
-                    삭제
+                    Delete
                   </Button>
                 </div>
               );
@@ -351,12 +351,12 @@ function WidgetTypeSpecificForm({
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <Label className="text-sm font-medium">이미지 목록</Label>
+              <Label className="text-sm font-medium">Image list</Label>
               <p className="text-xs text-gray-500 dark:text-white">
-                권장 크기: 가로형 640×360px · 세로형 720×960px (모바일 비율)
+                Recommended sizes: landscape 640×360px, portrait 720×960px (mobile ratio)
               </p>
               <p className="text-xs text-gray-500 dark:text-white">
-                제목은 이미지 좌측 상단에 얇은 텍스트로 노출됩니다.
+                Titles appear as subtle text in the upper-left corner of the image.
               </p>
             </div>
             <Button
@@ -370,21 +370,21 @@ function WidgetTypeSpecificForm({
                 })
               }
             >
-              이미지 추가
+              Add image
             </Button>
           </div>
           <div className="space-y-3">
             {items.map((item, index) => (
               <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
-                <Label className="text-xs font-semibold text-gray-500 dark:text-white">이미지 제목</Label>
+                <Label className="text-xs font-semibold text-gray-500 dark:text-white">Image title</Label>
                 <Input
                   className={SETTINGS_INPUT_CLASS}
                   value={item.label ?? ''}
                   onChange={(event) => onItemChange(index, { ...item, label: event.target.value })}
-                  placeholder="이미지 제목"
+                  placeholder="Image title"
                 />
                 <p className="text-[11px] text-gray-500 dark:text-white">
-                  여러 이미지를 올릴 경우 제목으로 식별됩니다.
+                  When you upload multiple images, the title helps distinguish them.
                 </p>
                 {item.imageUrl && (
                   <div className="overflow-hidden rounded-lg border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
@@ -415,24 +415,24 @@ function WidgetTypeSpecificForm({
                       input.click();
                     }}
                   >
-                    이미지 선택
+                    Choose image
                   </Button>
                   <span className="text-xs text-gray-500 dark:text-white">
-                    JPG/PNG/WebP · 최대 10MB
+                    JPG/PNG/WebP · up to 10MB
                   </span>
                 </div>
                 <Label className="text-xs font-semibold text-gray-500 dark:text-white">
-                  이미지 설명 (선택)
+                  Image caption (optional)
                 </Label>
                 <Textarea
                   className={cn(SETTINGS_INPUT_CLASS, 'min-h-[80px]')}
                   value={item.body ?? ''}
                   onChange={(event) => onItemChange(index, { ...item, body: event.target.value })}
-                  placeholder="이미지 아래쪽에 표시할 짧은 문장"
+                  placeholder="Short text shown below the image"
                   rows={2}
                 />
                 <Label className="text-xs font-semibold text-gray-500 dark:text-white">
-                  이미지 클릭 시 이동할 주소 (선택)
+                  Click-through URL (optional)
                 </Label>
                 <Input
                   value={item.linkUrl ?? ''}
@@ -457,10 +457,10 @@ function WidgetTypeSpecificForm({
                       : 'text-gray-500 dark:text-white',
                   )}
                 >
-                  URL을 입력하지 않으면 이미지만 노출됩니다.
+                  Leave this empty to show the image without a link.
                 </p>
                 <Button variant="ghost" size="sm" className="text-red-500" onClick={() => onRemoveItem(index)}>
-                  삭제
+                  Delete
                 </Button>
               </div>
             ))}
@@ -471,7 +471,7 @@ function WidgetTypeSpecificForm({
       return (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">추천 커뮤니티</Label>
+            <Label className="text-sm font-medium">Featured communities</Label>
             <Button
               size="sm"
               variant="outline"
@@ -482,7 +482,7 @@ function WidgetTypeSpecificForm({
                 })
               }
             >
-              추가
+              Add
             </Button>
           </div>
           <div className="space-y-3">
@@ -507,19 +507,19 @@ function WidgetTypeSpecificForm({
                 />
                 {item.targetCommunitySlug ? (
                   <p className="text-xs text-gray-500 dark:text-white">
-                    선택된 커뮤니티: <strong>c/{item.targetCommunitySlug}</strong>
+                    Selected community: <strong>c/{item.targetCommunitySlug}</strong>
                   </p>
                 ) : (
-                  <p className="text-xs text-pink-600">추천할 커뮤니티를 선택하세요.</p>
+                  <p className="text-xs text-pink-600">Search for and select a community to feature.</p>
                 )}
                 <Textarea
                   className={cn(SETTINGS_INPUT_CLASS, 'min-h-[80px]')}
                   value={item.body ?? ''}
                   onChange={(event) => onItemChange(index, { ...item, body: event.target.value })}
-                  placeholder="설명 (선택)"
+                  placeholder="Description (optional)"
                 />
                 <Button variant="ghost" size="sm" className="text-red-500" onClick={() => onRemoveItem(index)}>
-                  삭제
+                  Delete
                 </Button>
               </div>
             ))}
@@ -531,11 +531,11 @@ function WidgetTypeSpecificForm({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">캘린더 이벤트</Label>
+              <Label className="text-sm font-medium">Calendar events</Label>
               <p className="text-xs text-gray-500 dark:text-white">
-                시작 날짜는 필수이며, 종료/시간/링크는 선택입니다.
+                A start date is required. End time, location, and link are optional.
               </p>
-              <p className="text-xs text-gray-500 dark:text-white">최대 {MAX_WIDGET_ITEMS}개까지 관리할 수 있습니다.</p>
+              <p className="text-xs text-gray-500 dark:text-white">You can manage up to {MAX_WIDGET_ITEMS} items.</p>
             </div>
             <Button
               size="sm"
@@ -543,27 +543,27 @@ function WidgetTypeSpecificForm({
               disabled={items.length >= MAX_WIDGET_ITEMS}
               onClick={() =>
                 onAddItem({
-                  label: '새 이벤트',
+                  label: 'New event',
                   startsAt: new Date().toISOString(),
                 })
               }
             >
-              추가
+              Add
             </Button>
           </div>
           <div className="space-y-3">
             {items.map((item, index) => (
               <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
-                <Label className="text-xs font-semibold text-gray-500 dark:text-white">이벤트 제목</Label>
+                <Label className="text-xs font-semibold text-gray-500 dark:text-white">Event title</Label>
                 <Input
                   className={SETTINGS_INPUT_CLASS}
                   value={item.label ?? ''}
                   onChange={(event) => onItemChange(index, { ...item, label: event.target.value })}
-                  placeholder="이벤트 제목"
+                  placeholder="Event title"
                 />
                 <DateTimeInlineControl
-                  label="시작 시간"
-                  helpText="날짜만 입력하면 하루 종일 일정으로 표시됩니다."
+                  label="Start time"
+                  helpText="If you only enter a date, the event is shown as all-day."
                   parts={parseDateParts(item.startsAt)}
                   onChange={(changes) => {
                     const iso = buildDateTime({ ...parseDateParts(item.startsAt), ...changes });
@@ -571,8 +571,8 @@ function WidgetTypeSpecificForm({
                   }}
                 />
                 <DateTimeInlineControl
-                  label="종료 시간 (선택)"
-                  helpText="미입력 시 시작 시간만 표시됩니다."
+                  label="End time (optional)"
+                  helpText="If you leave this empty, only the start time is shown."
                   parts={parseDateParts(item.endsAt)}
                   optional
                   onClear={() => onItemChange(index, { ...item, endsAt: undefined })}
@@ -581,22 +581,22 @@ function WidgetTypeSpecificForm({
                     onItemChange(index, { ...item, endsAt: iso });
                   }}
                 />
-                <Label className="text-xs font-semibold text-gray-500 dark:text-white">위치 (선택)</Label>
+                <Label className="text-xs font-semibold text-gray-500 dark:text-white">Location (optional)</Label>
                 <Input
                   className={SETTINGS_INPUT_CLASS}
                   value={item.location ?? ''}
                   onChange={(event) => onItemChange(index, { ...item, location: event.target.value })}
-                  placeholder="예: 교대역, 온라인 (Zoom)"
+                  placeholder="e.g. Union Square, Online (Zoom)"
                 />
-                <Label className="text-xs font-semibold text-gray-500 dark:text-white">이벤트 설명 (선택)</Label>
+                <Label className="text-xs font-semibold text-gray-500 dark:text-white">Event description (optional)</Label>
                 <Textarea
                   className={cn(SETTINGS_INPUT_CLASS, 'min-h-[100px]')}
                   value={item.body ?? ''}
                   onChange={(event) => onItemChange(index, { ...item, body: event.target.value })}
-                  placeholder="참석자에게 전달할 세부 내용을 입력하세요."
+                  placeholder="Add the details attendees should know."
                   rows={3}
                 />
-                <Label className="text-xs font-semibold text-gray-500 dark:text-white">이벤트 링크 (선택)</Label>
+                <Label className="text-xs font-semibold text-gray-500 dark:text-white">Event link (optional)</Label>
                 <Input
                   value={item.linkUrl ?? ''}
                   onChange={(event) =>
@@ -620,10 +620,10 @@ function WidgetTypeSpecificForm({
                       : 'text-gray-500 dark:text-white',
                   )}
                 >
-                  링크를 입력하면 사이드바에서 \"자세히 보기\" 버튼이 노출됩니다.
+                  If provided, the sidebar shows a "View details" button.
                 </p>
                 <Button variant="ghost" size="sm" className="text-red-500" onClick={() => onRemoveItem(index)}>
-                  삭제
+                  Delete
                 </Button>
               </div>
             ))}
@@ -638,7 +638,7 @@ function WidgetTypeSpecificForm({
       return (
         <div className="space-y-4">
           <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
-            <Label className="text-sm font-medium mb-3 block">표시 방식</Label>
+            <Label className="text-sm font-medium mb-3 block">Display mode</Label>
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
                 <input
@@ -650,7 +650,7 @@ function WidgetTypeSpecificForm({
                   className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700"
                 />
                 <Label htmlFor="mode-all" className="text-sm cursor-pointer select-none">
-                  전체 말머리 (기본)
+                  All flairs (default)
                 </Label>
               </div>
               <div className="flex items-center gap-2">
@@ -663,15 +663,15 @@ function WidgetTypeSpecificForm({
                   className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700"
                 />
                 <Label htmlFor="mode-select" className="text-sm cursor-pointer select-none">
-                  특정 말머리 강조
+                  Highlight selected flairs
                 </Label>
               </div>
             </div>
             
             <p className="text-xs text-gray-500 mt-2 px-1">
               {showAll 
-                ? "커뮤니티의 모든 말머리를 목록 형태로 표시합니다." 
-                : "선택한 말머리만 별도로 강조하여 표시합니다."}
+                ? "Show every flair from the community in a list."
+                : "Highlight only the flairs you select below."}
             </p>
           </div>
 
@@ -679,9 +679,9 @@ function WidgetTypeSpecificForm({
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <Label className="text-sm font-medium">최대 표시 개수</Label>
+                  <Label className="text-sm font-medium">Maximum visible items</Label>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-2">
-                    이 개수까지 펼쳐 보이고, 나머지는 '더보기' 버튼으로 숨깁니다 (기본값: 10개)
+                    Show this many items before hiding the rest behind a "View more" button. Default: 10.
                   </p>
                   <Input
                     className={SETTINGS_INPUT_CLASS}
@@ -703,14 +703,14 @@ function WidgetTypeSpecificForm({
 
           {!showAll && (
             <div className="space-y-3 pl-1">
-              <Label className="text-sm font-medium">강조할 말머리 선택</Label>
+              <Label className="text-sm font-medium">Choose flairs to highlight</Label>
               {availableFlairs.length === 0 ? (
                 <div className="rounded-lg border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 p-3 space-y-2">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
-                    말머리가 아직 생성되지 않았습니다
+                    No flairs have been created yet
                   </p>
                   <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                    커뮤니티 설정에서 말머리를 생성해주세요.
+                    Create flairs first in the community settings.
                   </p>
                   <a
                     href={`/c/${community.slug}/settings/flairs`}
@@ -718,7 +718,7 @@ function WidgetTypeSpecificForm({
                     rel="noopener noreferrer"
                     className="inline-block text-xs text-blue-600 dark:text-blue-400 hover:underline"
                   >
-                    말머리 관리 페이지로 이동 →
+                    Open flair management →
                   </a>
                 </div>
               ) : (
@@ -756,7 +756,7 @@ function WidgetTypeSpecificForm({
           )}
           
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Label className="text-sm font-medium mb-3 block">말머리 관리</Label>
+            <Label className="text-sm font-medium mb-3 block">Flair management</Label>
             <FlairsManagerPanel slug={community.slug} initialFlairs={community.flairs} embedded />
           </div>
         </div>
@@ -782,12 +782,12 @@ function WidgetTypeSpecificForm({
           />
           
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Label className="text-sm font-medium mb-3 block">표시 옵션</Label>
+            <Label className="text-sm font-medium mb-3 block">Display options</Label>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label className="text-sm font-medium">최대 표시 규칙 수</Label>
+                <Label className="text-sm font-medium">Maximum visible rules</Label>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-2">
-                  이 개수까지 펼쳐 보이고, 나머지는 '더보기' 버튼으로 숨깁니다
+                  Show this many rules before hiding the rest behind a "View more" button.
                 </p>
                 <Input
                   className={SETTINGS_INPUT_CLASS}
@@ -846,31 +846,31 @@ export function buildInitialWidgetPayload(
     case 'text':
       return {
         type,
-        title: '새 공지',
+        title: 'New notice',
         metadata: {
-          content: '여기에 공지를 입력하세요.',
+          content: 'Write your notice here.',
           format: 'markdown',
         },
       };
     case 'buttons':
       return {
         type,
-        title: '바로가기',
+        title: 'Quick links',
         items: [
           {
-            label: '홈으로 이동',
+            label: 'Visit homepage',
             linkUrl: 'https://example.com',
-            body: '링크 설명',
+            body: 'Link description',
           },
         ],
       };
     case 'bookmarks':
       return {
         type,
-        title: '북마크',
+        title: 'Bookmarks',
         items: [
           {
-            label: '첫 번째 링크',
+            label: 'First link',
             linkUrl: 'https://example.com',
           },
         ],
@@ -878,7 +878,7 @@ export function buildInitialWidgetPayload(
     case 'images':
       return {
         type,
-        title: '이미지 모듈',
+        title: 'Image module',
         items: [
           {
             label: community.name,
@@ -889,7 +889,7 @@ export function buildInitialWidgetPayload(
     case 'community_list':
       return {
         type,
-        title: '추천 커뮤니티',
+        title: 'Featured communities',
         items: [
           {
             targetCommunitySlug: community.slug,
@@ -899,17 +899,17 @@ export function buildInitialWidgetPayload(
     case 'calendar':
       return {
         type,
-        title: '캘린더',
+        title: 'Calendar',
         items: [
           {
-            label: '새 이벤트',
+            label: 'New event',
             startsAt: new Date().toISOString(),
           },
         ],
       };
     case 'post_flairs':
       if (!community.flairs || community.flairs.length === 0) {
-        throw new Error('먼저 말머리를 생성한 뒤 위젯을 추가할 수 있습니다.');
+        throw new Error('Create flairs first before adding this widget.');
       }
       return {
         type,
@@ -959,18 +959,18 @@ function CommunitySearchSelect({ selectedSlug, onSelect }: CommunitySelectProps)
           setQuery(event.target.value);
           setOpen(true);
         }}
-        placeholder="커뮤니티 검색 (두 글자 이상)"
+        placeholder="Search communities (2+ characters)"
       />
       {open && (
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-56 overflow-y-auto">
           {!shouldSearch && (
-            <p className="px-3 py-2 text-xs text-gray-500 dark:text-white">두 글자 이상 입력하면 검색합니다.</p>
+            <p className="px-3 py-2 text-xs text-gray-500 dark:text-white">Start typing at least 2 characters to search.</p>
           )}
           {shouldSearch && isLoading && (
-            <p className="px-3 py-2 text-xs text-gray-500 dark:text-white">검색 중...</p>
+            <p className="px-3 py-2 text-xs text-gray-500 dark:text-white">Searching...</p>
           )}
           {shouldSearch && !isLoading && results.length === 0 && (
-            <p className="px-3 py-2 text-xs text-gray-500 dark:text-white">검색 결과가 없습니다.</p>
+            <p className="px-3 py-2 text-xs text-gray-500 dark:text-white">No matching communities found.</p>
           )}
           {results.map((community) => (
             <button
@@ -1004,7 +1004,7 @@ function CommunitySearchSelect({ selectedSlug, onSelect }: CommunitySelectProps)
           target="_blank"
           className="text-xs text-blue-600 dark:text-blue-400"
         >
-          c/{selectedSlug} 바로가기
+          Open c/{selectedSlug}
         </Link>
       )}
     </div>
@@ -1074,16 +1074,16 @@ function validateWidgetDraft(
       for (let i = 0; i < items.length; i += 1) {
         const item = items[i];
         if (!item.label?.trim()) {
-          return `${i + 1}번째 항목의 라벨을 입력하세요.`;
+          return `Enter a label for item ${i + 1}.`;
         }
         if (type === 'bookmarks' && item.label.trim().length > BOOKMARK_LABEL_MAX) {
-          return `${i + 1}번째 라벨은 최대 ${BOOKMARK_LABEL_MAX}자까지 입력할 수 있습니다.`;
+          return `Label ${i + 1} must be ${BOOKMARK_LABEL_MAX} characters or fewer.`;
         }
         if (!isLinkFieldValid(item.linkUrl)) {
-          return `${i + 1}번째 항목의 링크는 https:// 로 시작하는 전체 주소여야 합니다.`;
+          return `Item ${i + 1} must use a full URL starting with https://.`;
         }
         if (type === 'bookmarks' && item.body?.trim() && item.body.trim().length > BOOKMARK_BODY_MAX) {
-          return `${i + 1}번째 소개는 최대 ${BOOKMARK_BODY_MAX}자까지 입력할 수 있습니다.`;
+          return `Description ${i + 1} must be ${BOOKMARK_BODY_MAX} characters or fewer.`;
         }
       }
       break;
@@ -1092,10 +1092,10 @@ function validateWidgetDraft(
       for (let i = 0; i < items.length; i += 1) {
         const item = items[i];
         if (!item.imageUrl) {
-          return `${i + 1}번째 이미지 파일을 업로드하세요.`;
+          return `Upload an image for item ${i + 1}.`;
         }
         if (!isLinkFieldValid(item.linkUrl)) {
-          return `${i + 1}번째 이미지의 링크가 올바르지 않습니다.`;
+          return `The link for image ${i + 1} is invalid.`;
         }
       }
       break;
@@ -1103,7 +1103,7 @@ function validateWidgetDraft(
     case 'community_list': {
       for (let i = 0; i < items.length; i += 1) {
         if (!items[i].targetCommunitySlug) {
-          return `${i + 1}번째 추천 커뮤니티를 검색 후 선택하세요.`;
+          return `Search for and select featured community ${i + 1}.`;
         }
       }
       break;
@@ -1112,10 +1112,10 @@ function validateWidgetDraft(
       for (let i = 0; i < items.length; i += 1) {
         const item = items[i];
         if (!item.startsAt) {
-          return `${i + 1}번째 이벤트의 시작 날짜를 지정하세요.`;
+          return `Set a start date for event ${i + 1}.`;
         }
         if (!isLinkFieldValid(item.linkUrl)) {
-          return `${i + 1}번째 이벤트의 링크가 올바르지 않습니다.`;
+          return `The link for event ${i + 1} is invalid.`;
         }
       }
       break;
@@ -1133,16 +1133,16 @@ type DateTimeParts = {
   date: string;
   hour: string;
   minute: string;
-  period: '오전' | '오후';
+  period: 'AM' | 'PM';
 };
 
 function parseDateParts(value?: string): DateTimeParts {
   if (!value) {
-    return { date: '', hour: '--', minute: '--', period: '오전' };
+    return { date: '', hour: '--', minute: '--', period: 'AM' };
   }
   const date = new Date(value);
   const hours = date.getHours();
-  const period = hours >= 12 ? '오후' : '오전';
+  const period = hours >= 12 ? 'PM' : 'AM';
   const hour12 = hours % 12 || 12;
   return {
     date: date.toISOString().slice(0, 10),
@@ -1158,8 +1158,8 @@ function buildDateTime(parts: DateTimeParts): string | undefined {
     return new Date(`${parts.date}T00:00:00`).toISOString();
   }
   let hour = parseInt(parts.hour, 10);
-  if (parts.period === '오후' && hour < 12) hour += 12;
-  if (parts.period === '오전' && hour === 12) hour = 0;
+  if (parts.period === 'PM' && hour < 12) hour += 12;
+  if (parts.period === 'AM' && hour === 12) hour = 0;
   const minute = parts.minute.padStart(2, '0');
   const iso = new Date(`${parts.date}T${hour.toString().padStart(2, '0')}:${minute}:00`).toISOString();
   return iso;
@@ -1193,11 +1193,11 @@ function DateTimeInlineControl({ label, parts, optional, onClear, onChange, help
         {HOURS.map((hour) =>
           hour === '--' ? (
             <option key="unset" value="--">
-              --시
+              -- hour
             </option>
           ) : (
             <option key={hour} value={hour}>
-              {hour}시
+              {hour}
             </option>
           ),
         )}
@@ -1210,18 +1210,18 @@ function DateTimeInlineControl({ label, parts, optional, onClear, onChange, help
         {MINUTES.map((minute) =>
           minute === '--' ? (
             <option key="unset-min" value="--">
-              --분
+              -- min
             </option>
           ) : (
             <option key={minute} value={minute}>
-              {minute}분
+              {minute}
             </option>
           ),
         )}
       </select>
       </div>
       <div className="flex items-center gap-2">
-        {(['오전', '오후'] as const).map((period) => (
+        {(['AM', 'PM'] as const).map((period) => (
           <Button
             key={period}
             type="button"
@@ -1234,7 +1234,7 @@ function DateTimeInlineControl({ label, parts, optional, onClear, onChange, help
         ))}
         {optional && (
           <Button variant="ghost" size="sm" onClick={onClear}>
-            비우기
+            Clear
           </Button>
         )}
       </div>

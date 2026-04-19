@@ -38,7 +38,7 @@ const CommunityInfo = React.memo(function CommunityInfo({
   // 날짜 포맷팅
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -49,13 +49,13 @@ const CommunityInfo = React.memo(function CommunityInfo({
   const getJoinPolicyLabel = (policy: JoinPolicyType) => {
     switch (policy) {
       case JoinPolicy.OPEN:
-        return { label: '누구나 가입 가능', icon: Globe };
+        return { label: 'Open to everyone', icon: Globe };
       case JoinPolicy.RESTRICTED:
-        return { label: '승인 필요', icon: Shield };
+        return { label: 'Approval required', icon: Shield };
       case JoinPolicy.PRIVATE:
-        return { label: '초대 전용', icon: Lock };
+        return { label: 'Invite only', icon: Lock };
       default:
-        return { label: '공개', icon: Globe };
+        return { label: 'Public', icon: Globe };
     }
   };
 
@@ -86,7 +86,7 @@ const CommunityInfo = React.memo(function CommunityInfo({
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
             <Users className="w-4 h-4" />
-            <span>멤버</span>
+            <span>Members</span>
           </div>
           <span className="font-medium text-gray-900 dark:text-gray-100">
             {formatCount(community.memberCount)}
@@ -96,7 +96,7 @@ const CommunityInfo = React.memo(function CommunityInfo({
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
             <FileText className="w-4 h-4" />
-            <span>게시물</span>
+            <span>Posts</span>
           </div>
           <span className="font-medium text-gray-900 dark:text-gray-100">
             {formatCount(community.postCount)}
@@ -106,7 +106,7 @@ const CommunityInfo = React.memo(function CommunityInfo({
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
             <Calendar className="w-4 h-4" />
-            <span>생성일</span>
+            <span>Created</span>
           </div>
           <span className="font-medium text-gray-900 dark:text-gray-100">
             {formatDate(community.createdAt)}
@@ -116,7 +116,7 @@ const CommunityInfo = React.memo(function CommunityInfo({
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
             <PolicyIcon className="w-4 h-4" />
-            <span>가입 정책</span>
+            <span>Join policy</span>
           </div>
           <span className="font-medium text-gray-900 dark:text-gray-100">
             {joinPolicyInfo.label}

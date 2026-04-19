@@ -51,7 +51,7 @@ const stripHtml = (html?: string | null): string => {
 };
 
 const createPlaceholderAuthor = (post: CommunityPost): Post['author'] => {
-  const username = post.author?.username || '알 수 없음';
+                const username = post.author?.username || 'Unknown user';
   const id = post.author?.id || `community-${post.id}`;
 
   return {
@@ -305,8 +305,8 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
 
   // 정렬 옵션
   const sortOptions = [
-    { value: 'newest' as const, label: '최신순', icon: Clock },
-    { value: 'hot' as const, label: '인기순', icon: Flame },
+    { value: 'newest' as const, label: 'Newest', icon: Clock },
+    { value: 'hot' as const, label: 'Popular', icon: Flame },
     { value: 'top' as const, label: 'TOP', icon: TrendingUp },
   ];
 
@@ -339,23 +339,23 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
     const isPrivateAccessError =
       communityError instanceof Error &&
       (((communityError as Error & { status?: number }).status ?? 0) === 403 ||
-        communityError.message.includes('초대 전용'));
+        communityError.message.includes('invite'));
 
     if (isPrivateAccessError) {
       return (
         <div className="max-w-6xl mx-auto px-4 py-16 text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-            초대 전용 커뮤니티입니다
+            This community is invite-only
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
-            멤버만 접근할 수 있습니다. 초대 링크가 필요합니다.
+            Only invited members can access this community.
           </p>
           <div className="flex items-center justify-center gap-3">
             {!isAuthenticated && (
-              <Button onClick={handleLoginRedirect}>로그인</Button>
+              <Button onClick={handleLoginRedirect}>Sign in</Button>
             )}
             <Button variant="outline" onClick={() => router.back()}>
-              뒤로 가기
+              Go back
             </Button>
           </div>
         </div>
@@ -368,12 +368,12 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
     return (
       <div className="max-w-6xl mx-auto px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-          커뮤니티를 불러올 수 없습니다
+          Could not load this community
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mb-6">
-          {communityError instanceof Error ? communityError.message : '알 수 없는 오류가 발생했습니다.'}
+          {communityError instanceof Error ? communityError.message : 'An unknown error occurred.'}
         </p>
-        <Button onClick={() => router.back()}>뒤로 가기</Button>
+        <Button onClick={() => router.back()}>Go back</Button>
       </div>
     );
   }
@@ -397,11 +397,11 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
           <AdultVerificationModal
             isOpen={showAdultModal}
             onClose={handleNsfwModalClose}
-            title="로그인이 필요합니다"
-            description={`"${community.name}" 커뮤니티는 성인 전용입니다.`}
+            title="Sign in required"
+            description={`"${community.name}" is an adults-only community.`}
             requiresLogin
             onLogin={handleLoginRedirect}
-            loginDescription="로그인을 완료하면 성인 인증을 진행하여 NSFW 커뮤니티를 안전하게 이용할 수 있습니다."
+            loginDescription="Sign in first, then complete age verification to access this NSFW community."
           />
         </>
       );
@@ -418,8 +418,8 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
           isOpen={showAdultModal}
           onClose={handleNsfwModalClose}
           onVerified={handleAdultVerified}
-          title="성인 인증 필요"
-          description={`"${community.name}" 커뮤니티는 성인 전용입니다. 계속하려면 성인 인증이 필요합니다.`}
+          title="Age verification required"
+          description={`"${community.name}" is an adults-only community. Please verify your age to continue.`}
         />
       </>
     );
@@ -492,11 +492,11 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
             ) : regularPosts.length === 0 && pinnedPosts.length === 0 ? (
               <div className="max-w-[780px] mx-auto text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
-                  아직 게시물이 없습니다.
+                  No posts yet.
                 </p>
                 {community.userMembership?.isMember && (
                   <Button onClick={() => router.push(`/c/${slug}/submit`)}>
-                    첫 번째 게시물 작성하기
+                    Write the first post
                   </Button>
                 )}
               </div>

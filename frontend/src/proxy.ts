@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import {
+  DEFAULT_LOCALE,
+  LOCALE_HEADER_NAME,
+  extractLocaleFromPathname,
+} from '@/lib/i18n/config';
 
 const PROTECTED_ROUTES = ['/bookmarks', '/new-story', '/settings'];
+const AUTH_COOKIE_NAMES = ['connect.sid', 'Authentication', 'access_token', 'token', 'session'];
 const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
   'account',
   'admin',
@@ -74,25 +80,50 @@ function getCandidateBlogRoute(pathname: string) {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(LOCALE_HEADER_NAME, DEFAULT_LOCALE);
+  const {
+    hasLocalePrefix,
+    pathnameWithoutLocale,
+  } = extractLocaleFromPathname(pathname);
 
-  // Mobile/Desktop Routing (Code Splitting) logic
   if (pathname === '/') {
+    const hasAuthCookie = AUTH_COOKIE_NAMES.some(name => request.cookies.has(name));
+
+    if (!hasAuthCookie) {
+      const rewriteUrl = request.nextUrl.clone();
+      rewriteUrl.pathname = '/product';
+
+      return NextResponse.rewrite(rewriteUrl, {
+        request: {
+          headers: requestHeaders,
+        },
+      });
+    }
+
     const userAgent = request.headers.get('user-agent') || '';
     const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);
+    const rewriteUrl = request.nextUrl.clone();
+    rewriteUrl.pathname = isMobile ? '/mobile' : '/desktop';
 
-    if (isMobile) {
-      return NextResponse.rewrite(new URL('/mobile', request.url));
-    } else {
-      return NextResponse.rewrite(new URL('/desktop', request.url));
-    }
+    return NextResponse.rewrite(rewriteUrl, {
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
+
+  if (hasLocalePrefix) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = pathnameWithoutLocale;
+    return NextResponse.redirect(redirectUrl, 308);
   }
 
   // Protected routes logic
   const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
 
   if (isProtectedRoute) {
-    const authCookieNames = ['connect.sid', 'Authentication', 'access_token', 'token', 'session'];
-    const hasAuthCookie = authCookieNames.some(name => request.cookies.has(name));
+    const hasAuthCookie = AUTH_COOKIE_NAMES.some(name => request.cookies.has(name));
 
     if (!hasAuthCookie) {
       const loginUrl = new URL('/login', request.url);
@@ -144,7 +175,11 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {

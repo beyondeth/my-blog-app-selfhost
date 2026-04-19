@@ -1,6 +1,6 @@
 ---
 style_name: "Tech Podcast Script Style"
-language: "korean"
+language: "english"
 min_length: 5000
 target_length: "5000-8000"
 code_block_ratio: 0.05
@@ -21,7 +21,7 @@ Use this style for audio-friendly, conversational content formatted as dialogue 
 - Content consumed while multitasking (driving, exercising, commuting)
 
 ### Recommended Signals
-**Keywords**: "대화", "질문", "설명", "토론", "인터뷰"
+**Keywords**: "conversation", "questions", "explanation", "discussion", "interview"
 **Intent**: Conversational, easy-to-follow explanation without visual dependency
 
 ### When Another Style Fits Better

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { isSafeRedirectUrl } from '@/lib/utils/sanitize';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 export type OAuthProvider = 'google'  | 'github';
 
@@ -39,6 +40,7 @@ const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/re
 export function SocialLoginButton({ provider, className = '', disabled = false }: SocialLoginButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const config = providerConfig[provider];
+  const { locale } = useLocaleContext();
 
   const sanitizeRedirect = (target?: string | null) => {
     if (typeof window === 'undefined' || !target) {
@@ -116,7 +118,7 @@ export function SocialLoginButton({ provider, className = '', disabled = false }
 
     } catch (error) {
       console.error(`${provider} 로그인 실패:`, error);
-      toast.error('로그인에 실패했습니다. 다시 시도해주세요.');
+      toast.error(locale === 'ko' ? '로그인에 실패했습니다. 다시 시도해주세요.' : 'Login failed. Please try again.');
       setIsLoading(false);
     }
   };
@@ -135,7 +137,7 @@ export function SocialLoginButton({ provider, className = '', disabled = false }
         ${isLoading || disabled ? 'opacity-50 cursor-not-allowed' : ''}
         ${className}
       `}
-      title={`Login with ${config.name}`}
+      title={locale === 'ko' ? `${config.name}로 로그인` : `Login with ${config.name}`}
     >
       {isLoading ? (
         <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-gray-400 dark:border-gray-500 border-t-transparent rounded-full animate-spin" />
@@ -143,7 +145,7 @@ export function SocialLoginButton({ provider, className = '', disabled = false }
         <div className="flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap">
           <div className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5">{config.icon}</div>
           <span className="font-medium">
-            Login with {config.name}
+            {locale === 'ko' ? `${config.name}로 로그인` : `Login with ${config.name}`}
           </span>
         </div>
       )}

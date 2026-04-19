@@ -39,7 +39,7 @@ const TagsSection = React.memo(function TagsSection({
       title={
         <div className="flex items-center gap-2">
           <FiHash className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-          <span>태그</span>
+          <span>Tags</span>
         </div>
       }
     >
@@ -64,7 +64,7 @@ const TagsSection = React.memo(function TagsSection({
               }}
               role="button"
               tabIndex={0}
-              aria-label={`${tag} 태그`}
+              aria-label={`${tag} tag`}
             >
               #{tag}
             </span>
@@ -72,7 +72,7 @@ const TagsSection = React.memo(function TagsSection({
         })}
         {tags.length === 0 && (
           <div className="text-center py-4 text-gray-500 w-full">
-            <p className="text-[15px]">태그가 없습니다.</p>
+            <p className="text-[15px]">No tags yet.</p>
           </div>
         )}
       </div>

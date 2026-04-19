@@ -34,7 +34,7 @@ const LoadMoreSection = React.memo(function LoadMoreSection({
             backgroundColor: accentSoftColor || 'transparent',
           }}
         >
-          {isFetchingNextPage ? '로딩 중...' : '더 많은 포스트 보기'}
+          {isFetchingNextPage ? 'Loading...' : 'Show more posts'}
         </button>
       </div>
     );
@@ -43,7 +43,7 @@ const LoadMoreSection = React.memo(function LoadMoreSection({
   if (allPostsCount > 0) {
     return (
       <div className="text-center py-8 text-gray-500 text-sm">
-        모든 포스트를 불러왔습니다. (총 {totalPosts}개)
+        You have reached the end. ({totalPosts} posts total)
       </div>
     );
   }

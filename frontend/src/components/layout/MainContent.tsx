@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { stripLocalePrefix } from '@/lib/i18n/config';
 
 interface MainContentProps {
   children: React.ReactNode;
@@ -14,11 +15,12 @@ interface MainContentProps {
  */
 export default function MainContent({ children }: MainContentProps) {
   const pathname = usePathname();
+  const normalizedPathname = stripLocalePrefix(pathname || '/');
 
   // Admin, 인증, 커스텀 레이아웃 페이지에서는 여백 제거
-  const isAdminPage = pathname?.startsWith('/admin');
+  const isAdminPage = normalizedPathname.startsWith('/admin');
   const authPaths = ['/login', '/register', '/consent', '/forgot-password', '/reset-password'];
-  const isAuthPage = authPaths.includes(pathname || '');
+  const isAuthPage = authPaths.includes(normalizedPathname);
   const layoutlessPaths = [
     '/mock-home-shell',
     '/mock-home-shell-ko',
@@ -26,7 +28,7 @@ export default function MainContent({ children }: MainContentProps) {
     '/mock-home-shell-harbor',
     '/mock-home-shell-harbor-white',
   ];
-  const isLayoutlessPage = layoutlessPaths.includes(pathname || '');
+  const isLayoutlessPage = layoutlessPaths.includes(normalizedPathname);
   const shouldRemoveMargin = isAdminPage || isAuthPage || isLayoutlessPage;
   const baseMarginClass = shouldRemoveMargin
     ? ''

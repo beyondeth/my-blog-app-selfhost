@@ -48,8 +48,8 @@ function useIsClient() {
 }
 
 const sortOptions = [
-  { value: 'recent', label: '최신순', icon: Clock },
-  { value: 'popular', label: '인기순', icon: Flame },
+  { value: 'recent', label: 'Newest', icon: Clock },
+  { value: 'popular', label: 'Popular', icon: Flame },
   { value: 'trending', label: 'Top', icon: TrendingUp },
 ] as const;
 
@@ -57,8 +57,8 @@ type SortType = (typeof sortOptions)[number]['value'];
 type BlogSidebarView = 'categories' | 'knowledge';
 
 const sidebarViewOptions: SidebarViewTabOption<BlogSidebarView>[] = [
-  { value: 'categories', label: '카테고리' },
-  { value: 'knowledge', label: '지식 지도' },
+  { value: 'categories', label: 'Categories' },
+  { value: 'knowledge', label: 'Knowledge map' },
 ];
 
 interface BlogClientPageProps {
@@ -226,12 +226,12 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   const hasCategoryFilter = Boolean(currentParams.category);
   const hasTagFilter = Boolean(currentTag);
   const emptyStateMessage = hasTagFilter
-    ? "이 태그의 글이 삭제되었거나 아직 발행되지 않아 표시할 내용이 없습니다."
+    ? 'No published posts are available for this tag yet.'
     : hasCategoryFilter
-    ? "이 카테고리의 글이 삭제되었거나 아직 발행되지 않아 표시할 내용이 없습니다."
+    ? 'No published posts are available for this category yet.'
     : isBlogOwner
-      ? "아직 작성된 글이 없습니다. 첫 번째 글을 작성해보세요."
-      : "아직 포스트가 없습니다.";
+      ? 'No posts yet. Publish your first one.'
+      : 'No posts yet.';
 
   // 브랜드 색상 관련 유틸
   const brandColor = useMemo(() => {
@@ -424,7 +424,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
     setDeleteDialog({
       isOpen: true,
       postId: id,
-      postTitle: post?.title || '게시글'
+      postTitle: post?.title || 'Post'
     });
   }, [allPosts]);
 
@@ -438,7 +438,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
         },
         onError: (error: any) => {
           // 에러 메시지 표시
-          const errorMessage = error?.message || error?.error || '포스트 삭제에 실패했습니다';
+          const errorMessage = error?.message || error?.error || 'Failed to delete the post.';
           toast.error(errorMessage);
           console.error('[Delete Post Error]', {
             postId: deleteDialog.postId,
@@ -486,17 +486,17 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   }, [router, blogSlug, searchParams]);
 
   if (!isClient) {
-    return <LoadingSpinner message="페이지를 불러오는 중..." />;
+    return <LoadingSpinner message="Loading page..." />;
   }
 
   if (blogLoading) {
-    return <LoadingSpinner message="블로그 정보를 불러오는 중..." />;
+    return <LoadingSpinner message="Loading blog..." />;
   }
 
   if (blogError) {
     return (
       <ErrorMessage
-        message={blogError.message || '블로그 정보를 불러오는데 실패했습니다.'}
+        message={blogError.message || 'Failed to load the blog.'}
         showBackButton={true}
       />
     );
@@ -505,7 +505,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   if (!blog) {
     return (
       <ErrorMessage 
-        message="블로그를 찾을 수 없습니다."
+        message="Blog not found."
         showBackButton={true}
       />
     );
@@ -515,7 +515,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   if (error) {
     return (
       <ErrorMessage 
-        message={`오류가 발생했습니다: ${error.message}`}
+        message={`Something went wrong: ${error.message}`}
         showBackButton={false}
       />
     );
@@ -553,7 +553,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                         : 'border-transparent text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'
                     }`}
                   >
-                    글
+                    Posts
                   </button>
                   <button
                     onClick={() => setActiveTab('products')}
@@ -563,7 +563,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                         : 'border-transparent text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'
                     }`}
                   >
-                    상품
+                    Products
                   </button>
                 </div>
                 {isBlogOwner && canManageMarketplace && activeTab === 'products' && (
@@ -571,7 +571,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                     href="/marketplace/seller"
                     className="text-xs text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300 underline underline-offset-2 pb-2"
                   >
-                    판매 관리
+                    Seller dashboard
                   </a>
                 )}
               </div>
@@ -667,11 +667,11 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                       return (
                         <div className="text-center py-16">
                           <p className="text-sm text-gray-500 dark:text-zinc-400">
-                            아직 등록된 상품이 없습니다
+                            No products yet
                           </p>
                           {isBlogOwner && canManageMarketplace && (
                             <a href="/new-product" className="mt-3 inline-block text-sm text-gray-700 dark:text-zinc-300 underline underline-offset-2">
-                              상품 등록하기
+                              Add your first product
                             </a>
                           )}
                         </div>
@@ -686,7 +686,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                               href="/new-product"
                               className="px-4 py-2 rounded-lg bg-gray-900 dark:bg-white text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
                             >
-                              + 상품 등록
+                              + Add product
                             </a>
                           </div>
                         )}
@@ -707,7 +707,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                               )}
                               <div className="mt-3 flex items-center justify-between">
                                 <span className="text-xs text-gray-400 dark:text-zinc-500">
-                                  {product.category || '상품'}
+                                  {product.category || 'Product'}
                                 </span>
                                 <span className="text-sm font-bold text-gray-900 dark:text-white">
                                   ₩{(product.productDetail?.price || 0).toLocaleString()}
@@ -723,7 +723,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                               disabled={isFetchingNextProducts}
                               className="px-6 py-2 rounded-lg border border-gray-200 dark:border-zinc-700 text-sm text-gray-600 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800"
                             >
-                              {isFetchingNextProducts ? '로딩 중...' : '더 보기'}
+                              {isFetchingNextProducts ? 'Loading...' : 'Load more'}
                             </button>
                           </div>
                         )}

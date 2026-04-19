@@ -38,28 +38,28 @@ export default function SecuritySettingsPage() {
 
       // 기본 검증
       if (!validation.hasMinLength) {
-        errors.push('최소 8자 이상');
+        errors.push('At least 8 characters');
       }
       if (!validation.hasUpperCase) {
-        errors.push('대문자 포함');
+        errors.push('Uppercase letter');
       }
       if (!validation.hasLowerCase) {
-        errors.push('소문자 포함');
+        errors.push('Lowercase letter');
       }
       if (!validation.hasNumber) {
-        errors.push('숫자 포함');
+        errors.push('Number');
       }
       if (validation.hasForbiddenChars) {
-        errors.push('사용 금지 문자 포함');
+        errors.push('Forbidden character');
       }
 
       // 추가 보안 검증
       if (isCommonPassword(passwordForm.newPassword)) {
-        errors.push('흔한 비밀번호 사용');
+        errors.push('Too common');
       }
 
       if (containsUserInfo(passwordForm.newPassword, user?.email, user?.username)) {
-        errors.push('개인정보 포함');
+        errors.push('Contains personal info');
       }
 
       setPasswordErrors(errors);
@@ -79,7 +79,7 @@ export default function SecuritySettingsPage() {
 
     // 비밀번호 일치 확인
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError('새 비밀번호가 일치하지 않습니다');
+      setError('The new passwords do not match.');
       return;
     }
 
@@ -89,26 +89,26 @@ export default function SecuritySettingsPage() {
 
       // 백엔드와 동일한 기본 요구사항 확인 (대문자, 소문자, 숫자)
       if (!validation.hasMinLength) {
-        setError('비밀번호는 최소 8자 이상이어야 합니다');
+        setError('Your password must be at least 8 characters long.');
         return;
       }
       if (!validation.hasUpperCase || !validation.hasLowerCase || !validation.hasNumber) {
-        setError('비밀번호는 최소 하나의 소문자, 하나의 대문자, 그리고 하나의 숫자를 포함해야 합니다');
+        setError('Your password must include at least one uppercase letter, one lowercase letter, and one number.');
         return;
       }
       if (validation.hasForbiddenChars) {
-        setError('비밀번호에 사용할 수 없는 문자가 포함되어 있습니다: " \' \\ < > ` 공백');
+        setError('Your password contains unsupported characters: " \' \\ < > ` or spaces.');
         return;
       }
 
       // 추가 보안 검증
       if (isCommonPassword(passwordForm.newPassword)) {
-        setError('너무 흔한 비밀번호는 사용할 수 없습니다');
+        setError('This password is too common.');
         return;
       }
 
       if (containsUserInfo(passwordForm.newPassword, user?.email, user?.username)) {
-        setError('비밀번호에 개인정보를 포함할 수 없습니다');
+        setError('Your password cannot include personal information.');
         return;
       }
     }
@@ -135,7 +135,7 @@ export default function SecuritySettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || '비밀번호 변경에 실패했습니다');
+        throw new Error(error.message || 'Failed to change the password.');
       }
 
       setPasswordForm({
@@ -148,7 +148,7 @@ export default function SecuritySettingsPage() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다');
+      setError(err.message || 'Something went wrong.');
     } finally {
       setLoading(false);
     }
@@ -159,7 +159,7 @@ export default function SecuritySettingsPage() {
     return (
       <div className="space-y-6">
         <div className={`${SETTINGS_CARD_CLASS} p-6 text-center text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300`}>
-          로그인이 필요합니다
+          Please sign in to continue.
         </div>
       </div>
     );
@@ -219,7 +219,7 @@ export default function SecuritySettingsPage() {
       default:
         return {
           icon: <FiLock className="h-5 w-5 text-gray-600 dark:text-gray-300" />,
-          name: '이메일/비밀번호',
+          name: 'Email and password',
           color: 'text-gray-600 dark:text-gray-300'
         };
     }
@@ -230,37 +230,37 @@ export default function SecuritySettingsPage() {
   return (
     <div className="space-y-6 pt-2">
       <div className="space-y-2 pt-1">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">보안 설정</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300">계정 보안을 강화하고 안전하게 관리하세요.</p>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">Security</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300">Strengthen and manage your account security.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className={`${SETTINGS_CARD_CLASS} p-4 sm:p-6`}>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">인증 정보</h3>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Sign-in method</h3>
           <div className="flex items-start sm:items-center gap-3">
             {authInfo.icon}
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{authInfo.name} 계정 사용 중</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Using {authInfo.name}</p>
               <p className="text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300">{user.email}</p>
             </div>
           </div>
         </div>
 
         <div className={`${SETTINGS_CARD_CLASS} p-4 sm:p-6 space-y-4`}>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">보안 상태</h3>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Security status</h3>
           <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
             <div className="flex items-center gap-2">
               <FiCheck className="h-4 w-4 text-emerald-500" />
-              이메일 인증 완료
+              Email verified
             </div>
             <div className="flex items-center gap-2">
               <FiShield className="h-4 w-4 text-blue-500" />
-              활성 세션: 1개
+              Active sessions: 1
             </div>
             {user.authProvider && user.authProvider !== 'local' && (
               <div className="flex items-center gap-2">
                 {authInfo.icon}
-                <span>{authInfo.name} 계정 연결됨</span>
+                <span>{authInfo.name} connected</span>
               </div>
             )}
           </div>
@@ -270,13 +270,13 @@ export default function SecuritySettingsPage() {
       {(!user.authProvider || user.authProvider === 'local') ? (
         <div className={`${SETTINGS_CARD_CLASS} p-4 sm:p-6 space-y-4`}>
             <div>
-              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">비밀번호 변경</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-300 dark:text-gray-300 mt-1">강력한 새 비밀번호를 설정하세요.</p>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Change password</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-300 dark:text-gray-300 mt-1">Set a stronger password for your account.</p>
             </div>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
                 <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  현재 비밀번호
+                  Current password
                 </label>
                 <div className="relative">
                   <input
@@ -291,7 +291,7 @@ export default function SecuritySettingsPage() {
                     type="button"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                     className="absolute inset-y-0 right-0 pr-2 flex items-center min-w-[44px] justify-center text-gray-400"
-                    aria-label={showCurrentPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
+                    aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
                   >
                     {showCurrentPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
                   </button>
@@ -300,7 +300,7 @@ export default function SecuritySettingsPage() {
 
               <div>
                 <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  새 비밀번호
+                  New password
                 </label>
                 <div className="relative">
                   <input
@@ -315,7 +315,7 @@ export default function SecuritySettingsPage() {
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
                     className="absolute inset-y-0 right-0 pr-2 flex items-center min-w-[44px] justify-center text-gray-400"
-                    aria-label={showNewPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                   >
                     {showNewPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
                   </button>
@@ -324,7 +324,7 @@ export default function SecuritySettingsPage() {
                 {passwordStrength && (
                   <div className="mt-3">
                     <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300 mb-1">
-                      <span>비밀번호 강도</span>
+                      <span>Password strength</span>
                       <span className="text-gray-700 dark:text-gray-300">{passwordStrength.scoreLabel}</span>
                     </div>
                     <div className="h-2 bg-gray-200 dark:bg-[#2F3440] rounded-full overflow-hidden">
@@ -337,34 +337,34 @@ export default function SecuritySettingsPage() {
                 )}
 
                 <div className="mt-3 p-3 rounded-xl border border-gray-100 dark:border-[#2F3440] bg-gray-50 dark:bg-[#1F2229]">
-                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">비밀번호 요구사항</p>
+                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Password requirements</p>
                   <div className="space-y-1">
                     <div className={`flex items-center text-xs ${passwordStrength?.hasMinLength ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasMinLength ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasMinLength ? 'line-through' : ''}>최소 8자 이상</span>
+                      <span className={passwordStrength?.hasMinLength ? 'line-through' : ''}>At least 8 characters</span>
                     </div>
                     <div className={`flex items-center text-xs ${passwordStrength?.hasUpperCase ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasUpperCase ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasUpperCase ? 'line-through' : ''}>대문자 포함 (A-Z)</span>
+                      <span className={passwordStrength?.hasUpperCase ? 'line-through' : ''}>Uppercase letter (A-Z)</span>
                     </div>
                     <div className={`flex items-center text-xs ${passwordStrength?.hasLowerCase ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasLowerCase ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasLowerCase ? 'line-through' : ''}>소문자 포함 (a-z)</span>
+                      <span className={passwordStrength?.hasLowerCase ? 'line-through' : ''}>Lowercase letter (a-z)</span>
                     </div>
                     <div className={`flex items-center text-xs ${passwordStrength?.hasNumber ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasNumber ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasNumber ? 'line-through' : ''}>숫자 포함 (0-9)</span>
+                      <span className={passwordStrength?.hasNumber ? 'line-through' : ''}>Number (0-9)</span>
                     </div>
                     <div className={`flex items-center text-xs ${passwordStrength?.hasSpecialChar ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasSpecialChar ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasSpecialChar ? 'line-through' : ''}>특수문자 포함 (!@#$%^&*)</span>
+                      <span className={passwordStrength?.hasSpecialChar ? 'line-through' : ''}>Special character (!@#$%^&*)</span>
                     </div>
                   </div>
                 </div>
 
                 {passwordErrors.length > 0 && (
                   <div className={`mt-3 rounded-xl p-3 ${DESTRUCTIVE_SURFACE_CLASS}`}>
-                    <p className="text-xs font-semibold text-[#7A271A] dark:text-red-200 mb-1">해결해야 할 항목</p>
+                    <p className="text-xs font-semibold text-[#7A271A] dark:text-red-200 mb-1">Needs attention</p>
                     <ul className="text-xs text-[#7A271A] dark:text-red-200 space-y-0.5">
                       {passwordErrors.map((error, index) => (
                         <li key={index} className="flex items-start gap-1">
@@ -376,12 +376,12 @@ export default function SecuritySettingsPage() {
                   </div>
                 )}
 
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300">최소 8자 이상, 영문 대소문자와 숫자를 포함하세요.</p>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300">Use at least 8 characters with uppercase, lowercase, and numbers.</p>
               </div>
 
               <div>
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  새 비밀번호 확인
+                  Confirm new password
                 </label>
                 <div className="relative">
                   <input
@@ -396,7 +396,7 @@ export default function SecuritySettingsPage() {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute inset-y-0 right-0 pr-2 flex items-center min-w-[44px] justify-center text-gray-400"
-                    aria-label={showConfirmPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                   >
                     {showConfirmPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
                   </button>
@@ -415,7 +415,7 @@ export default function SecuritySettingsPage() {
                   }}
                   className={`${SETTINGS_PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}
                 >
-                  {loading ? '변경 중...' : '비밀번호 변경'}
+                  {loading ? 'Updating...' : 'Update password'}
                 </button>
               </div>
             </form>
@@ -426,17 +426,17 @@ export default function SecuritySettingsPage() {
             <FiAlertCircle className="h-5 w-5 text-gray-500 dark:text-gray-300 dark:text-gray-300 mt-0.5" />
             <div className="space-y-2">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">소셜 로그인 사용 중</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Social sign-in active</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300 mt-1">
-                  {authInfo.name} 계정으로 로그인하셨습니다. 비밀번호는 {authInfo.name}에서 관리됩니다.
+                  You signed in with {authInfo.name}. Your password is managed by {authInfo.name}.
                 </p>
               </div>
               <div className="rounded-xl border border-gray-100 dark:border-[#2F3440] bg-gray-50 dark:bg-[#1F2229] p-3 space-y-1">
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">보안 강화 팁</p>
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Security tips</p>
                 <ul className="text-xs text-gray-600 dark:text-gray-300 dark:text-gray-300 space-y-1 list-disc list-inside">
-                  <li>{authInfo.name} 계정에서 2단계 인증을 활성화하세요.</li>
-                  <li>정기적으로 {authInfo.name} 보안 설정을 검토하세요.</li>
-                  <li>의심스러운 로그인 활동이 없는지 확인하세요.</li>
+                  <li>Enable two-factor authentication on your {authInfo.name} account.</li>
+                  <li>Review your {authInfo.name} security settings regularly.</li>
+                  <li>Watch for suspicious sign-in activity.</li>
                 </ul>
               </div>
             </div>
@@ -451,7 +451,7 @@ export default function SecuritySettingsPage() {
       )}
       {success && (
         <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
-          보안 설정이 성공적으로 업데이트되었습니다!
+          Security settings were updated successfully.
         </div>
       )}
     </div>

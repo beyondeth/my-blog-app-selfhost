@@ -17,11 +17,9 @@ import {
   FiSettings,
   FiLogOut,
   FiChevronDown,
-  FiShield,
   FiBell,
+  FiBookOpen,
   FiHelpCircle,
-  FiUsers,
-  FiMessageCircle,
   FiCreditCard,
   FiTrendingUp,
   FiKey,
@@ -30,12 +28,7 @@ import {
 } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
 import { canAccessSubscriptionUi } from '@/lib/subscription-access';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { routes } from '@/lib/navigation';
 import { useMyCommunities } from '@/hooks/community/useCommunities';
 
 interface ProfileDropdownProps {
@@ -78,29 +71,25 @@ export default function ProfileDropdown({
   }
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <DropdownMenu modal={false}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center space-x-2 px-3 py-2 text-sm text-foreground rounded-md border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-gray-600">
-                <div className="flex items-center space-x-2">
-                  <Avatar
-                    src={user.profileImage}
-                    alt={user.username}
-                    fallback={user.username}
-                    size="sm"
-                  />
-                  <span className="font-medium">{user.username}</span>
-                  <FiChevronDown className="w-4 h-4" />
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={5}>
-            <p className="text-sm">계정</p>
-          </TooltipContent>
-        </Tooltip>
+    <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Account menu"
+            className="flex items-center space-x-2 px-3 py-2 text-sm text-foreground rounded-md border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-gray-600"
+          >
+            <div className="flex items-center space-x-2">
+              <Avatar
+                src={user.profileImage}
+                alt={user.username}
+                fallback={user.username}
+                size="sm"
+              />
+              <span className="font-medium">{user.username}</span>
+              <FiChevronDown className="w-4 h-4" />
+            </div>
+          </button>
+        </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>
           <div className="flex flex-col space-y-1">
@@ -119,7 +108,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiCreditCard className="mr-2 h-4 w-4" />
-          <span>구독 관리</span>
+          <span>Manage subscription</span>
         </DropdownMenuItem>
 
         {/* 요금제 */}
@@ -128,7 +117,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiTrendingUp className="mr-2 h-4 w-4" />
-          <span>요금제</span>
+          <span>Pricing</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -141,7 +130,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiUser className="mr-2 h-4 w-4" />
-          <span>프로필 설정</span>
+          <span>Profile settings</span>
         </DropdownMenuItem>
 
         {/* Blog Settings */}
@@ -150,7 +139,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiSettings className="mr-2 h-4 w-4" />
-          <span>블로그 설정</span>
+          <span>Blog settings</span>
         </DropdownMenuItem>
 
         <DropdownMenuItem
@@ -158,7 +147,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiKey className="mr-2 h-4 w-4" />
-          <span>자동포스팅 연결</span>
+          <span>Auto-posting connection</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -169,7 +158,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiFileText className="mr-2 h-4 w-4" />
-          <span>내 초안</span>
+          <span>My drafts</span>
         </DropdownMenuItem>
 
         {/* 북마크 */}
@@ -178,7 +167,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiBookmark className="mr-2 h-4 w-4" />
-          <span>북마크</span>
+          <span>Bookmarks</span>
         </DropdownMenuItem>
         
         {/* Managed Communities */}
@@ -186,7 +175,7 @@ export default function ProfileDropdown({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1.5">
-              커뮤니티 관리
+              Manage communities
             </DropdownMenuLabel>
             {managedCommunities.map((community) => (
               <DropdownMenuItem
@@ -207,11 +196,19 @@ export default function ProfileDropdown({
 
         {/* Customer Support */}
         <DropdownMenuItem
+          onClick={() => handleNavigation(routes.docs())}
+          className="cursor-pointer"
+        >
+          <FiBookOpen className="mr-2 h-4 w-4" />
+          <span>Guides</span>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
           onClick={() => handleNavigation('/support')}
           className="cursor-pointer"
         >
           <FiHelpCircle className="mr-2 h-4 w-4" />
-          <span>고객센터</span>
+          <span>Support</span>
         </DropdownMenuItem>
 
         {/* Notifications (Feature Flag) */}
@@ -221,7 +218,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiBell className="mr-2 h-4 w-4" />
-          <span>알림</span>
+          <span>Notifications</span>
         </DropdownMenuItem>
         )}
 
@@ -233,10 +230,9 @@ export default function ProfileDropdown({
           className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
         >
           <FiLogOut className="mr-2 h-4 w-4" />
-          <span>로그아웃</span>
+          <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
-      </DropdownMenu>
-    </TooltipProvider>
+    </DropdownMenu>
   );
 }

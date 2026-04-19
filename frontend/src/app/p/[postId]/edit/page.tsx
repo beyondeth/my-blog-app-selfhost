@@ -40,7 +40,7 @@ export default function EditPostPage() {
       const isBlogOwner = post.blog?.owner?.id === user.id || post.blog?.userId === user.id;
 
       if (!isAuthor && !isBlogOwner && !isAdmin) {
-        toast.error('이 글을 수정할 권한이 없습니다.');
+        toast.error('You do not have permission to edit this post.');
         // 새 URL 구조로 리다이렉트
         if (post.blog?.slug) {
           router.push(`/${post.blog.slug}/${post.slug || post.id}`);
@@ -51,8 +51,8 @@ export default function EditPostPage() {
     }
   }, [isLoading, post, user, isAdmin, router, postIdOrSlug]);
 
-  if (isLoading) return <LoadingSpinner message="게시글을 불러오는 중..." />;
-  if (error || !post) return <ErrorMessage message={`게시글을 불러올 수 없습니다. (${error?.message || 'Unknown error'})`} showBackButton={true} />;
+  if (isLoading) return <LoadingSpinner message="Loading post..." />;
+  if (error || !post) return <ErrorMessage message={`Unable to load the post. (${error?.message || 'Unknown error'})`} showBackButton={true} />;
 
   // Blog 정보 추출 (post.blog에서)
   const blogInfo = post.blog ? {

@@ -77,26 +77,26 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
 
   const handleSave = async (dto: UpdateCommunityWidgetInput) => {
     if (!widget) return;
-    setStatus('저장 중...');
+    setStatus('Saving...');
     try {
       await updateMutation.mutateAsync({ widgetId: widget.id, dto });
-      setStatus('저장되었습니다.');
+      setStatus('Saved.');
     } catch (error: any) {
-      setStatus(error?.message || '저장에 실패했습니다.');
+      setStatus(error?.message || 'Failed to save the widget.');
     }
   };
 
   const handleCreateWidget = async (type: string) => {
     setPendingType(type);
-    setStatus('새 위젯을 추가하는 중...');
+    setStatus('Adding a new widget...');
     try {
       const payload = buildInitialWidgetPayload(type as any, community);
       const created = await createMutation.mutateAsync(payload);
       selectWidget(created);
       setLocalWidgets((prev) => [...prev, created]);
-      setStatus('새 위젯이 추가되었습니다. 사이드바를 확인하세요.');
+      setStatus('New widget added. Check the sidebar.');
     } catch (error: any) {
-      setStatus(error?.message || '위젯 추가에 실패했습니다.');
+      setStatus(error?.message || 'Failed to add the widget.');
     } finally {
       setPendingType(null);
     }
@@ -119,16 +119,16 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
   const canDeleteSelected = Boolean(widget && deletableTypes.has(widget.type));
 
   const handleDeleteWidget = async (widgetId: string) => {
-    setStatus('위젯을 삭제하는 중...');
+    setStatus('Deleting widget...');
     try {
       await deleteMutation.mutateAsync(widgetId);
-      setStatus('위젯을 삭제했습니다.');
+      setStatus('Widget deleted.');
       setLocalWidgets((prev) => prev.filter((widgetItem) => widgetItem.id !== widgetId));
       if (selectedWidget?.id === widgetId) {
         selectWidget(null);
       }
     } catch (error: any) {
-      setStatus(error?.message || '위젯을 삭제하지 못했습니다.');
+      setStatus(error?.message || 'Failed to delete the widget.');
     } finally {
       setPendingDeleteId(null);
     }
@@ -149,25 +149,25 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#3C3D37]">
               <div className="flex flex-col gap-1">
                 <p className="text-base font-semibold text-gray-900 dark:text-white">
-                  {widget?.title || '위젯 선택'}
+                  {widget?.title || 'Select a widget'}
                 </p>
                 <span className="text-xs text-gray-600 dark:text-gray-200">
-                  {status || '사이드바에서 위젯을 선택해 구성하세요.'}
+                  {status || 'Select a widget from the sidebar to configure it.'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => selectWidget(null)}>
-                  초기화
+                  Reset
                 </Button>
                 <Button size="sm" onClick={() => setEditing(false)}>
-                  닫기
+                  Close
                 </Button>
               </div>
             </div>
 
             <div className="max-h-[60vh] overflow-y-auto p-6 space-y-5 bg-white dark:bg-transparent">
               <section className="space-y-3 rounded-2xl border border-gray-200 dark:border-[#3C3D37] bg-gray-50 dark:bg-[#3C3D37] p-4">
-                <p className="text-sm font-semibold">위젯 추가</p>
+                <p className="text-sm font-semibold">Add widget</p>
                 <div className="flex flex-wrap gap-2">
                   {widgetTypeOptions.map((option) => {
                     const isSelectedType = selectedWidget?.type === option.type;
@@ -195,29 +195,29 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
                         onClick={() => {
                           if (alreadyExists && existingWidget) {
                             selectWidget(existingWidget);
-                            setStatus(`${option.label} 위젯 설정을 열었습니다.`);
+                            setStatus(`Opened settings for ${option.label}.`);
                             return;
                           }
                           handleCreateWidget(option.type);
                         }}
                         title={
                           alreadyExists
-                            ? '이미 추가된 위젯입니다. 버튼을 눌러 구성 화면으로 이동하세요.'
+                            ? 'This widget already exists. Click to open its configuration.'
                             : option.description
                         }
                       >
-                        {pendingType === option.type ? '추가 중...' : option.label}
+                        {pendingType === option.type ? 'Adding...' : option.label}
                       </Button>
                     );
                   })}
                 </div>
                 <p className="text-xs text-gray-700 dark:text-white">
-                  말머리/규칙/북마크 등 일부 위젯은 커뮤니티당 1개만 존재합니다. 이미 존재한다면 목록에서 선택해 수정하세요.
+                  Some widgets, such as flairs, rules, and bookmarks, can only exist once per community. If one already exists, select it from the list and edit it there.
                 </p>
               </section>
 
               <section className="space-y-3 rounded-2xl border border-gray-200 dark:border-[#3C3D37] bg-gray-50 dark:bg-[#3C3D37] p-4">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">현재 위젯</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Current widgets</p>
                 <div className="flex flex-wrap gap-2">
                   {sortedWidgets.map((item) => {
                     const isSelected = selectedWidget?.id === item.id;
@@ -251,7 +251,7 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
                                   : 'text-amber-600 dark:text-amber-200',
                               )}
                             >
-                              비활성
+                              Hidden
                             </span>
                           )}
                         </span>
@@ -261,7 +261,7 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
                           type="button"
                           className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white text-[9px] shadow focus:outline-none dark:bg-white dark:text-[#181C14]"
                           onClick={() => setPendingDeleteId(item.id)}
-                          aria-label={`${resolveWidgetTitle(item)} 삭제`}
+                          aria-label={`Delete ${resolveWidgetTitle(item)}`}
                         >
                           ×
                         </button>
@@ -270,7 +270,7 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
                   )})}
                   {sortedWidgets.length === 0 && (
                     <p className="text-xs text-gray-500 dark:text-gray-200">
-                      아직 위젯이 없습니다. 위에서 타입을 선택해 추가해보세요.
+                      No widgets yet. Choose a type above to add one.
                     </p>
                   )}
                 </div>
@@ -288,7 +288,7 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
                   />
                 ) : (
                   <p className="text-sm text-gray-500 dark:text-gray-200">
-                    위젯을 선택하거나 새로운 위젯을 추가하면 이곳에서 상세 설정을 수정할 수 있습니다.
+                    Select a widget or add a new one to edit its detailed settings here.
                   </p>
                 )}
               </section>
@@ -300,21 +300,21 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
     <AlertDialog open={Boolean(pendingDeleteId)} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
       <AlertDialogContent className="bg-white dark:bg-[#0b1220] dark:text-gray-100 border border-gray-100 dark:border-[#24304a]">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-gray-900 dark:text-gray-50">위젯을 삭제할까요?</AlertDialogTitle>
+          <AlertDialogTitle className="text-gray-900 dark:text-gray-50">Delete this widget?</AlertDialogTitle>
           <AlertDialogDescription className="text-gray-600 dark:text-gray-300">
-            삭제하면 해당 위젯의 설정과 내용이 모두 사라집니다. 다시 추가해야 복원할 수 있습니다.
+            Deleting this widget removes all of its settings and content. You will need to add it again to restore it.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel className="bg-gray-100 text-gray-800 dark:bg-[#161c2d] dark:text-gray-100 border border-gray-200 dark:border-[#2c344b]">
-            취소
+            Cancel
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={() => pendingDeleteId && handleDeleteWidget(pendingDeleteId)}
             className="bg-[#ef4444] hover:bg-[#dc2626] focus:ring-[#ef4444] text-white"
             disabled={deleteMutation.isPending}
           >
-            삭제
+            Delete
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

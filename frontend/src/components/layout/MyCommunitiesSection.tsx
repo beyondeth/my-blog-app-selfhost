@@ -43,7 +43,7 @@ const CommunityRecentPosts = ({ communitySlug, isExpanded, onToggle, posts, isLo
         }}
         className="flex w-full items-center justify-end gap-1 text-xs text-[#3F4A59] hover:text-[#264653] dark:text-[#E1E8F0] dark:hover:text-[#6CC3B2] transition-colors"
       >
-        {!isExpanded && <span>최신글</span>}
+        {!isExpanded && <span>Recent posts</span>}
         {isExpanded ? (
           <ChevronUp className="h-3.5 w-3.5" />
         ) : (
@@ -57,10 +57,10 @@ const CommunityRecentPosts = ({ communitySlug, isExpanded, onToggle, posts, isLo
           {isLoading ? (
             <div className="flex items-center gap-1.5 py-1">
               <Loader2 className="h-3 w-3 animate-spin text-[#3F4A59] dark:text-[#E1E8F0]" />
-              <span className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">로딩 중...</span>
+              <span className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">Loading...</span>
             </div>
           ) : !posts || posts.length === 0 ? (
-            <p className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">최신글이 없습니다</p>
+            <p className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">No recent posts yet.</p>
           ) : (
             posts.map((post) => (
               <Link
@@ -102,7 +102,7 @@ const CommunityCard = ({ community, isExpanded, onToggle, renderImage, recentPos
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{community.name || community.slug}</p>
           <p className="truncate text-xs text-[#3F4A59] dark:text-[#E1E8F0]">
-            {community.memberCount?.toLocaleString() || 0}명 참여 중
+            {(community.memberCount?.toLocaleString() || 0)} members
           </p>
         </div>
       </Link>
@@ -206,7 +206,7 @@ const MyCommunitiesSection = () => {
       title={
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-[#264653] dark:text-[#6CC3B2]" />
-          <span>내 커뮤니티</span>
+          <span>My communities</span>
         </div>
       }
     >
@@ -227,17 +227,17 @@ const MyCommunitiesSection = () => {
         </div>
       ) : error ? (
         <div className="text-sm text-[#4B5563] dark:text-[#C7D1DD]">
-          커뮤니티 목록을 불러오는 중 오류가 발생했어요.
+          We couldn&apos;t load your communities.
           <button
             type="button"
             className="ml-2 text-[#264653] underline dark:text-[#6CC3B2]"
             onClick={() => refetch()}
           >
-            다시 시도
+            Try again
           </button>
         </div>
       ) : communities.length === 0 ? (
-        <p className="text-sm text-[#4B5563] dark:text-[#C7D1DD]">가입한 커뮤니티가 아직 없습니다.</p>
+        <p className="text-sm text-[#4B5563] dark:text-[#C7D1DD]">You haven&apos;t joined any communities yet.</p>
       ) : (
         <div className="-mx-5 divide-y divide-[#E5E7EB] dark:divide-[#4B5563]">
           {communities.map((community) => (
@@ -258,7 +258,7 @@ const MyCommunitiesSection = () => {
                 href="/c?tab=joined"
                 className="text-sm text-[#4B5563] hover:text-[#264653] dark:text-[#A9B4C2] dark:hover:text-[#6CC3B2] transition-colors"
               >
-                더보기
+                View more
               </Link>
             </div>
           )}

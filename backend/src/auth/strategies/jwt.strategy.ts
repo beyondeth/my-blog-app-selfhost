@@ -150,7 +150,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       this.logger.warn("[JWT] User account is permanently banned");
       throw new ForbiddenException({
         statusCode: 403,
-        message: "계정이 영구 차단되었습니다. 관리자에게 문의해주세요.",
+        message: "This account has been permanently banned. Contact support for assistance.",
         error: "Forbidden",
         code: "ACCOUNT_BANNED",
         reason: user.banReason,
@@ -172,7 +172,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
       throw new ForbiddenException({
         statusCode: 403,
-        message: `계정이 정지되었습니다. ${suspensionEnd.toLocaleString("ko-KR")}까지 로그인할 수 없습니다.`,
+        message: `Your account is suspended until ${suspensionEnd.toLocaleString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          timeZoneName: "short",
+        })}.`,
         error: "Forbidden",
         code: "ACCOUNT_SUSPENDED",
         reason: user.suspensionReason,

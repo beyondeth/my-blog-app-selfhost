@@ -60,10 +60,10 @@ import {
 // Define schema for community post editing
 const communityPostFormSchema = z.object({
   title: z.string()
-    .min(1, { message: "제목을 입력해주세요." })
-    .max(200, { message: "제목은 200자 이하로 입력해주세요." }),
+    .min(1, { message: "Please enter a title." })
+    .max(200, { message: "Title must be 200 characters or fewer." }),
   content: z.string()
-    .min(1, { message: "내용을 입력해주세요." }),
+    .min(1, { message: "Please enter the content." }),
   flairId: z.string().optional(),
   tags: z.array(z.string()).optional(),
   attachedFileIds: z.array(z.string()).optional(),
@@ -76,7 +76,7 @@ const IMAGE_URL_PATTERN = /\.(png|jpe?g|gif|webp|svg)$/i;
 const FALLBACK_USER_BLOG = {
   id: 'my-blog',
   slug: 'my-blog',
-  name: '내 블로그',
+  name: 'My blog',
 };
 
 // MarkdownImageInfo 타입은 @/types/image-metadata.types에서 import
@@ -329,7 +329,7 @@ export default function CommunityPostEditForm({
     const currentIds = form.getValues('attachedFileIds') || [];
     const index = currentIds.indexOf(fileId);
     if (index === -1) {
-      toast.warning('썸네일로 지정할 이미지를 찾을 수 없습니다.');
+      toast.warning('Could not find the image to use as the thumbnail.');
       return;
     }
     handleThumbnailChange(fileId);
@@ -339,7 +339,7 @@ export default function CommunityPostEditForm({
     if (!videoId) return;
     setSelectedYouTubeThumbnailId(videoId);
     handleThumbnailChange(null);
-    toast.success('YouTube 영상을 썸네일로 지정했습니다.');
+    toast.success('YouTube video set as the thumbnail.');
   }, [handleThumbnailChange]);
 
   const executeEditorModeChange = useCallback((mode: EditorMode) => {
@@ -354,7 +354,7 @@ export default function CommunityPostEditForm({
       } else {
         const issues = getRichEditorCompatibilityIssues(currentContent);
         if (issues.length > 0) {
-          toast.error(`리치 편집기로 안전하게 전환할 수 없는 요소가 있습니다: ${issues.join(', ')}`);
+          toast.error(`Some elements cannot be converted safely to the rich editor: ${issues.join(', ')}`);
           return;
         }
         const html = convertMarkdownToHtml(currentContent);
@@ -363,7 +363,7 @@ export default function CommunityPostEditForm({
       setEditorMode(mode);
     } catch (error) {
       console.error('Failed to switch editor mode', error);
-      toast.error('편집 모드를 전환하지 못했습니다.');
+      toast.error('Failed to switch editor modes.');
     } finally {
       setIsSwitchingEditorMode(false);
       setIsConfirmDialogOpen(false);
@@ -392,7 +392,7 @@ export default function CommunityPostEditForm({
       markdownVideoState.stage === 'uploading' ||
       markdownVideoState.stage === 'processing';
     if (isVideoBusy) {
-      toast.warning('비디오 업로드/처리가 끝난 후에 저장할 수 있습니다.');
+      toast.warning('You can save after the video upload and processing are complete.');
       return;
     }
 
@@ -461,7 +461,7 @@ export default function CommunityPostEditForm({
 
   const handleMarkdownImageFile = useCallback(async (file: File) => {
     if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
-      toast.error('SVG 이미지는 업로드할 수 없습니다.');
+      toast.error('SVG images cannot be uploaded.');
       return;
     }
     setIsMarkdownImageUploading(true);
@@ -474,7 +474,7 @@ export default function CommunityPostEditForm({
       const fileId = result.id;
       const imageUrl = normalizeImageUrl(result.accessUrl || result.fileUrl || '');
       if (!fileId || !imageUrl) {
-        throw new Error('이미지 업로드 결과가 올바르지 않습니다.');
+        throw new Error('The image upload response was invalid.');
       }
 
       fileMetadataRef.current.set(fileId, {
@@ -501,9 +501,9 @@ export default function CommunityPostEditForm({
         handleThumbnailChange(fileId);
       }
 
-      toast.success('이미지를 본문에 삽입했습니다.');
+      toast.success('Image inserted into the post.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다.';
+      const message = error instanceof Error ? error.message : 'Failed to upload the image.';
       toast.error(message);
     } finally {
       setIsMarkdownImageUploading(false);
@@ -526,10 +526,10 @@ export default function CommunityPostEditForm({
       const result = await uploadMarkdownVideo(file);
       if (result && result.success && result.url) {
         insertMarkdownSnippet(`<video controls src="${result.url}" data-video-id="${result.videoId}"></video>`);
-        toast.success('비디오를 본문에 추가했습니다.');
+        toast.success('Video added to the post.');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '비디오 업로드에 실패했습니다.';
+      const message = error instanceof Error ? error.message : 'Failed to upload the video.';
       toast.error(message);
     } finally {
       setIsMarkdownVideoUploading(false);
@@ -538,16 +538,16 @@ export default function CommunityPostEditForm({
 
   const markdownVideoStatusMessage = useMemo(() => {
     if (markdownVideoState.stage === 'uploading') {
-      return `비디오 업로드 중 (${Math.round(markdownVideoState.uploadProgress)}%)`;
+      return `Uploading video (${Math.round(markdownVideoState.uploadProgress)}%)`;
     }
     if (markdownVideoState.stage === 'processing') {
-      return '서버에서 비디오를 처리하고 있습니다...';
+      return 'Processing video on the server...';
     }
     if (markdownVideoState.stage === 'complete') {
-      return '비디오 업로드가 완료되었습니다.';
+      return 'Video upload completed.';
     }
     if (markdownVideoState.stage === 'error') {
-      return markdownVideoState.error ?? '비디오 업로드 오류가 발생했습니다.';
+      return markdownVideoState.error ?? 'An error occurred while uploading the video.';
     }
     return null;
   }, [markdownVideoState]);
@@ -683,7 +683,7 @@ export default function CommunityPostEditForm({
       {publishTarget && (
         <div className="mb-3 pt-8">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-700 dark:text-gray-100">발행 위치:</span>
+            <span className="text-sm text-gray-700 dark:text-gray-100">Publishing to:</span>
             <PublishTargetSelector
               value={publishTarget}
               onChange={() => undefined}
@@ -698,7 +698,7 @@ export default function CommunityPostEditForm({
           <Card className="border-0 shadow-none bg-transparent">
             <CardContent className={`space-y-4 ${hasPublishTarget ? '' : 'pt-12'} px-4`}>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                작성 중인 내용은 자동으로 임시 저장됩니다.
+                Your draft is saved automatically while you write.
               </p>
               <FormField
                 control={form.control}
@@ -709,8 +709,8 @@ export default function CommunityPostEditForm({
                       <FloatingTitleField
                         field={field}
                         disabled={isLoading}
-                        label="제목"
-                        placeholder="당신의 이야기를 들려주세요..."
+                        label="Title"
+                        placeholder="Share your story..."
                       />
                     </FormControl>
                     <FormMessage />
@@ -725,15 +725,15 @@ export default function CommunityPostEditForm({
                     name="flairId"
                     render={({ field }) => (
                       <FormItem>
-                        <Label className="text-sm font-medium">말머리 (선택)</Label>
+                        <Label className="text-sm font-medium">Flair (optional)</Label>
                         <Select
                           value={field.value ?? '__none__'}
                           onValueChange={(value) => field.onChange(value === '__none__' ? undefined : value)}
                           disabled={isLoading}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="말머리 선택">
+                          >
+                            <FormControl>
+                              <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select a flair">
                                 {selectedCommunityFlair && (
                                   <FlairBadge flair={selectedCommunityFlair} size="sm" />
                                 )}
@@ -741,7 +741,7 @@ export default function CommunityPostEditForm({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="__none__">말머리 없음</SelectItem>
+                            <SelectItem value="__none__">No flair</SelectItem>
                             {availableCommunityFlairs.map((flair) => (
                               <SelectItem key={flair.id} value={flair.id}>
                                 <FlairBadge flair={flair} size="sm" />
@@ -760,7 +760,7 @@ export default function CommunityPostEditForm({
                     <div>
                       <Label className="text-sm font-medium">NSFW</Label>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        성인용 또는 민감한 콘텐츠입니다
+                        Adult or sensitive content
                       </p>
                     </div>
                     <Switch
@@ -771,9 +771,9 @@ export default function CommunityPostEditForm({
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm font-medium">스포일러</Label>
+                      <Label className="text-sm font-medium">Spoiler</Label>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        스포일러가 포함된 콘텐츠입니다
+                        Content that includes spoilers
                       </p>
                     </div>
                     <Switch
@@ -791,7 +791,7 @@ export default function CommunityPostEditForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <TagInputField field={field} disabled={isLoading} label="태그" />
+                      <TagInputField field={field} disabled={isLoading} label="Tags" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -810,14 +810,14 @@ export default function CommunityPostEditForm({
                   const previewContent =
                     field.value && field.value.trim().length > 0
                       ? field.value
-                      : '미리보기 내용이 여기에 표시됩니다.';
+                      : 'Preview content will appear here.';
 
                   return (
                     <FormItem>
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
                           <Plus className="h-3 w-3" />
-                          <span>본문 작성</span>
+                          <span>Write your post</span>
                         </div>
                         <div className="inline-flex rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1 text-xs font-medium">
                           {(['rich', 'markdown'] as EditorMode[]).map((mode) => (
@@ -832,12 +832,12 @@ export default function CommunityPostEditForm({
                               }`}
                               disabled={editorMode === mode || isSwitchingEditorMode}
                             >
-                              {mode === 'rich' ? '리치 텍스트' : 'Markdown'}
+                              {mode === 'rich' ? 'Rich text' : 'Markdown'}
                             </button>
                           ))}
                           {isSwitchingEditorMode && (
                             <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
-                              전환 중...
+                              Switching...
                             </span>
                           )}
                         </div>
@@ -869,7 +869,7 @@ export default function CommunityPostEditForm({
                                 disabled={isMarkdownImageUploading}
                               >
                                 <ImageIcon className="h-4 w-4 mr-1.5" />
-                                이미지 업로드
+                                Upload image
                               </Button>
                               <Button
                                 type="button"
@@ -879,11 +879,11 @@ export default function CommunityPostEditForm({
                                 disabled={isMarkdownVideoUploading}
                               >
                                 <Film className="h-4 w-4 mr-1.5" />
-                                영상 업로드
+                                Upload video
                               </Button>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 업로드 중...
+                                  Uploading image...
                                 </span>
                               )}
                               {markdownVideoStatusMessage && (
@@ -892,7 +892,7 @@ export default function CommunityPostEditForm({
                                 </span>
                               )}
                               <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                업로드 시 아래 목록에서 썸네일을 고를 수 있어요.
+                                After upload, you can choose a thumbnail from the list below.
                               </span>
                             </div>
                             <div className="space-y-4">
@@ -907,16 +907,16 @@ export default function CommunityPostEditForm({
                               </div>
                               <div className="space-y-1">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지는 시각적으로 편집할 수 있으며, 텍스트는 Markdown 문법을 따릅니다.
+                                  Images can be edited visually, while text follows Markdown syntax.
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 링크를 붙여넣으면 자동으로 <code>![이미지]</code> 형식으로 바뀝니다.
+                                  Pasting an image URL automatically converts it to <code>![image]</code>.
                                 </p>
                               </div>
                               <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 lg:p-6 bg-white dark:bg-gray-900">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between">
-                                  <span>실시간 미리보기</span>
-                                  <span className="text-[11px] text-gray-400 dark:text-gray-500">이미지, 표, 코드까지 즉시 반영돼요.</span>
+                                  <span>Live preview</span>
+                                  <span className="text-[11px] text-gray-400 dark:text-gray-500">Images, tables, and code render instantly.</span>
                                 </p>
                               <HtmlContentRenderer
                                 content={convertMarkdownToHtml(previewContent)}
@@ -928,15 +928,15 @@ export default function CommunityPostEditForm({
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  업로드한 이미지
+                                  Uploaded images
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  썸네일은 이미지 또는 YouTube에서 선택할 수 있습니다.
+                                  You can choose the thumbnail from an image or YouTube video.
                                 </span>
                               </div>
                               {isResolvingFileMetadata && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 정보를 불러오는 중입니다...
+                                  Loading image details...
                                 </p>
                               )}
                               {markdownImages.length > 0 ? (
@@ -952,17 +952,17 @@ export default function CommunityPostEditForm({
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  업로드한 이미지가 없습니다. 위의 버튼으로 이미지를 추가하면 여기에서 미리보고 썸네일을 지정할 수 있어요.
+                                  No uploaded images yet. Add one with the button above to preview it here and set a thumbnail.
                                 </p>
                               )}
                             </div>
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  본문 내 YouTube
+                                  YouTube in this post
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  YouTube 링크가 있으면 여기서 썸네일로 선택할 수 있어요.
+                                  If your post includes YouTube links, you can use them as thumbnails here.
                                 </span>
                               </div>
                               {markdownYouTubeIds.length > 0 ? (
@@ -978,7 +978,7 @@ export default function CommunityPostEditForm({
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  본문에 YouTube 링크를 추가하면 목록에 표시됩니다.
+                                  Add a YouTube link to the post and it will appear here.
                                 </p>
                               )}
                             </div>
@@ -1008,7 +1008,7 @@ export default function CommunityPostEditForm({
                               <BlogSimpleEditor
                                 content={field.value}
                                 onChange={field.onChange}
-                                placeholder=" 내용을 입력하세요..."
+                                placeholder="Write your content..."
                                 thumbnailImageId={watchedThumbnailImageId || undefined}
                                 onThumbnailChange={handleThumbnailChange}
                                 onFileIdsChange={handleFileIdsChange}
@@ -1032,7 +1032,7 @@ export default function CommunityPostEditForm({
               onClick={onCancel}
               disabled={isSaving}
             >
-              취소
+              Cancel
             </Button>
             <Button
               type="submit"
@@ -1041,18 +1041,18 @@ export default function CommunityPostEditForm({
                 if (isSaveDisabled && isVideoBusy) {
                   e.preventDefault();
                   e.stopPropagation();
-                  toast.warning('비디오 업로드/처리가 끝난 후에 저장할 수 있습니다.');
+                  toast.warning('You can save after the video upload and processing are complete.');
                 }
               }}
               className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 min-w-[88px] text-[13px] font-semibold rounded-md bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-gray-100 shadow-lg"
-              aria-label={isSaving ? "저장 중" : "저장"}
+              aria-label={isSaving ? "Saving" : "Save"}
             >
               {isSaving ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  저장
+                  Save
                 </>
               )}
             </Button>
@@ -1071,9 +1071,9 @@ export default function CommunityPostEditForm({
             executeEditorModeChange(pendingEditorMode);
           }
         }}
-        title="편집 모드 변경"
-        description="편집 모드를 변경하면 일부 서식이 변환되거나 유실될 수 있습니다. 계속하시겠습니까?"
-        confirmText="계속하기"
+        title="Change editor mode"
+        description="Switching editor modes may convert or remove some formatting. Do you want to continue?"
+        confirmText="Continue"
       />
     </>
   );

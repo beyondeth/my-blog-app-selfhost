@@ -31,6 +31,7 @@ export const AuditAction = {
   ADMIN_ACCESS_DENIED: "admin_access_denied",
   SETTINGS_UPDATED: "settings_updated",
   BULK_ACTION_PERFORMED: "bulk_action_performed",
+  COOKIE_CONSENT_UPDATED: "cookie_consent_updated",
   IP_VIEW: "ip_view",
   IP_EXPORT: "ip_export",
   IP_BLOCK: "ip_block",

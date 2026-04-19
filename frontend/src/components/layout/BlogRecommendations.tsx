@@ -30,7 +30,7 @@ const BlogRecommendations = React.memo(function BlogRecommendations({
   }
 
   return (
-    <SidebarSection title="다른 블로그" className={className}>
+    <SidebarSection title="More blogs" className={className}>
       <div className="space-y-3">
         {blogs.map((blog) => (
           <Link

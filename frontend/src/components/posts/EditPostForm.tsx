@@ -62,21 +62,21 @@ import {
 // 폼 스키마 정의
 const postFormSchema = z.object({
   title: z.string()
-    .min(1, { message: "제목을 입력해주세요." })
-    .max(200, { message: "제목은 200자 이하로 입력해주세요." }),
+    .min(1, { message: "Please enter a title." })
+    .max(200, { message: "Title must be 200 characters or fewer." }),
   categories: z.array(
       z.string()
-        .min(1, '카테고리는 최소 1글자 이상이어야 합니다.')
-        .max(15, '카테고리는 최대 15글자까지 입력 가능합니다.')
+        .min(1, 'Category must be at least 1 character.')
+        .max(15, 'Category must be 15 characters or fewer.')
     )
-    .min(1, '카테고리를 최소 1개 입력해주세요.')
-    .max(2, '카테고리는 최대 2개까지만 입력 가능합니다.')
+    .min(1, 'Add at least 1 category.')
+    .max(2, 'You can add up to 2 categories.')
     .refine(
       (arr) => arr.every(cat => !cat.includes('/')),
-      { message: '카테고리에 슬래시(/)를 포함할 수 없습니다.' }
+      { message: 'Categories cannot include a slash (/).' }
     ),
   content: z.string()
-    .min(1, { message: "내용을 입력해주세요." }),
+    .min(1, { message: "Please enter the content." }),
   tags: z.array(z.string()).optional(),
   githubUrl: z.string().optional(),
   githubDescription: z.string().optional(),
@@ -202,8 +202,8 @@ export default function EditPostForm({
   isLoading = false,
   onSubmit,
   onCancel,
-  submitButtonText = "저장",
-  title = "게시글 수정",
+  submitButtonText = "Save",
+  title = "Edit post",
   blogInfo
 }: EditPostFormProps) {
   const isSubmittingRef = useRef(false); // 동기적 중복 제출 방지 플래그
@@ -413,7 +413,7 @@ export default function EditPostForm({
     const currentIds = form.getValues('attachedFileIds') || [];
     const index = currentIds.indexOf(fileId);
     if (index === -1) {
-      toast.warning('썸네일로 지정할 이미지를 찾을 수 없습니다.');
+      toast.warning('Could not find the image to use as the thumbnail.');
       return;
     }
     handleThumbnailChange(fileId);
@@ -423,7 +423,7 @@ export default function EditPostForm({
     if (!videoId) return;
     setSelectedYouTubeThumbnailId(videoId);
     handleThumbnailChange(null);
-    toast.success('YouTube 영상을 썸네일로 지정했습니다.');
+    toast.success('YouTube video set as the thumbnail.');
   }, [handleThumbnailChange]);
 
   const executeEditorModeChange = useCallback((mode: EditorMode) => {
@@ -437,7 +437,7 @@ export default function EditPostForm({
       } else {
         const issues = getRichEditorCompatibilityIssues(currentContent);
         if (issues.length > 0) {
-          toast.error(`리치 편집기로 안전하게 전환할 수 없는 요소가 있습니다: ${issues.join(', ')}`);
+          toast.error(`Some elements cannot be converted safely to the rich editor: ${issues.join(', ')}`);
           return;
         }
         const html = convertMarkdownToHtml(currentContent);
@@ -447,7 +447,7 @@ export default function EditPostForm({
       setEditorMode(mode);
     } catch (error) {
       console.error('Failed to switch editor mode', error);
-      toast.error('편집 모드를 전환하지 못했습니다.');
+      toast.error('Failed to switch editor modes.');
     } finally {
       setIsSwitchingEditorMode(false);
       setIsConfirmDialogOpen(false);
@@ -717,7 +717,7 @@ export default function EditPostForm({
 
   const handleMarkdownImageFile = useCallback(async (file: File) => {
     if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
-      toast.error('SVG 이미지는 업로드할 수 없습니다.');
+      toast.error('SVG images cannot be uploaded.');
       return;
     }
     setIsMarkdownImageUploading(true);
@@ -731,7 +731,7 @@ export default function EditPostForm({
       const imageUrl = normalizeImageUrl(result.accessUrl || result.fileUrl || '');
 
       if (!fileId || !imageUrl) {
-        throw new Error('이미지 업로드 결과가 올바르지 않습니다.');
+        throw new Error('The image upload response was invalid.');
       }
 
       fileMetadataRef.current.set(fileId, { url: imageUrl, name: file.name });
@@ -754,9 +754,9 @@ export default function EditPostForm({
         handleThumbnailChange(fileId);
       }
 
-      toast.success('이미지를 본문에 삽입했습니다.');
+      toast.success('Image inserted into the post.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다.';
+      const message = error instanceof Error ? error.message : 'Failed to upload the image.';
       toast.error(message);
     } finally {
       setIsMarkdownImageUploading(false);
@@ -787,8 +787,8 @@ export default function EditPostForm({
                       <FloatingTitleField
                         field={field}
                         disabled={isLoading}
-                        label="제목"
-                        placeholder=" 당신의 이야기를 들려주세요..."
+                        label="Title"
+                        placeholder="Share your story..."
                       />
                     </FormControl>
                     <FormMessage />
@@ -817,7 +817,7 @@ export default function EditPostForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <TagInputField field={field} disabled={isLoading} label="태그" />
+                      <TagInputField field={field} disabled={isLoading} label="Tags" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -827,10 +827,10 @@ export default function EditPostForm({
                 <div className="flex items-center gap-2">
                   <Label className="text-xs font-medium">
                     {isPublicTransitionLocked
-                      ? '포스트 비공개(잠금)'
+                      ? 'Private post (locked)'
                       : postVisibility === 'public'
-                        ? '포스트 공개'
-                        : '포스트 비공개'}
+                        ? 'Public post'
+                        : 'Private post'}
                   </Label>
                   <Switch
                     checked={postVisibility === 'public'}
@@ -850,13 +850,13 @@ export default function EditPostForm({
                       isLocalSubmitting ||
                       isPublicTransitionLocked
                     }
-                    title={isPublicTransitionLocked ? '전체 비공개 잠금' : undefined}
+                    title={isPublicTransitionLocked ? 'Locked by blog privacy setting' : undefined}
                     className="focus-visible:ring-gray-400 data-[state=checked]:bg-gray-500 dark:data-[state=checked]:bg-gray-500 [&>span:first-child]:bg-gray-500 dark:[&>span:first-child]:bg-gray-500"
                   />
                 </div>
                 {isPublicTransitionLocked && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    TIP. 공개로 변경하려면 '블로그 설정'에서 전체 공개로 바꿔주세요.
+                    Tip: switch the blog itself to public in Blog Settings before making this post public.
                   </p>
                 )}
               </div>
@@ -874,14 +874,14 @@ export default function EditPostForm({
                   const previewContent =
                     field.value && field.value.trim().length > 0
                       ? field.value
-                      : '미리보기 내용이 여기에 표시됩니다.';
+                      : 'The preview will appear here.';
 
                   return (
                     <FormItem>
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
                           <Plus className="h-3 w-3" />
-                          <span>본문</span>
+                          <span>Write your post</span>
                         </div>
                         <div className="inline-flex rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1 text-xs font-medium">
                           {(['rich', 'markdown'] as EditorMode[]).map((mode) => (
@@ -896,12 +896,12 @@ export default function EditPostForm({
                               }`}
                               disabled={editorMode === mode || isSwitchingEditorMode}
                             >
-                              {mode === 'rich' ? '리치 텍스트' : 'Markdown'}
+                              {mode === 'rich' ? 'Rich text' : 'Markdown'}
                             </button>
                           ))}
                           {isSwitchingEditorMode && (
                             <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
-                              전환 중...
+                              Switching...
                             </span>
                           )}
                         </div>
@@ -926,7 +926,7 @@ export default function EditPostForm({
                                 disabled={isMarkdownImageUploading}
                               >
                                 <ImageIcon className="h-4 w-4 mr-1.5" />
-                                이미지 업로드
+                                Upload image
                               </Button>
                               <GithubResourcePopover
                                 githubUrl={form.watch('githubUrl') ?? ''}
@@ -939,18 +939,18 @@ export default function EditPostForm({
                                   variant="outline"
                                   size="sm"
                                   className="px-2.5"
-                                  title="GitHub 리소스"
+                                  title="GitHub resource"
                                 >
                                   <Github className="h-4 w-4" />
                                 </Button>
                               </GithubResourcePopover>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 업로드 중...
+                                  Uploading image...
                                 </span>
                               )}
                               <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                업로드한 이미지는 아래 목록과 미리보기에서 즉시 확인할 수 있어요.
+                                Uploaded images appear immediately in the preview and the list below.
                               </span>
                             </div>
                             <div className="space-y-4">
@@ -959,10 +959,10 @@ export default function EditPostForm({
                                   <div className="mb-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
                                     <p className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
                                       <FileText className="h-3.5 w-3.5" />
-                                      <span>본문 작성</span>
+                                      <span>Editor</span>
                                     </p>
                                     <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                      Markdown 편집
+                                      Markdown editing
                                     </span>
                                   </div>
                                   <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
@@ -975,7 +975,7 @@ export default function EditPostForm({
                                     />
                                   </div>
                                   <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                                    이미지는 시각적으로 편집할 수 있으며, 텍스트는 Markdown 문법을 따릅니다.
+                                    Images can be edited visually, while text follows Markdown syntax.
                                   </p>
                                 </section>
 
@@ -983,10 +983,10 @@ export default function EditPostForm({
                                   <div className="mb-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
                                     <p className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
                                       <ImageIcon className="h-3.5 w-3.5" />
-                                      <span>실시간 미리보기</span>
+                                      <span>Live preview</span>
                                     </p>
                                     <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                      게시글과 동일한 스타일
+                                      Matches the published post style
                                     </span>
                                   </div>
                                   <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-950/40 p-3">
@@ -1002,15 +1002,15 @@ export default function EditPostForm({
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  업로드한 이미지
+                                  Uploaded images
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  썸네일은 이미지 또는 YouTube에서 선택할 수 있습니다.
+                                  Choose the thumbnail from an image or a YouTube video.
                                 </span>
                               </div>
                               {isResolvingFileMetadata && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 정보를 불러오는 중입니다...
+                                  Loading image details...
                                 </p>
                               )}
                               {markdownImages.length > 0 ? (
@@ -1026,17 +1026,17 @@ export default function EditPostForm({
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  아직 업로드한 이미지가 없습니다. 위의 버튼으로 이미지를 추가하면 여기에서 미리보고 썸네일을 지정할 수 있어요.
+                                  No uploaded images yet. Add one above to preview it here and use it as the thumbnail.
                                 </p>
                               )}
                             </div>
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  본문 내 YouTube
+                                  YouTube in this post
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  YouTube 링크가 있으면 여기서 썸네일로 선택할 수 있어요.
+                                  If the post contains a YouTube link, you can choose it as the thumbnail here.
                                 </span>
                               </div>
                               {markdownYouTubeIds.length > 0 ? (
@@ -1052,7 +1052,7 @@ export default function EditPostForm({
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  본문에 YouTube 링크를 추가하면 목록에 표시됩니다.
+                                  Add a YouTube link to the post and it will appear here.
                                 </p>
                               )}
                             </div>
@@ -1068,7 +1068,7 @@ export default function EditPostForm({
                             <BlogSimpleEditor
                               content={field.value}
                               onChange={field.onChange}
-                              placeholder=" 내용을 입력하세요..."
+                              placeholder="Start writing..."
                               thumbnailImageId={watchedThumbnailImageId || undefined}
                               onThumbnailChange={handleThumbnailChange}
                               initialThumbnailIndex={thumbnailIndex}
@@ -1106,7 +1106,7 @@ export default function EditPostForm({
               onClick={onCancel}
               disabled={isLoading || isLocalSubmitting}
             >
-              취소
+              Cancel
             </Button>
             {/* 초안 상태일 경우: 임시저장과 발행 버튼 분리 */}
             {!isPublished ? (
@@ -1122,7 +1122,7 @@ export default function EditPostForm({
                   className="flex items-center gap-2"
                 >
                   <Save className="h-4 w-4" />
-                  임시저장
+                  Save draft
                 </Button>
                 <Button
                   type="button"
@@ -1138,7 +1138,7 @@ export default function EditPostForm({
                   ) : (
                     <>
                       <FileText className="h-4 w-4" />
-                      발행하기
+                      Publish
                     </>
                   )}
                 </Button>
@@ -1153,7 +1153,7 @@ export default function EditPostForm({
                   handleFormSubmit(true); // 계속 발행 상태 유지
                 }}
                 className="flex items-center gap-2 min-w-[120px]"
-                aria-label={isLoading ? "저장 중" : submitButtonText}
+                aria-label={isLoading ? "Saving" : submitButtonText}
               >
                 {isLoading ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -1181,9 +1181,9 @@ export default function EditPostForm({
             executeEditorModeChange(pendingEditorMode);
           }
         }}
-        title="편집 모드 변경"
-        description="편집 모드를 변경하면 일부 서식이 변환되거나 유실될 수 있습니다. 계속하시겠습니까?"
-        confirmText="계속하기"
+        title="Change editor mode"
+        description="Switching editor modes may convert or remove some formatting. Do you want to continue?"
+        confirmText="Continue"
       />
     </div>
   );

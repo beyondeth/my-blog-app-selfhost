@@ -70,7 +70,7 @@ const ConversationSearch: React.FC = () => {
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           onKeyDown={handleKeyDown}
-          placeholder="대화 검색..."
+          placeholder="Search conversations..."
           className="
             flex-1
             bg-transparent
@@ -118,8 +118,8 @@ const ConversationSearch: React.FC = () => {
           z-10
         ">
           <div className="flex items-center justify-between">
-            <span>Enter로 검색</span>
-            <span>ESC로 초기화</span>
+            <span>Press Enter to search</span>
+            <span>Press Esc to clear</span>
           </div>
         </div>
       )}

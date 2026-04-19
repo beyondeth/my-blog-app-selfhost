@@ -14,6 +14,11 @@ const TOOL_NAMES = [
   "list_my_published_posts",
   "search_my_published_posts",
   "read_my_published_post",
+  "get_knowledge_manifest",
+  "search_knowledge_nodes",
+  "read_knowledge_node",
+  "list_followup_suggestions",
+  "dismiss_followup_suggestion",
   "get_writing_style_guide",
   "create_post",
   "get_image_upload_url",
@@ -37,6 +42,7 @@ const STYLE_PRESETS = [
   "pm",
   "designer",
   "marketer",
+  "sell",
 ];
 
 function fail(message) {

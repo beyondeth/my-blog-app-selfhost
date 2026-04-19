@@ -32,7 +32,7 @@ function formatPostDate(value?: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Recently updated";
 
-  return parsed.toLocaleDateString("ko-KR", {
+  return parsed.toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -40,11 +40,11 @@ function formatPostDate(value?: string) {
 }
 
 function resolveAuthorName(post: Post) {
-  return post.author?.name || post.author?.username || "익명";
+  return post.author?.name || post.author?.username || "Anonymous";
 }
 
 function resolveExcerpt(post: Post) {
-  return post.editorPickExcerpt || post.excerpt || "요약이 아직 정리되지 않았습니다.";
+  return post.editorPickExcerpt || post.excerpt || "No summary is available yet.";
 }
 
 function FeaturedCard({
@@ -220,18 +220,17 @@ export default function BlogEditorialHighlightsSection({
               Recent Blog Posts
             </p>
             <h2 className="mt-3 text-2xl font-semibold leading-tight text-[#1B2430] dark:text-[#E6EDF3] md:text-[2rem]">
-              이 블로그의 최신 아카이브
+              The latest archive from this blog
             </h2>
             <p className="mt-3 text-sm leading-6 text-[#4B5563] dark:text-[#A9B4C2] md:text-[15px]">
-              먼저 큰 흐름을 한 번에 훑고, 이어서 작은 카드들로 최근에 쌓인 글의 결을 빠르게
-              읽을 수 있게 정리했습니다.
+              Start with the main feature, then skim the supporting cards to catch up on what this blog has published most recently.
             </p>
           </div>
           <a
             href="#blog-post-tabs"
             className="inline-flex items-center gap-2 rounded-full border border-[#D9E0EA] bg-white px-4 py-2 text-sm font-semibold text-[#1B2430] shadow-sm transition-colors hover:bg-[#EEF3F8] dark:border-[#2A3645] dark:bg-[#111923] dark:text-[#E6EDF3] dark:hover:bg-[#16212C]"
           >
-            전체 글 보기
+            View all posts
             <FiArrowRight className="h-4 w-4" />
           </a>
         </div>

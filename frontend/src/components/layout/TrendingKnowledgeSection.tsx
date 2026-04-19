@@ -45,18 +45,18 @@ export default function TrendingKnowledgeSection() {
         </div>
       ) : error ? (
         <div className="text-sm text-[#3F4A59] dark:text-[#E1E8F0]">
-          데이터를 불러오지 못했습니다.
+          Could not load the data.
           <button
             type="button"
             className="ml-2 text-[#264653] underline dark:text-[#6CC3B2]"
             onClick={() => refetch()}
           >
-            다시 시도
+            Retry
           </button>
         </div>
       ) : items.length === 0 ? (
         <p className="text-sm text-[#3F4A59] dark:text-[#E1E8F0]">
-          아직 축적된 지식 노드가 없습니다.
+          No knowledge nodes yet.
         </p>
       ) : (
         <div className="-mx-5 divide-y divide-[#E5E7EB] dark:divide-[#4B5563]">
@@ -72,12 +72,12 @@ export default function TrendingKnowledgeSection() {
                     {node.title}
                   </p>
                   <p className="mt-1 text-xs text-[#667085] dark:text-[#98A2B3] line-clamp-2">
-                    {node.summary || `${node.blog.name} 블로그에서 연결된 지식 노드`}
+                    {node.summary || `Connected knowledge node from ${node.blog.name}`}
                   </p>
                   <div className="mt-2 flex items-center gap-2 text-[11px] text-[#667085] dark:text-[#98A2B3]">
                     <span>{node.blog.name}</span>
                     <span>•</span>
-                    <span>{node.postCount}개 글</span>
+                    <span>{node.postCount} posts</span>
                   </div>
                 </div>
               </div>

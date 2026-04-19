@@ -4,7 +4,6 @@ import { useCommunityPosts } from '@/hooks/community/useCommunityPosts';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import { FiEye, FiMessageSquare, FiThumbsUp } from 'react-icons/fi';
 import { CommunityPost } from '@/types/community';
 
@@ -55,13 +54,13 @@ export default function CommunityTrendingSection({
       <div className="py-16">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            이 커뮤니티의 인기 글
+            Trending in this community
           </h2>
           <Link
             href={`/c/${communitySlug}`}
             className="inline-flex px-4 py-1.5 rounded-full text-sm font-medium bg-[#264653] text-white hover:bg-[#1e3a45] dark:bg-[#6CC3B2] dark:text-[#0E141B] dark:hover:bg-[#5aa89a] transition-all transform hover:-translate-y-0.5 shadow-sm"
           >
-            더보기
+            View more
           </Link>
         </div>
 
@@ -94,7 +93,6 @@ export default function CommunityTrendingSection({
                 <time>
                   {formatDistanceToNow(new Date(post.createdAt), {
                     addSuffix: true,
-                    locale: ko,
                   })}
                 </time>
               </div>

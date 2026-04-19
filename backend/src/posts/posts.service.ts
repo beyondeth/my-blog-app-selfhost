@@ -58,7 +58,10 @@ import { RedisLockService } from "../redis/redis-lock.service";
 import { CacheInvalidationEvents } from "../common/events/cache.events";
 import { PostMapperService } from "./services/post-mapper.service";
 import { PostCacheService } from "./services/post-cache.service";
-import { PostFileService } from "./services/post-file.service";
+import {
+  ManagedImageReconcileSummary,
+  PostFileService,
+} from "./services/post-file.service";
 import { PostContentService } from "./services/post-content.service";
 import { PostReadService } from "./services/post-read.service";
 import { PostInteractionService } from "./services/post-interaction.service";
@@ -860,6 +863,28 @@ export class PostsService {
     await this.postFileService.relinkContentFiles(posts);
 
     this.logger.log(`Relinked content files for ${posts.length} posts`);
+  }
+
+  async reconcileManagedImages(
+    dryRun = true,
+  ): Promise<ManagedImageReconcileSummary> {
+    this.logger.log(`Reconciling managed images for all posts (dryRun=${dryRun})`);
+
+    const posts = await this.postsRepository.find({
+      where: { isDeleted: false },
+      relations: ["attachedFiles"],
+    });
+
+    const summary = await this.postFileService.reconcileManagedImagesForPosts(
+      posts,
+      { dryRun },
+    );
+
+    this.logger.log(
+      `Managed image reconcile completed: scanned=${summary.scannedPosts}, repairedPosts=${summary.repairedPosts}, linkedFiles=${summary.linkedFiles}, unresolvedPosts=${summary.unresolvedPosts}, dryRun=${summary.dryRun}`,
+    );
+
+    return summary;
   }
 
   /**

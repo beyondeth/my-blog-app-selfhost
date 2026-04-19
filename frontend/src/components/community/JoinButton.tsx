@@ -94,12 +94,12 @@ const JoinButton = React.memo(function JoinButton({
 
       if (error instanceof Error) {
         if (error.message.includes('401') || error.message.includes('UNAUTHORIZED')) {
-          toast.error('로그인이 필요합니다.');
+          toast.error('Please sign in to continue.');
           router.push('/login');
         } else if (error.message.includes('banned')) {
-          toast.error('이 커뮤니티에서 차단되었습니다.');
+          toast.error('You are blocked from this community.');
         } else {
-          toast.error('가입에 실패했습니다.');
+          toast.error('Could not join the community.');
         }
       }
     },
@@ -149,9 +149,9 @@ const JoinButton = React.memo(function JoinButton({
 
       if (error instanceof Error) {
         if (error.message.includes('owner')) {
-          toast.error('커뮤니티 오너는 탈퇴할 수 없습니다.');
+          toast.error('Community owners cannot leave their own community.');
         } else {
-          toast.error('탈퇴에 실패했습니다.');
+          toast.error('Could not leave the community.');
         }
       }
     },
@@ -168,7 +168,7 @@ const JoinButton = React.memo(function JoinButton({
 
   const handleClick = () => {
     if (!isAuthenticated || !user) {
-      toast.error('로그인이 필요합니다.');
+      toast.error('Please sign in to continue.');
       router.push('/login');
       return;
     }
@@ -184,7 +184,7 @@ const JoinButton = React.memo(function JoinButton({
   const buttonConfig = useMemo(() => {
     if (isPending) {
       return {
-        text: '처리 중...',
+        text: 'Working...',
         icon: Loader2,
         className:
           'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700',
@@ -196,7 +196,7 @@ const JoinButton = React.memo(function JoinButton({
     if (isMember) {
       if (isHovered) {
         return {
-          text: '탈퇴',
+          text: 'Leave',
           icon: UserMinus,
           className:
             'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400',
@@ -206,7 +206,7 @@ const JoinButton = React.memo(function JoinButton({
       }
 
       return {
-        text: '참여중',
+        text: 'Joined',
         icon: Check,
         className:
           'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600',
@@ -216,7 +216,7 @@ const JoinButton = React.memo(function JoinButton({
     }
 
     return {
-      text: '가입',
+      text: 'Join',
       icon: UserPlus,
       className:
         'bg-gray-900 text-white border-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-500 dark:hover:bg-gray-600',
@@ -246,7 +246,7 @@ const JoinButton = React.memo(function JoinButton({
           buttonConfig.className,
           className
         )}
-        aria-label={isPending ? '처리 중...' : isMember ? '탈퇴' : '가입'}
+        aria-label={isPending ? 'Working...' : isMember ? 'Leave' : 'Join'}
       >
         {isPending ? (
           <Loader2 className="w-5 h-5 animate-spin" />
@@ -279,7 +279,7 @@ const JoinButton = React.memo(function JoinButton({
         {isPending ? (
           <>
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>처리 중...</span>
+            <span>Working...</span>
           </>
         ) : (
           <>
@@ -309,12 +309,12 @@ const JoinButton = React.memo(function JoinButton({
         buttonConfig.className,
         className
       )}
-      aria-label={isPending ? '처리 중...' : isMember ? '탈퇴' : '가입'}
+      aria-label={isPending ? 'Working...' : isMember ? 'Leave' : 'Join'}
     >
       {isPending ? (
         <>
           <Loader2 className="w-4 h-4 animate-spin" />
-          <span>처리 중...</span>
+          <span>Working...</span>
         </>
       ) : (
         <>

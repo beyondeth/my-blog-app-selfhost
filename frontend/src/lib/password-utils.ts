@@ -3,6 +3,8 @@
  * KISA 및 NIST 보안 권장사항 기반
  */
 
+import type { AppLocale } from './i18n/config';
+
 // 비밀번호 강도 체크 결과 타입
 export interface PasswordStrength {
   isValid: boolean;
@@ -32,12 +34,77 @@ const LOWERCASE_PATTERN = /[a-z]/;
 // 숫자 패턴
 const NUMBER_PATTERN = /[0-9]/;
 
+const PASSWORD_COPY: Record<
+  AppLocale,
+  {
+    empty: string;
+    forbiddenChars: string;
+    minLength: string;
+    weak: string;
+    fair: string;
+    good: string;
+    strong: string;
+    minTypeCount: string;
+    checklist: {
+      minLength: string;
+      upperCase: string;
+      lowerCase: string;
+      number: string;
+      specialChar: string;
+      noForbiddenChars: string;
+    };
+  }
+> = {
+  ko: {
+    empty: '비밀번호를 입력해주세요',
+    forbiddenChars: '사용할 수 없는 문자가 포함되어 있습니다: " \' \\ < > ` 공백',
+    minLength: '비밀번호는 최소 8자 이상이어야 합니다',
+    weak: '비밀번호가 너무 약합니다',
+    fair: '비밀번호 강도가 보통입니다',
+    good: '안전한 비밀번호입니다',
+    strong: '매우 강력한 비밀번호입니다',
+    minTypeCount: '대문자, 소문자, 숫자, 특수문자 중 3종류 이상을 포함해야 합니다',
+    checklist: {
+      minLength: '최소 8자 이상',
+      upperCase: '대문자 포함',
+      lowerCase: '소문자 포함',
+      number: '숫자 포함',
+      specialChar: '특수문자 포함',
+      noForbiddenChars: '금지 문자 없음',
+    },
+  },
+  en: {
+    empty: 'Enter a password.',
+    forbiddenChars: 'Your password contains unsupported characters: " \' \\ < > ` or whitespace.',
+    minLength: 'Your password must be at least 8 characters long.',
+    weak: 'Your password is too weak.',
+    fair: 'Your password strength is fair.',
+    good: 'Your password is secure.',
+    strong: 'Your password is very strong.',
+    minTypeCount:
+      'Use at least three of the following: uppercase letters, lowercase letters, numbers, and special characters.',
+    checklist: {
+      minLength: 'At least 8 characters',
+      upperCase: 'Uppercase letter',
+      lowerCase: 'Lowercase letter',
+      number: 'Number',
+      specialChar: 'Special character',
+      noForbiddenChars: 'No unsupported characters',
+    },
+  },
+};
+
+export function getPasswordRequirementLabels(locale: AppLocale = 'en') {
+  return PASSWORD_COPY[locale].checklist;
+}
+
 /**
  * 비밀번호 강도 검증
  * @param password 검증할 비밀번호
  * @returns 비밀번호 강도 정보
  */
-export function validatePasswordStrength(password: string): PasswordStrength {
+export function validatePasswordStrength(password: string, locale: AppLocale = 'en'): PasswordStrength {
+  const copy = PASSWORD_COPY[locale];
   const result: PasswordStrength = {
     isValid: false,
     score: 0,
@@ -53,21 +120,21 @@ export function validatePasswordStrength(password: string): PasswordStrength {
 
   // 빈 문자열 체크
   if (!password) {
-    result.message = '비밀번호를 입력해주세요';
+    result.message = copy.empty;
     return result;
   }
 
   // 금지된 문자 체크
   if (FORBIDDEN_CHARS_PATTERN.test(password)) {
     result.hasForbiddenChars = true;
-    result.message = '사용할 수 없는 문자가 포함되어 있습니다: " \' \\ < > ` 공백';
+    result.message = copy.forbiddenChars;
     return result;
   }
 
   // 최소 길이 체크 (8자)
   result.hasMinLength = password.length >= 8;
   if (!result.hasMinLength) {
-    result.message = '비밀번호는 최소 8자 이상이어야 합니다';
+    result.message = copy.minLength;
     return result;
   }
 
@@ -91,16 +158,16 @@ export function validatePasswordStrength(password: string): PasswordStrength {
   // 강도 판정
   if (result.score <= 1) {
     result.strength = 'weak';
-    result.message = '비밀번호가 너무 약합니다';
+    result.message = copy.weak;
   } else if (result.score === 2) {
     result.strength = 'fair';
-    result.message = '비밀번호 강도가 보통입니다';
+    result.message = copy.fair;
   } else if (result.score === 3) {
     result.strength = 'good';
-    result.message = '안전한 비밀번호입니다';
+    result.message = copy.good;
   } else {
     result.strength = 'strong';
-    result.message = '매우 강력한 비밀번호입니다';
+    result.message = copy.strong;
   }
 
   // 최소 3가지 문자 유형 체크 (필수 요구사항)
@@ -113,7 +180,7 @@ export function validatePasswordStrength(password: string): PasswordStrength {
 
   if (typeCount < 3) {
     result.isValid = false;
-    result.message = '대문자, 소문자, 숫자, 특수문자 중 3종류 이상을 포함해야 합니다';
+    result.message = copy.minTypeCount;
   } else {
     result.isValid = true;
   }

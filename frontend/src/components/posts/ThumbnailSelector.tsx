@@ -92,13 +92,13 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ImageIcon className="h-5 w-5" />
-            썸네일 선택
+            Choose thumbnail
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            <span className="ml-2 text-sm text-gray-600">불러오는 중...</span>
+            <span className="ml-2 text-sm text-gray-600">Loading...</span>
           </div>
         </CardContent>
       </Card>
@@ -110,14 +110,14 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ImageIcon className="h-5 w-5" />
-          썸네일 선택
+          Choose thumbnail
         </CardTitle>
       </CardHeader>
       <CardContent>
         {thumbnailCandidates.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <ImageIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <p>에디터에 이미지를 업로드하면 썸네일로 선택할 수 있습니다.</p>
+            <p>Upload an image in the editor to use it as the thumbnail.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -128,13 +128,13 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={selectedThumbnailUrl}
-                    alt="선택된 썸네일"
+                    alt="Selected thumbnail"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
                   <Check className="h-3 w-3" />
-                  현재 썸네일
+                  Current thumbnail
                 </div>
                 {!disabled && (
                   <Button
@@ -144,7 +144,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
                     onClick={handleRemoveThumbnail}
                   >
                     <X className="h-4 w-4" />
-                    취소
+                    Clear
                   </Button>
                 )}
               </div>
@@ -153,7 +153,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
             {/* 썸네일 후보 이미지 목록 */}
             <div>
               <p className="text-sm font-medium mb-2">
-                {selectedThumbnailUrl ? '다른 이미지로 변경' : '썸네일로 선택할 이미지'}
+                {selectedThumbnailUrl ? 'Choose a different image' : 'Select an image for the thumbnail'}
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {thumbnailCandidates.map((image) => {
@@ -190,7 +190,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
             {/* 선택 힌트 */}
             {!disabled && (
               <p className="text-xs text-gray-500">
-                이미지를 클릭하여 썸네일로 선택할 수 있습니다. 선택된 썸네일은 홈 피드에 표시됩니다.
+                Click an image to use it as the thumbnail. The selected thumbnail will appear in the home feed.
               </p>
             )}
           </div>

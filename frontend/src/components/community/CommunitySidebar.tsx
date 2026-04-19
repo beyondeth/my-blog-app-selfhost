@@ -131,7 +131,7 @@ const CommunitySidebar = React.memo(function CommunitySidebar({
 
       {canEditWidgets && (
         <div className="flex items-center justify-between rounded-xl border border-dashed border-gray-300 dark:border-gray-600 px-4 py-2 text-sm text-gray-600 dark:text-gray-300">
-          <span>{isEditing ? '사이드바 편집 중입니다.' : '위젯을 직접 편집할 수 있습니다.'}</span>
+          <span>{isEditing ? 'Sidebar editing is active.' : 'You can edit these widgets directly.'}</span>
           <Button
             variant={isEditing ? 'secondary' : 'outline'}
             size="sm"
@@ -144,7 +144,7 @@ const CommunitySidebar = React.memo(function CommunitySidebar({
               widgetEditor.setEditing(!widgetEditor.isEditing);
             }}
           >
-            {isEditing ? '편집 종료' : '위젯 편집'}
+            {isEditing ? 'Finish editing' : 'Edit widgets'}
           </Button>
         </div>
       )}
@@ -205,7 +205,7 @@ function SortableEditableWidget({
         {...listeners}
       >
         <GripVertical className="w-3 h-3" />
-        정렬
+        Reorder
       </button>
       <div
         role="button"
@@ -224,7 +224,7 @@ function SortableEditableWidget({
         )}
       >
         <div className="absolute right-3 top-3 z-30 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 shadow group-hover:bg-blue-600 group-hover:text-white dark:bg-[#0b1220]/90 dark:text-gray-100 dark:group-hover:bg-[#4d68ff]">
-          편집
+          Edit
         </div>
         <div className={cn('relative', isSelected && 'z-10 rounded-2xl overflow-hidden')}>
           {children}

@@ -89,8 +89,8 @@ export async function generateMetadata(
 
   if (!post) {
     return {
-      title: '게시물을 찾을 수 없습니다',
-      description: '요청하신 게시물을 찾을 수 없습니다.',
+      title: 'Post not found',
+      description: 'The requested post could not be found.',
     };
   }
 
@@ -99,7 +99,7 @@ export async function generateMetadata(
     ?.replace(/<[^>]*>/g, '') // HTML 태그 제거
     .replace(/\n+/g, ' ')
     .trim()
-    .substring(0, 160) || '커뮤니티 게시물';
+    .substring(0, 160) || 'Community post';
 
   // 사이트 정보
   const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Codebase';
@@ -115,7 +115,7 @@ export async function generateMetadata(
     : `${siteUrl}/assets/block-logo(dark)-128.png`;
 
   // 저자 정보
-  const authorName = post.author?.username || '알 수 없음';
+  const authorName = post.author?.username || 'Unknown';
 
   // 커뮤니티 이름
   const communityName = post.community?.name || `c/${slug}`;
@@ -214,7 +214,7 @@ function generateStructuredData(
     dateModified: post.updatedAt,
     author: {
       '@type': 'Person',
-      name: post.author?.username || '알 수 없음',
+      name: post.author?.username || 'Unknown',
       url: `${siteUrl}/${post.author?.username}`,
     },
     publisher: {
@@ -257,13 +257,13 @@ function generateStructuredData(
       {
         '@type': 'ListItem',
         position: 1,
-        name: '홈',
+        name: 'Home',
         item: siteUrl,
       },
       {
         '@type': 'ListItem',
         position: 2,
-        name: '커뮤니티',
+        name: 'Communities',
         item: `${siteUrl}/c`,
       },
       {
@@ -346,4 +346,3 @@ export default async function CommunityPostPage({
     </>
   );
 }
-

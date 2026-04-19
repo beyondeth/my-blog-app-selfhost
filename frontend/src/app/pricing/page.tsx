@@ -8,6 +8,7 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import { useSubscriptionPlans } from '@/hooks/useSubscription';
 import { canAccessSubscriptionUi } from '@/lib/subscription-access';
 import { getMySubscription } from '@/services/api/subscription.service';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 import {
   BillingCycle,
   SubscriptionTier,
@@ -59,6 +60,7 @@ const planFeatureRows = [
 
 export default function PricingPage() {
   const { user, isAdmin } = useAuth();
+  const { t, href } = useLocaleContext();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(BillingCycle.MONTHLY);
   const { data: plansData, isLoading } = useSubscriptionPlans();
   const billingEnabled = canAccessSubscriptionUi(isAdmin);
@@ -88,10 +90,39 @@ export default function PricingPage() {
   const primaryCtaHref = billingEnabled
     ? user
       ? '/settings/billing'
-      : '/register'
-    : '/support';
+      : href('/register')
+    : href('/support');
 
-  const primaryCtaLabel = billingEnabled ? '시작하기' : '도입 문의';
+  const primaryCtaLabel = billingEnabled ? t('publicSite.header.getStarted') : t('publicSite.resources.support.label');
+
+  if (!billingEnabled) {
+    return (
+      <main className="bg-white text-[#202124] dark:bg-[#202124] dark:text-[#e8eaed]">
+        <section className="mx-auto flex min-h-[70vh] max-w-4xl flex-col items-center justify-center px-6 py-24 text-center">
+          <h1 className="text-4xl font-bold tracking-tight text-[#202124] dark:text-white">
+            {t('beta.billingDisabledTitle')}
+          </h1>
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-[#5f6368] dark:text-[#9aa0a6]">
+            {t('beta.billingDisabledDescription')}
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link
+              href={href('/docs/get-started')}
+              className="inline-flex items-center rounded-full border border-[#D9E0EA] bg-white px-5 py-3 text-sm font-semibold text-[#1B2430] transition-colors hover:bg-[#F7F9FC] dark:border-[#223244] dark:bg-[#0E141B] dark:text-[#E6EDF3] dark:hover:bg-[#162231]"
+            >
+              {t('publicSite.resources.docs.label')}
+            </Link>
+            <Link
+              href={href('/support')}
+              className="inline-flex items-center rounded-full bg-[#101828] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1F2937] dark:bg-white dark:text-[#101828]"
+            >
+              {t('publicSite.resources.support.label')}
+            </Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="bg-white text-[#202124] selection:bg-[#e8f0fe] selection:text-[#1a73e8] dark:bg-[#202124] dark:text-[#e8eaed]">

@@ -33,7 +33,7 @@ export default function CommunityPostEditPage() {
       // Check ownership
       if (post.author?.id !== user.id) {
         setIsUnauthorized(true);
-        toast.error('수정 권한이 없습니다.');
+        toast.error('You do not have permission to edit this post.');
         router.push(`/c/${communitySlug}/comments/${post.slug}`);
       }
     }
@@ -45,7 +45,7 @@ export default function CommunityPostEditPage() {
             postSlug: post!.slug, // post is guaranteed to exist here
             data: data
         });
-        toast.success('게시물이 수정되었습니다.');
+        toast.success('Post updated successfully.');
         router.push(`/c/${communitySlug}/comments/${post!.slug}`);
     } catch (error) {
         console.error("Failed to update post:", error);
@@ -62,14 +62,14 @@ export default function CommunityPostEditPage() {
     }
   };
 
-  if (isPostLoading) return <LoadingSpinner message="게시물을 로딩 중입니다..." />;
+  if (isPostLoading) return <LoadingSpinner message="Loading post..." />;
   
   if (postError || !post) {
       if (postError?.message.includes('404')) return notFound();
-      return <ErrorMessage message="게시물을 불러올 수 없습니다." />;
+      return <ErrorMessage message="Unable to load this post." />;
   }
 
-  if (isUnauthorized) return <ErrorMessage message="수정 권한이 없습니다." />;
+  if (isUnauthorized) return <ErrorMessage message="You do not have permission to edit this post." />;
 
   return (
     <div className="max-w-5xl mx-auto px-3 pt-20 pb-6 lg:py-6">

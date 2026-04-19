@@ -22,7 +22,6 @@ const SearchSection = React.memo(function SearchSection({
     e.preventDefault();
     onSearch(searchQuery);
 
-    // Mixpanel: 검색 이벤트 추적
     if (searchQuery.trim()) {
       mixpanel.track('Search Performed', {
         query: searchQuery.trim(),
@@ -37,13 +36,13 @@ const SearchSection = React.memo(function SearchSection({
   }, [onSearchQueryChange]);
 
   return (
-    <SidebarSection title="검색">
+    <SidebarSection title="Search">
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="text"
           value={searchQuery}
           onChange={handleInputChange}
-          placeholder="검색어를 입력하세요"
+          placeholder="Search posts"
           className="flex-1 px-3 py-2.5 sm:py-2 text-sm sm:text-xs border border-gray-300 dark:border-gray-600 rounded-md sm:rounded-none focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:border-gray-400 dark:focus:border-gray-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           autoComplete="off"
           autoCapitalize="off"
@@ -52,7 +51,7 @@ const SearchSection = React.memo(function SearchSection({
         <button
           type="submit"
           className="px-4 py-2.5 sm:px-3 sm:py-2 border border-gray-300 text-gray-600 rounded-md sm:rounded-none hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all min-w-[44px] flex items-center justify-center"
-          aria-label="검색"
+          aria-label="Search"
         >
           <FiSearch className="w-4 h-4" />
         </button>

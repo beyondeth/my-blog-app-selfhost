@@ -18,14 +18,15 @@ import {
   FiUser,
   FiCreditCard,
   FiTrendingUp,
+  FiBookOpen,
   FiFileText,
   FiBookmark,
   FiHelpCircle,
   FiKey,
 } from 'react-icons/fi';
-import { FEATURES } from '@/lib/features';
 import { canAccessSubscriptionUi } from '@/lib/subscription-access';
 import { useMyCommunities } from '@/hooks/community/useCommunities';
+import { routes } from '@/lib/navigation';
 
 interface MobileProfileDropdownProps {
   user: User;
@@ -64,8 +65,9 @@ export default function MobileProfileDropdown({
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
+          type="button"
           className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-full"
-          aria-label="프로필 메뉴"
+          aria-label="Profile menu"
         >
           <Avatar
             src={user.profileImage}
@@ -89,11 +91,11 @@ export default function MobileProfileDropdown({
           <>
             <DropdownMenuItem onClick={() => handleNavigation('/account/subscription')} className="cursor-pointer">
               <FiCreditCard className="mr-2 h-4 w-4" />
-              <span>구독 관리</span>
+              <span>Manage subscription</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleNavigation('/pricing')} className="cursor-pointer">
               <FiTrendingUp className="mr-2 h-4 w-4" />
-              <span>요금제</span>
+              <span>Pricing</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
@@ -102,17 +104,17 @@ export default function MobileProfileDropdown({
         {/* Basic Settings */}
         <DropdownMenuItem onClick={() => handleNavigation('/settings')} className="cursor-pointer">
           <FiUser className="mr-2 h-4 w-4" />
-          <span>프로필 설정</span>
+          <span>Profile settings</span>
         </DropdownMenuItem>
 
         <DropdownMenuItem onClick={() => handleNavigation('/settings/blog')} className="cursor-pointer">
           <FiSettings className="mr-2 h-4 w-4" />
-          <span>블로그 설정</span>
+          <span>Blog settings</span>
         </DropdownMenuItem>
 
         <DropdownMenuItem onClick={() => handleNavigation('/settings/api-keys')} className="cursor-pointer">
           <FiKey className="mr-2 h-4 w-4" />
-          <span>자동포스팅 연결</span>
+          <span>Auto-posting connection</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -120,12 +122,12 @@ export default function MobileProfileDropdown({
         {/* Content Management */}
         <DropdownMenuItem onClick={() => handleNavigation('/drafts')} className="cursor-pointer">
           <FiFileText className="mr-2 h-4 w-4" />
-          <span>내 초안</span>
+          <span>My drafts</span>
         </DropdownMenuItem>
 
         <DropdownMenuItem onClick={() => handleNavigation('/bookmarks')} className="cursor-pointer">
           <FiBookmark className="mr-2 h-4 w-4" />
-          <span>북마크</span>
+          <span>Bookmarks</span>
         </DropdownMenuItem>
 
         {/* Managed Communities */}
@@ -133,7 +135,7 @@ export default function MobileProfileDropdown({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1.5">
-              커뮤니티 관리
+              Manage communities
             </DropdownMenuLabel>
             {managedCommunities.map((community) => (
               <DropdownMenuItem
@@ -151,9 +153,14 @@ export default function MobileProfileDropdown({
         <DropdownMenuSeparator />
 
         {/* Support */}
+        <DropdownMenuItem onClick={() => handleNavigation(routes.docs())} className="cursor-pointer">
+          <FiBookOpen className="mr-2 h-4 w-4" />
+          <span>Guides</span>
+        </DropdownMenuItem>
+
         <DropdownMenuItem onClick={() => handleNavigation('/support')} className="cursor-pointer">
           <FiHelpCircle className="mr-2 h-4 w-4" />
-          <span>고객센터</span>
+          <span>Support</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -163,7 +170,7 @@ export default function MobileProfileDropdown({
           className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
         >
           <FiLogOut className="mr-2 h-4 w-4" />
-          <span>로그아웃</span>
+          <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

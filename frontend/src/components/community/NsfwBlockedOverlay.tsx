@@ -43,11 +43,11 @@ export default function NsfwBlockedOverlay({
 }: NsfwBlockedOverlayProps) {
   const primaryCta = requiresLogin ? onLogin ?? onVerify : onVerify;
   const PrimaryIcon = requiresLogin ? LogIn : Shield;
-  const primaryLabel = requiresLogin ? '로그인하기' : '성인 인증하기';
-  const title = requiresLogin ? '로그인이 필요합니다' : '성인 전용 커뮤니티';
+  const primaryLabel = requiresLogin ? 'Sign in' : 'Verify age';
+  const title = requiresLogin ? 'Sign-in required' : 'Adults-only community';
   const description = requiresLogin
-    ? '로그인을 완료하면 성인 인증을 진행하고 NSFW 커뮤니티에 참여할 수 있습니다.'
-    : '이 커뮤니티는 18세 이상 성인만 접근할 수 있습니다. 계속하려면 성인 인증이 필요합니다.';
+    ? 'Sign in first to complete age verification and access this NSFW community.'
+    : 'This community is restricted to adults aged 18 or older. Age verification is required to continue.';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4">
@@ -80,20 +80,20 @@ export default function NsfwBlockedOverlay({
             <Shield className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-gray-600 dark:text-gray-400">
               <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">
-                성인 인증 안내
+                Age verification
               </p>
               <ul className="space-y-1 list-disc list-inside">
                 {requiresLogin ? (
                   <>
-                    <li>로그인을 완료하면 성인 인증 절차를 진행할 수 있습니다</li>
-                    <li>한 번 인증하면 모든 NSFW 커뮤니티에 접근할 수 있습니다</li>
-                    <li>계정이 없다면 회원가입 후 다시 시도해주세요</li>
+                    <li>Sign in to start the age verification flow.</li>
+                    <li>Once verified, you can access all NSFW communities.</li>
+                    <li>If you do not have an account yet, create one and try again.</li>
                   </>
                 ) : (
                   <>
-                    <li>생년월일 확인을 통해 인증합니다</li>
-                    <li>인증 정보는 안전하게 보호됩니다</li>
-                    <li>허위 정보 입력 시 서비스 이용이 제한될 수 있습니다</li>
+                    <li>Verification is completed using your date of birth.</li>
+                    <li>Your verification data is stored securely.</li>
+                    <li>Providing false information may limit access to the service.</li>
                   </>
                 )}
               </ul>
@@ -110,7 +110,7 @@ export default function NsfwBlockedOverlay({
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              뒤로 가기
+              Go back
             </Button>
           )}
           {primaryCta && (

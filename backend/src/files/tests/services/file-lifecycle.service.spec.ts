@@ -10,6 +10,7 @@ import {
   FileLifecycleEvent,
 } from "../../services/file-lifecycle.service";
 import { File } from "../../entities/file.entity";
+import { Post } from "../../../posts/entities/post.entity";
 import {
   FileContext,
   FileContextType,
@@ -22,6 +23,7 @@ import { MockFactory } from "../test-utils/mock.factory";
 describe("FileLifecycleService", () => {
   let service: FileLifecycleService;
   let fileRepository: MockRepository<File>;
+  let postsRepository: MockRepository<Post>;
   let contextRepository: MockRepository<FileContext>;
   let s3Service: MockS3Service;
 
@@ -31,6 +33,7 @@ describe("FileLifecycleService", () => {
 
     // Create mock repositories and services
     fileRepository = new MockRepository<File>();
+    postsRepository = new MockRepository<Post>();
     contextRepository = new MockRepository<FileContext>();
     s3Service = new MockS3Service();
 
@@ -40,6 +43,10 @@ describe("FileLifecycleService", () => {
         {
           provide: getRepositoryToken(File),
           useValue: fileRepository,
+        },
+        {
+          provide: getRepositoryToken(Post),
+          useValue: postsRepository,
         },
         {
           provide: getRepositoryToken(FileContext),
@@ -57,6 +64,7 @@ describe("FileLifecycleService", () => {
 
   afterEach(() => {
     fileRepository.clear();
+    postsRepository.clear();
     contextRepository.clear();
     s3Service.clear();
   });
@@ -154,6 +162,13 @@ describe("FileLifecycleService", () => {
       });
 
       fileRepository.setData([orphanedFile, recentOrphan, attachedFile]);
+      const fileQb = {
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([orphanedFile]),
+      };
+      fileRepository.createQueryBuilder.mockReturnValue(fileQb as any);
 
       // Act
       const cleanedCount = await service.cleanupOrphanedFiles();
@@ -180,6 +195,13 @@ describe("FileLifecycleService", () => {
         createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
       });
       fileRepository.setData([fileWithContext]);
+      const fileQb = {
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      fileRepository.createQueryBuilder.mockReturnValue(fileQb as any);
 
       // Act
       const cleanedCount = await service.cleanupOrphanedFiles();
@@ -187,6 +209,38 @@ describe("FileLifecycleService", () => {
       // Assert
       expect(cleanedCount).toBe(0);
       expect(fileRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("should skip scheduling when a post still references the file key", async () => {
+      // Arrange
+      const referencedFile = MockFactory.createMockFile({
+        contextId: null,
+        createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000),
+        fileKey: "uploads/image/2026/04/referenced.png",
+      });
+      fileRepository.setData([referencedFile]);
+      const fileQb = {
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([referencedFile]),
+      };
+      fileRepository.createQueryBuilder.mockReturnValue(fileQb as any);
+
+      const qb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(1),
+      };
+      postsRepository.createQueryBuilder.mockReturnValue(qb as any);
+
+      // Act
+      const cleanedCount = await service.cleanupOrphanedFiles();
+
+      // Assert
+      expect(cleanedCount).toBe(0);
+      expect(fileRepository.save).not.toHaveBeenCalled();
+      expect(qb.getCount).toHaveBeenCalled();
     });
   });
 

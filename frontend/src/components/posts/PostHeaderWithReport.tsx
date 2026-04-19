@@ -187,7 +187,7 @@ export default function PostHeaderWithReport({
                     ? 'bg-red-500 text-white border-red-600 hover:bg-red-600 dark:bg-red-600 dark:border-red-700 dark:hover:bg-red-700'
                     : 'bg-green-500 text-white border-green-600 hover:bg-green-600 dark:bg-green-600 dark:border-green-700 dark:hover:bg-green-700'
                 } ${editorPickPending ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title={isEditorPick ? 'Editor\'s Pick에서 제거' : 'Editor\'s Pick에 추가'}
+                title={isEditorPick ? 'Remove from Editor\'s Pick' : 'Add to Editor\'s Pick'}
               >
                 {editorPickPending ? (
                   <>
@@ -195,7 +195,7 @@ export default function PostHeaderWithReport({
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    처리 중
+                    Working...
                   </>
                 ) : isEditorPick ? (
                   <>
@@ -224,10 +224,10 @@ export default function PostHeaderWithReport({
                 <button
                   onClick={onEdit}
                   className={`${actionButtonBase} ${neutralActionButton}`}
-                  title="수정"
+                  title="Edit"
                 >
                   <FiEdit3 className="mr-1 w-3 h-3" />
-                  수정
+                  Edit
                 </button>
                 {onToggleVisibility && (
                   <>
@@ -237,24 +237,24 @@ export default function PostHeaderWithReport({
                       className={`${actionButtonBase} ${neutralActionButton}`}
                       title={visibilityToggleDisabledReason || (
                         visibility === 'private'
-                          ? '공개로 변경'
-                          : '비공개로 변경'
+                          ? 'Make public'
+                          : 'Make private'
                       )}
                     >
                       {visibilityPending ? (
                         <>
                           <span className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-                          변경 중...
+                          Updating...
                         </>
                       ) : visibility === 'private' ? (
                         <>
                           <FiGlobe className="mr-1 w-3 h-3" />
-                          공개로 변경
+                          Make public
                         </>
                       ) : (
                         <>
                           <FiLock className="mr-1 w-3 h-3" />
-                          비공개로 변경
+                          Make private
                         </>
                       )}
                     </button>
@@ -263,10 +263,10 @@ export default function PostHeaderWithReport({
                 <button
                   onClick={onDelete}
                   className={`${actionButtonBase} ${dangerActionButton}`}
-                  title="삭제"
+                  title="Delete"
                 >
                   <FiTrash2 className="mr-1 w-3 h-3" />
-                  삭제
+                  Delete
                 </button>
               </div>
             </div>
@@ -306,7 +306,7 @@ export default function PostHeaderWithReport({
               <button
                 onClick={handleScrollToComments}
                 className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors font-medium"
-                title="댓글 보기"
+                title="View comments"
               >
                 <FiMessageCircle className="w-5 h-5" />
                 <span>{post.commentCount || 0}</span>
@@ -320,7 +320,7 @@ export default function PostHeaderWithReport({
               <button
                 onClick={onGithubResource}
                 className="flex items-center justify-center p-1 rounded-full text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors"
-                title={user ? 'GitHub 주소 복사' : '로그인 후 GitHub 주소 보기'}
+                title={user ? 'Copy GitHub URL' : 'Sign in to view the GitHub URL'}
               >
                 <Github className="w-5 h-5" />
               </button>
@@ -331,7 +331,7 @@ export default function PostHeaderWithReport({
               <button
                 onClick={onShare}
                 className="flex items-center justify-center p-1 rounded-full text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors"
-                title="공유"
+                title="Share"
               >
                 <FiUpload className="w-5 h-5" />
               </button>
@@ -342,7 +342,7 @@ export default function PostHeaderWithReport({
               <button
                 onClick={onCopy}
                 className="flex items-center justify-center p-1 rounded-full text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors"
-                title="포스트 내용 복사"
+                title="Copy post content"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -362,7 +362,7 @@ export default function PostHeaderWithReport({
                     ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/40'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100'
                 }`}
-                title={bookmarkPending ? '처리 중...' : '북마크'}
+                title={bookmarkPending ? 'Working...' : 'Bookmark'}
               >
                 <FiBookmark className={`w-5 h-5 ${bookmarked ? 'fill-current' : ''}`} />
               </button>
@@ -377,7 +377,7 @@ export default function PostHeaderWithReport({
                     setShowDropdown(!showDropdown);
                   }}
                   className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  title="더보기"
+                  title="More"
                 >
                   <FiMoreVertical className="w-4 h-4" />
                 </button>
@@ -397,7 +397,7 @@ export default function PostHeaderWithReport({
                         className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
                         <FiFlag className="mr-2 w-4 h-4" />
-                        신고하기
+                        Report
                       </button>
                     </div>
                   </>

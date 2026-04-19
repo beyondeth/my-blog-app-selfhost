@@ -88,7 +88,7 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-500">대화를 불러오는 중...</p>
+            <p className="text-gray-500">Loading conversation...</p>
           </div>
         </div>
       </div>
@@ -102,7 +102,7 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
         <ChatHeader otherUser={null} conversationId={conversationId} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-gray-500">대화를 불러올 수 없습니다.</p>
+            <p className="text-gray-500">Unable to load this conversation.</p>
           </div>
         </div>
       </div>

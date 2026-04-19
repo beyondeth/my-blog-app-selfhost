@@ -1,6 +1,6 @@
 ---
 style_name: "Product Manager Narrative Style"
-language: "korean"
+language: "english"
 min_length: 5000
 target_length: "5000-8000"
 code_block_ratio: 0.05
@@ -104,7 +104,7 @@ This is the base rhythm for most PM posts.
 ## Use Simple Comparison Tables
 
 ```markdown
-| Option | 장점 | 비용/리스크 | 선택 여부 |
+| Option | Advantage | Cost / risk | Decision |
 ```
 
 # === QUALITY CHECKLIST ===

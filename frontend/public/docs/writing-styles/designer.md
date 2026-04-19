@@ -1,6 +1,6 @@
 ---
 style_name: "Product Designer Case Study Style"
-language: "korean"
+language: "english"
 min_length: 5000
 target_length: "5000-8000"
 code_block_ratio: 0.03
@@ -106,8 +106,8 @@ Use this structure to keep the case study persuasive without becoming decorative
 
 ## Replace Taste Words
 
-- `더 예쁘게` → `스캔 속도를 높이기 위해`
-- `정돈했다` → `우선순위가 보이도록 계층을 재배치했다`
+- `made it prettier` → `improved scan speed`
+- `cleaned it up` → `restructured the hierarchy so priority is visible`
 
 # === QUALITY CHECKLIST ===
 

@@ -182,7 +182,7 @@ export default function PublishTargetSelector({
       >
         {renderIcon(value.type, value.iconUrl, value.name, value.iconFit)}
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300 max-w-[150px] truncate">
-          {value.type === 'blog' ? '내 블로그' : value.name}
+          {value.type === 'blog' ? 'My blog' : value.name}
         </span>
         <ChevronDown
           className={cn(
@@ -205,7 +205,7 @@ export default function PublishTargetSelector({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="커뮤니티 검색..."
+                  placeholder="Search communities..."
                   className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
                 />
               </div>
@@ -216,7 +216,7 @@ export default function PublishTargetSelector({
             {/* 내 블로그 섹션 */}
             <div className="p-2 border-b border-gray-100 dark:border-gray-800">
               <p className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                내 블로그
+                My blog
               </p>
               <button
                 type="button"
@@ -240,16 +240,16 @@ export default function PublishTargetSelector({
             {/* 커뮤니티 섹션 */}
             <div className="p-2">
               <p className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                가입한 커뮤니티
+                Joined communities
               </p>
 
               {isLoadingCommunities ? (
                 <div className="px-2 py-4 text-center text-sm text-gray-500">
-                  로딩 중...
+                  Loading...
                 </div>
               ) : filteredCommunities.length === 0 ? (
                 <div className="px-2 py-4 text-center text-sm text-gray-500">
-                  {searchQuery ? '검색 결과가 없습니다' : '가입한 커뮤니티가 없습니다'}
+                  {searchQuery ? 'No matching communities found.' : 'You have not joined any communities yet.'}
                 </div>
               ) : (
                 <div className="space-y-0.5">

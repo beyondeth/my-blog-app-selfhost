@@ -14,7 +14,7 @@ export default function ContentPreview({ text, visible }: ContentPreviewProps) {
   return (
     <div className="preview-panel">
       <div className="preview-head">
-        <p className="preview-title">본문 미리보기</p>
+        <p className="preview-title">{t('preview_title')}</p>
         <button
           className="preview-toggle"
           type="button"

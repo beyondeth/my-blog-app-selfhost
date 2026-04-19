@@ -44,7 +44,7 @@ export function MarkdownYouTubeCard({
               variant={isActiveThumbnail ? 'default' : 'secondary'}
               onClick={() => onSetThumbnail(videoId)}
             >
-              {isActiveThumbnail ? '썸네일 ✓' : '썸네일'}
+              {isActiveThumbnail ? 'Thumbnail ✓' : 'Set thumbnail'}
             </Button>
             <a
               href={watchUrl}
@@ -52,7 +52,7 @@ export function MarkdownYouTubeCard({
               rel="noopener noreferrer"
               className="text-[11px] text-blue-600 hover:underline dark:text-blue-400"
             >
-              영상 열기
+              Open video
             </a>
           </div>
         </div>

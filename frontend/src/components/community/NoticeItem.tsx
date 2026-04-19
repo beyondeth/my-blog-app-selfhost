@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Megaphone, Pin } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ko } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import type { Post } from '@/types';
 
@@ -36,7 +36,7 @@ export default function NoticeItem({ notice, className, postUrlOverride }: Notic
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white dark:bg-blue-500">
-            공지
+            Notice
           </span>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
             {notice.title}
@@ -44,16 +44,16 @@ export default function NoticeItem({ notice, className, postUrlOverride }: Notic
         </div>
         
         <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mb-1">
-          {notice.excerpt || "내용 미리보기가 없습니다."}
+          {notice.excerpt || 'No preview available.'}
         </p>
         
         <div className="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
-          <span>{notice.author?.username || '관리자'}</span>
+          <span>{notice.author?.username || 'Admin'}</span>
           <span>•</span>
           <span>
             {formatDistanceToNow(new Date(notice.createdAt), {
               addSuffix: true,
-              locale: ko,
+              locale: enUS,
             })}
           </span>
         </div>

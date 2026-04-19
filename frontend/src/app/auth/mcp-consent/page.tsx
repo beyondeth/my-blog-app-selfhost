@@ -14,6 +14,7 @@ import {
   writeMcpOAuthSession,
 } from '@/lib/mcpOAuth';
 import { useAuth } from '@/providers/AuthProviderV2';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -21,6 +22,7 @@ function McpConsentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading } = useAuth();
+  const { locale, href } = useLocaleContext();
   const [oauthData, setOauthData] = useState<McpOAuthSessionData | null>(null);
   const [isOauthDataResolved, setIsOauthDataResolved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,14 +66,14 @@ function McpConsentContent() {
     }
 
     if (!user) {
-      router.replace(buildMcpOAuthLoginPath(oauthData));
+      router.replace(buildMcpOAuthLoginPath(oauthData, locale));
       return;
     }
 
     if (!user.termsAcceptedAt || !user.privacyAcceptedAt) {
-      router.replace('/consent');
+      router.replace(href('/consent'));
     }
-  }, [isLoading, isOauthDataResolved, oauthData, router, user]);
+  }, [isLoading, isOauthDataResolved, oauthData, router, user, locale, href]);
 
   const requestedMcpScopes = oauthData ? parseMcpScopes(oauthData.scope) : [];
 
@@ -118,17 +120,17 @@ function McpConsentContent() {
 
       if (!response.ok) {
         if (data?.code === 'CONSENT_REQUIRED') {
-          router.push('/consent');
+          router.push(href('/consent'));
           return;
         }
 
-        throw new Error(data?.message || '연결 승인 처리에 실패했습니다.');
+        throw new Error(data?.message || (locale === 'ko' ? '연결 승인 처리에 실패했습니다.' : 'Connection approval failed.'));
       }
 
       clearMcpOAuthSession();
       window.location.assign(data.redirect_url);
     } catch (approveError: any) {
-      setError(approveError?.message || '연결 승인 처리 중 오류가 발생했습니다.');
+      setError(approveError?.message || (locale === 'ko' ? '연결 승인 처리 중 오류가 발생했습니다.' : 'An error occurred while approving the connection.'));
       setIsSubmitting(false);
     }
   };
@@ -145,7 +147,7 @@ function McpConsentContent() {
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-gray-900 dark:border-gray-700 dark:border-t-gray-100 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">연결 정보를 불러오는 중...</p>
+          <p className="text-gray-600 dark:text-gray-400">{locale === 'ko' ? '연결 정보를 불러오는 중...' : 'Loading connection details...'}</p>
         </div>
       </div>
     );
@@ -160,17 +162,19 @@ function McpConsentContent() {
       onBack={() => router.back()}
       onCancel={handleCancel}
       onApprove={handleApprove}
-      approveLabel={isSubmitting ? '연결 중...' : '연결하기'}
+      approveLabel={isSubmitting ? (locale === 'ko' ? '연결 중...' : 'Connecting...') : (locale === 'ko' ? '연결하기' : 'Connect')}
+      backLabel={locale === 'ko' ? '뒤로가기' : 'Back'}
     />
   );
 }
 
 export default function McpConsentPage() {
+  const { locale } = useLocaleContext();
   const fallback = (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-gray-900 dark:border-gray-700 dark:border-t-gray-100 mx-auto mb-4"></div>
-        <p className="text-gray-600 dark:text-gray-400">연결 정보를 불러오는 중...</p>
+        <p className="text-gray-600 dark:text-gray-400">{locale === 'ko' ? '연결 정보를 불러오는 중...' : 'Loading connection details...'}</p>
       </div>
     </div>
   );

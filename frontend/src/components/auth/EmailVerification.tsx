@@ -3,6 +3,7 @@
 import { useState, useEffect, forwardRef } from 'react';
 import { Mail, Check, AlertCircle } from 'lucide-react';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 interface EmailVerificationProps {
   email: string;
@@ -18,6 +19,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
 ) {
   const { state, sendCode, verifyCode, resendCode } = useEmailVerification();
   const [code, setCode] = useState('');
+  const { locale } = useLocaleContext();
 
   // 인증 완료 시 콜백 호출
   useEffect(() => {
@@ -51,7 +53,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
       {/* 이메일 입력 필드 */}
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          이메일
+          {locale === 'ko' ? '이메일' : 'Email'}
         </label>
         <div className="relative">
           <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
@@ -75,7 +77,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               disabled={state.isLoading || !email}
               className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-md text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
             >
-              {state.isLoading ? '발송 중...' : '인증 코드 발급'}
+              {state.isLoading ? (locale === 'ko' ? '발송 중...' : 'Sending...') : (locale === 'ko' ? '인증 코드 발급' : 'Send code')}
             </button>
           )}
           {state.step === 'verified' && (
@@ -92,7 +94,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
           {/* 인증 코드 입력창 - 위아래 필드와 동일한 너비 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              인증 코드
+              {locale === 'ko' ? '인증 코드' : 'Verification code'}
             </label>
             <input
               type="text"
@@ -103,7 +105,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               className={`w-full px-4 py-3 rounded-lg text-center text-lg font-mono tracking-wider auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                 state.error ? 'border-red-500 dark:border-red-400' : ''
               }`}
-              placeholder="인증 코드 6자리"
+              placeholder={locale === 'ko' ? '인증 코드 6자리' : '6-digit code'}
               autoFocus
             />
           </div>
@@ -120,7 +122,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
                   : 'auth-button-primary'
               }`}
             >
-              {state.isLoading ? '확인중...' : '인증'}
+              {state.isLoading ? (locale === 'ko' ? '확인중...' : 'Verifying...') : (locale === 'ko' ? '인증' : 'Verify')}
             </button>
             <button
               type="button"
@@ -128,7 +130,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               disabled={state.isLoading}
               className="flex-1 py-3 social-login-btn rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              재발급
+              {locale === 'ko' ? '재발급' : 'Resend'}
             </button>
           </div>
 
@@ -136,11 +138,11 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
           {state.timer > 0 && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500 dark:text-gray-400">
-                남은 시간: <span className="font-mono font-medium text-indigo-600 dark:text-indigo-400">{formatTime(state.timer)}</span>
+                {locale === 'ko' ? '남은 시간:' : 'Time left:'} <span className="font-mono font-medium text-indigo-600 dark:text-indigo-400">{formatTime(state.timer)}</span>
               </span>
               {state.attemptCount > 0 && (
                 <span className="text-amber-600 dark:text-amber-400">
-                  시도 횟수: {state.attemptCount}/3
+                  {locale === 'ko' ? '시도 횟수' : 'Attempts'}: {state.attemptCount}/3
                 </span>
               )}
             </div>
@@ -152,7 +154,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
       {state.step === 'verified' && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg flex items-center gap-2 fade-in-up">
           <Check className="w-5 h-5" />
-          <span className="text-sm font-medium">이메일 인증이 완료되었습니다.</span>
+          <span className="text-sm font-medium">{locale === 'ko' ? '이메일 인증이 완료되었습니다.' : 'Email verification is complete.'}</span>
         </div>
       )}
 

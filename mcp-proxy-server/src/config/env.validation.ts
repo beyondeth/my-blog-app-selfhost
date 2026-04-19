@@ -154,39 +154,39 @@ export function validateEnv(): EnvConfig {
     // 환경 변수 파싱 및 검증
     const env = envSchema.parse(process.env);
 
-    console.log('✅ 환경 변수 검증 완료 (MCP Dual Auth 모드)');
-    console.log(`📍 환경: ${env.NODE_ENV}`);
-    console.log(`📍 MCP Proxy 포트: ${env.MCP_PROXY_PORT}`);
+    console.log('✅ Environment validation complete (MCP dual-auth mode)');
+    console.log(`📍 Environment: ${env.NODE_ENV}`);
+    console.log(`📍 MCP Proxy port: ${env.MCP_PROXY_PORT}`);
     console.log(`🤖 OpenAI App Route Enabled: ${env.OPENAI_APP_ENABLED ? 'yes' : 'no'}`);
     console.log(`📍 MCP Base URL: ${env.MCP_BASE_URL}`);
     console.log(`📍 Backend: ${env.BACKEND_BASE_URL}`);
     console.log(`📍 Backend Public: ${env.BACKEND_PUBLIC_URL}`);
     console.log(`📍 Frontend: ${env.FRONTEND_URL}`);
-    console.log(`🔐 인증 방식: API Key (/mcp) + OAuth 2.1 (/mcp-remote)`);
+    console.log(`🔐 Auth modes: API Key (/mcp) + OAuth 2.1 (/mcp-remote)`);
     console.log(`🛡️ Rate Limit: ${env.RATE_LIMIT_MAX_REQUESTS} req/${env.RATE_LIMIT_WINDOW_MS / 3600000}h`);
 
     // 프로덕션 환경 추가 검증
     if (env.NODE_ENV === 'production') {
-      console.log('\n🔍 프로덕션 환경 추가 검증:');
+      console.log('\n🔍 Additional production checks:');
 
       // CORS 와일드카드 확인
       if (env.CORS_ORIGINS.includes('*')) {
         throw new Error('CORS wildcard is not allowed in production');
       }
-      console.log('  ✅ CORS 설정 안전');
+      console.log('  ✅ CORS configuration is valid');
 
       // HTTPS 확인
       if (!env.BACKEND_BASE_URL.startsWith('https://') && !env.BACKEND_BASE_URL.startsWith('http://backend:')) {
-        console.warn('  ⚠️ BACKEND_BASE_URL이 HTTPS를 사용하지 않습니다.');
+        console.warn('  ⚠️ BACKEND_BASE_URL is not using HTTPS.');
       } else {
-        console.log('  ✅ Backend URL 설정 안전');
+        console.log('  ✅ Backend URL configuration is valid');
       }
 
       // MCP_BASE_URL HTTPS 확인
       if (!env.MCP_BASE_URL.startsWith('https://')) {
-        console.warn('  ⚠️ MCP_BASE_URL이 HTTPS를 사용하지 않습니다. (프로덕션 필수)');
+        console.warn('  ⚠️ MCP_BASE_URL is not using HTTPS. (Required in production)');
       } else {
-        console.log('  ✅ MCP Base URL HTTPS 사용 중');
+        console.log('  ✅ MCP Base URL is using HTTPS');
       }
     }
 
@@ -199,7 +199,7 @@ export function validateEnv(): EnvConfig {
     return env;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('❌ 환경 변수 검증 실패:');
+      console.error('❌ Environment validation failed:');
       console.error('━'.repeat(50));
 
       error.issues.forEach(issue => {
@@ -207,15 +207,15 @@ export function validateEnv(): EnvConfig {
       });
 
       console.error('━'.repeat(50));
-      console.error('\n💡 .env 파일을 확인하고 필수 환경 변수를 설정해주세요.');
-      console.error('   참고: .env.development 또는 .env.production\n');
+      console.error('\n💡 Check your .env file and define the required environment variables.');
+      console.error('   Reference: .env.development or .env.production\n');
 
       // 개발 환경에서는 자세한 오류 표시
       if (process.env.NODE_ENV === 'development') {
-        console.error('🔍 전체 오류 정보:', JSON.stringify(error.issues, null, 2));
+        console.error('🔍 Full validation details:', JSON.stringify(error.issues, null, 2));
       }
     } else {
-      console.error('❌ 예상치 못한 오류:', error);
+      console.error('❌ Unexpected error during environment validation:', error);
     }
 
     // 서버 시작 중단

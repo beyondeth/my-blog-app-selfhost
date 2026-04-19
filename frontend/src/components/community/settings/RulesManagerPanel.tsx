@@ -112,16 +112,16 @@ export default function RulesManagerPanel({
       <header className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-            커뮤니티 규칙
+            Community rules
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            커뮤니티 운영 원칙을 추가하고 정렬하세요.
+            Add and organize the rules that guide this community.
           </p>
         </div>
         <div className="flex items-center gap-3">
           {onShowNumberingChange && (
             <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-100 dark:border-gray-700">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-300">번호 표시</span>
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Show numbering</span>
               <input
                 type="checkbox"
                 checked={showNumbering}
@@ -132,7 +132,7 @@ export default function RulesManagerPanel({
           )}
           <Button size="sm" onClick={() => setIsCreating(true)} disabled={isCreating}>
             <Plus className="w-4 h-4 mr-1" />
-            규칙 추가
+            Add rule
           </Button>
         </div>
       </header>
@@ -141,36 +141,36 @@ export default function RulesManagerPanel({
         <div className="rounded-xl border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-3">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">규칙 제목</label>
+              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Rule title</label>
               <span className="text-xs text-gray-500">{newTitle.length}/{TITLE_MAX_LENGTH}</span>
             </div>
             <input
               type="text"
               value={newTitle}
               onChange={(event) => setNewTitle(event.target.value.slice(0, TITLE_MAX_LENGTH))}
-              placeholder="규칙 제목"
+              placeholder="Rule title"
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
             />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">설명 (선택)</label>
+              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Description (optional)</label>
               <span className="text-xs text-gray-500">{newDescription.length}/{DESCRIPTION_MAX_LENGTH}</span>
             </div>
             <textarea
               value={newDescription}
               onChange={(event) => setNewDescription(event.target.value.slice(0, DESCRIPTION_MAX_LENGTH))}
-              placeholder="설명 (선택) - 링크 포함 가능"
+              placeholder="Description (optional) - links are allowed"
               rows={3}
               className="w-full max-w-2xl rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
             />
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsCreating(false)}>
-              취소
+              Cancel
             </Button>
             <Button size="sm" onClick={handleCreate}>
-              저장
+              Save
             </Button>
           </div>
         </div>
@@ -179,7 +179,7 @@ export default function RulesManagerPanel({
       <div className="space-y-3">
         {isLoading && (
           <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 animate-pulse text-sm text-gray-500">
-            규칙을 불러오는 중...
+            Loading rules...
           </div>
         )}
         {!isLoading &&
@@ -197,7 +197,7 @@ export default function RulesManagerPanel({
                   <div className="space-y-3">
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">규칙 제목</label>
+                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Rule title</label>
                         <span className="text-xs text-gray-500">{editTitle.length}/{TITLE_MAX_LENGTH}</span>
                       </div>
                       <input
@@ -208,7 +208,7 @@ export default function RulesManagerPanel({
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">설명 (선택)</label>
+                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Description (optional)</label>
                         <span className="text-xs text-gray-500">{editDescription.length}/{DESCRIPTION_MAX_LENGTH}</span>
                       </div>
                       <textarea
@@ -220,10 +220,10 @@ export default function RulesManagerPanel({
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={handleEditCancel}>
-                        취소
+                        Cancel
                       </Button>
                       <Button size="sm" onClick={handleEditSave}>
-                        저장
+                        Save
                       </Button>
                     </div>
                   </div>
@@ -264,21 +264,21 @@ export default function RulesManagerPanel({
             );
           })}
         {!isLoading && (!rules || rules.length === 0) && (
-          <p className="text-sm text-gray-500">등록된 규칙이 없습니다.</p>
+          <p className="text-sm text-gray-500">No rules added yet.</p>
         )}
       </div>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>규칙 삭제</AlertDialogTitle>
+            <AlertDialogTitle>Delete rule</AlertDialogTitle>
             <AlertDialogDescription>
-              "{deleteTarget?.title}" 규칙을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+              Delete the rule "{deleteTarget?.title}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm}>삭제</AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

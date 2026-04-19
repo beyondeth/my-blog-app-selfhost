@@ -34,7 +34,7 @@ const DMLayout: React.FC<ExtendedDMLayoutProps> = ({ isModal = false }) => {
       // Block 엔티티에서 blockedId만 추출하여 Set으로 변환
       const blockedUserIds = blockedData.data.map((block: any) => block.blockedId);
       setBlockedUsers(blockedUserIds);
-      console.log('[DMLayout] 차단 목록 로드:', blockedUserIds);
+      console.log('[DMLayout] Loaded blocked users:', blockedUserIds);
     }
   }, [blockedData, setBlockedUsers]);
 
@@ -142,10 +142,10 @@ const DMLayout: React.FC<ExtendedDMLayoutProps> = ({ isModal = false }) => {
                     </svg>
                   </div>
                   <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-                    메시지를 선택하세요
+                    Select a conversation
                   </h2>
                   <p className="text-gray-500">
-                    왼쪽 목록에서 대화를 선택하여 채팅을 시작하세요
+                    Choose a conversation from the list to start chatting
                   </p>
                 </div>
               </div>

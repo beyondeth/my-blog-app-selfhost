@@ -113,12 +113,12 @@ class DMErrorBoundary extends Component<Props, State> {
               </div>
 
               <h2 className="text-2xl font-semibold text-center text-gray-900 mb-2">
-                채팅 오류 발생
+                Chat unavailable
               </h2>
 
               <p className="text-gray-600 text-center mb-6">
-                채팅 시스템에 문제가 발생했습니다.
-                잠시 후 다시 시도해 주세요.
+                Something went wrong in the chat system.
+                Please try again in a moment.
               </p>
 
               {/* Error details for development */}
@@ -143,7 +143,7 @@ class DMErrorBoundary extends Component<Props, State> {
                   onClick={this.handleReset}
                   className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                 >
-                  다시 시도
+                  Try again
                 </button>
 
                 <button
@@ -151,14 +151,14 @@ class DMErrorBoundary extends Component<Props, State> {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  새로고침
+                  Refresh
                 </button>
               </div>
             </div>
 
             {/* Additional help text */}
             <p className="text-center text-sm text-gray-500 mt-4">
-              문제가 계속되면 고객 지원팀에 문의해 주세요
+              If the issue continues, contact support.
             </p>
           </div>
         </div>
