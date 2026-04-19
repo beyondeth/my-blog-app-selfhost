@@ -9,6 +9,7 @@ import { FollowInfo } from '@/types/api';
 import { Loader2, UserPlus, UserMinus, UserCheck, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries/keys';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 interface FollowButtonProps {
   userId: string;
@@ -95,6 +96,7 @@ export default function FollowButton({
   suppressSuccessToast = false,
 }: FollowButtonProps) {
   const { user } = useAuth();
+  const { t } = useLocaleContext();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isHovered, setIsHovered] = useState(false);
@@ -168,12 +170,12 @@ export default function FollowButton({
 
       // 에러 처리
       if (error.message === 'UNAUTHORIZED') {
-        toast.error('로그인이 필요합니다.');
+        toast.error(t('followButton.loginRequired'));
         router.push('/login');
       } else if (error.message.includes('자신을 팔로우할 수 없습니다')) {
-        toast.error('자신을 팔로우할 수 없습니다.');
+        toast.error(t('followButton.cannotFollowSelf'));
       } else {
-        toast.error('팔로우 상태 변경에 실패했습니다.');
+        toast.error(t('followButton.updateFailed'));
         console.error('Follow toggle failed:', error);
       }
     },
@@ -202,7 +204,7 @@ export default function FollowButton({
 
   const handleClick = () => {
     if (!user) {
-      toast.error('로그인이 필요합니다.');
+      toast.error(t('followButton.loginRequired'));
       router.push('/login');
       return;
     }
@@ -218,7 +220,7 @@ export default function FollowButton({
   const buttonConfig = useMemo(() => {
     if (isPending) {
       return {
-        text: '로딩 중...',
+        text: t('followButton.loading'),
         icon: Loader2,
         className: 'bg-white text-gray-400 border border-gray-300 cursor-not-allowed',
         iconClassName: 'animate-spin',
@@ -229,7 +231,7 @@ export default function FollowButton({
     // 언팔로우 성공 시 피드백
     if (showSuccessIcon && lastAction === 'UNFOLLOWED') {
       return {
-        text: '언팔로우',
+        text: t('followButton.unfollowed'),
         icon: Check,
         className: 'bg-white text-gray-900 border border-gray-900 transition-all duration-200',
         iconClassName: '',
@@ -239,7 +241,7 @@ export default function FollowButton({
 
     if (isFollowing) {
       return {
-        text: '팔로잉',
+        text: t('followButton.following'),
         icon: Check,
         className: 'bg-white text-gray-900 border border-gray-900 transition-all duration-200',
         iconClassName: '',
@@ -247,14 +249,14 @@ export default function FollowButton({
       };
     } else {
       return {
-        text: '팔로우',
+        text: t('followButton.follow'),
         icon: null,
         className: 'bg-white text-gray-900 border border-gray-900 transition-all duration-200',
         iconClassName: '',
         disabled: false,
       };
     }
-  }, [isPending, isFollowing, showSuccessIcon, lastAction]);
+  }, [isPending, isFollowing, showSuccessIcon, lastAction, t]);
 
   // 자신의 프로필에서는 버튼을 표시하지 않음
   if (user?.id === userId) {
@@ -290,7 +292,13 @@ export default function FollowButton({
           'transition-all duration-200',
           className
         )}
-        title={isPending ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
+        title={
+          isPending
+            ? t('followButton.loading')
+            : isFollowing
+              ? t('followButton.titleFollowing')
+              : t('followButton.titleFollow')
+        }
       >
         {isPending ? (
           <Loader2 className="w-5 h-5 animate-spin" />
@@ -323,7 +331,7 @@ export default function FollowButton({
         {isPending ? (
           <div className="flex items-center">
             <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-            <span>로딩 중...</span>
+            <span>{t('followButton.loading')}</span>
           </div>
         ) : (
           <div className="flex items-center gap-1.5">
@@ -348,12 +356,18 @@ export default function FollowButton({
           'disabled:opacity-60 disabled:pointer-events-none',
           buttonConfig.className
         )}
-        aria-label={isPending ? '로딩 중...' : isFollowing ? '팔로잉' : '팔로우'}
+        aria-label={
+          isPending
+            ? t('followButton.loading')
+            : isFollowing
+              ? t('followButton.following')
+              : t('followButton.follow')
+        }
       >
         {isPending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            <span>로딩 중...</span>
+            <span>{t('followButton.loading')}</span>
           </>
         ) : (
           <div className="flex items-center gap-1.5">
@@ -370,7 +384,7 @@ export default function FollowButton({
             {followInfo.followersCount.toLocaleString()}
           </span>
           <span className="text-xs text-gray-500">
-            팔로워
+            {t('followButton.followers')}
           </span>
         </div>
       )}
