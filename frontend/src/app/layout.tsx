@@ -9,7 +9,7 @@ import { SocketProvider } from '@/providers/SocketProvider';
 export const dynamic = 'force-dynamic';
 
 // metadataBase를 환경 변수에서 동적으로 설정
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
 /**
  * 루트 레이아웃 - 서버 컴포넌트

@@ -10,7 +10,7 @@ import { Metadata } from 'next';
  * - 구조화된 데이터 (JSON-LD) 포함
  */
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
 export const metadata: Metadata = {
   title: 'Pricing - Codebase',

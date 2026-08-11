@@ -1,8 +1,12 @@
+const MCP_BASE_URL = (process.env.NEXT_PUBLIC_MCP_BASE_URL || 'http://localhost:3002').replace(/\/$/, '');
+const MCP_URL = `${MCP_BASE_URL}/mcp`;
+const MCP_REMOTE_URL = `${MCP_BASE_URL}/mcp-remote`;
+
 export const getMcpJsonConfig = (apiKey: string) => `{
   "mcpServers": {
     "codebase-blog-mcp": {
       "type": "http",
-      "url": "https://mcp.codebase.blog/mcp",
+      "url": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}"
       }
@@ -16,7 +20,7 @@ export const getCursorConfig = (apiKey: string, includeComment: boolean = true) 
 {
   "mcpServers": {
     "codebase-blog-mcp": {
-      "url": "https://mcp.codebase.blog/mcp",
+      "url": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}"
       }
@@ -26,7 +30,7 @@ export const getCursorConfig = (apiKey: string, includeComment: boolean = true) 
     : `{
   "mcpServers": {
     "codebase-blog-mcp": {
-      "url": "https://mcp.codebase.blog/mcp",
+      "url": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}"
       }
@@ -37,8 +41,8 @@ export const getCursorConfig = (apiKey: string, includeComment: boolean = true) 
 export const getClaudeCodeConfig = (apiKey: string, includeComment: boolean = true) =>
   includeComment
     ? `# 터미널에서 실행
-claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization: Bearer ${apiKey}"`
-    : `claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization: Bearer ${apiKey}"`;
+claude mcp add codebase-blog-mcp --url ${MCP_URL} --header "Authorization: Bearer ${apiKey}"`
+    : `claude mcp add codebase-blog-mcp --url ${MCP_URL} --header "Authorization: Bearer ${apiKey}"`;
 
 export const getWindsurfConfig = (apiKey: string, includeComment: boolean = true) =>
   includeComment
@@ -46,7 +50,7 @@ export const getWindsurfConfig = (apiKey: string, includeComment: boolean = true
 {
   "mcpServers": {
     "codebase-blog-mcp": {
-      "serverUrl": "https://mcp.codebase.blog/mcp",
+      "serverUrl": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}"
       }
@@ -56,7 +60,7 @@ export const getWindsurfConfig = (apiKey: string, includeComment: boolean = true
     : `{
   "mcpServers": {
     "codebase-blog-mcp": {
-      "serverUrl": "https://mcp.codebase.blog/mcp",
+      "serverUrl": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}"
       }
@@ -70,7 +74,7 @@ export const getVSCodeConfig = (apiKey: string, includeComment: boolean = true) 
 {
   "mcpServers": {
     "codebase-blog-mcp": {
-      "url": "https://mcp.codebase.blog/mcp",
+      "url": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}"
       }
@@ -80,7 +84,7 @@ export const getVSCodeConfig = (apiKey: string, includeComment: boolean = true) 
     : `{
   "mcpServers": {
     "codebase-blog-mcp": {
-      "url": "https://mcp.codebase.blog/mcp",
+      "url": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}"
       }
@@ -94,7 +98,7 @@ export const getGeminiConfig = (apiKey: string, includeComment: boolean = true) 
 {
   "mcpServers": {
     "codebase-blog-mcp": {
-      "httpUrl": "https://mcp.codebase.blog/mcp",
+      "httpUrl": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}",
         "Accept": "application/json, text/event-stream"
@@ -105,7 +109,7 @@ export const getGeminiConfig = (apiKey: string, includeComment: boolean = true) 
     : `{
   "mcpServers": {
     "codebase-blog-mcp": {
-      "httpUrl": "https://mcp.codebase.blog/mcp",
+      "httpUrl": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}",
         "Accept": "application/json, text/event-stream"
@@ -120,7 +124,7 @@ export const getQwenConfig = (apiKey: string, includeComment: boolean = true) =>
 {
   "mcpServers": {
     "codebase-blog-mcp": {
-      "httpUrl": "https://mcp.codebase.blog/mcp",
+      "httpUrl": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}",
         "Accept": "application/json, text/event-stream"
@@ -131,7 +135,7 @@ export const getQwenConfig = (apiKey: string, includeComment: boolean = true) =>
     : `{
   "mcpServers": {
     "codebase-blog-mcp": {
-      "httpUrl": "https://mcp.codebase.blog/mcp",
+      "httpUrl": "${MCP_URL}",
       "headers": {
         "Authorization": "Bearer ${apiKey}",
         "Accept": "application/json, text/event-stream"
@@ -143,14 +147,14 @@ export const getQwenConfig = (apiKey: string, includeComment: boolean = true) =>
 export const getMcporterSetupSnippet = (apiKey: string, includeComment: boolean = true) =>
   includeComment
     ? `# PROD (일반 사용자)
-npx -y mcporter config add codebase-blog-oauth --url https://mcp.codebase.blog/mcp-remote --auth oauth --oauth-redirect-url http://127.0.0.1:33333/callback --scope home
+npx -y mcporter config add codebase-blog-oauth --url ${MCP_REMOTE_URL} --auth oauth --oauth-redirect-url http://127.0.0.1:33333/callback --scope home
 
 # DEV (테스트용)
 npx -y mcporter config add codebase-blog-oauth-dev --url http://localhost:3002/mcp-remote --auth oauth --allow-http --oauth-redirect-url http://127.0.0.1:33334/callback --scope project
 
 # 브라우저 OAuth 인증 (초기 1회)
 npx -y mcporter auth codebase-blog-oauth`
-    : `npx -y mcporter config add codebase-blog-oauth --url https://mcp.codebase.blog/mcp-remote --auth oauth --oauth-redirect-url http://127.0.0.1:33333/callback --scope home
+    : `npx -y mcporter config add codebase-blog-oauth --url ${MCP_REMOTE_URL} --auth oauth --oauth-redirect-url http://127.0.0.1:33333/callback --scope home
 npx -y mcporter config add codebase-blog-oauth-dev --url http://localhost:3002/mcp-remote --auth oauth --allow-http --oauth-redirect-url http://127.0.0.1:33334/callback --scope project
 npx -y mcporter auth codebase-blog-oauth`;
 
@@ -204,11 +208,11 @@ export const getMcporterOAuthSnippet = (apiKey: string, includeComment: boolean 
 
 # OAuth 대신 API Key 모드를 쓰는 경우 (선택)
 export CODEBASE_MCP_TOKEN="${apiKey}"
-npx -y mcporter config add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization=Bearer \${CODEBASE_MCP_TOKEN}" --header "Accept=application/json, text/event-stream" --scope home
+npx -y mcporter config add codebase-blog-mcp --url ${MCP_URL} --header "Authorization=Bearer \${CODEBASE_MCP_TOKEN}" --header "Accept=application/json, text/event-stream" --scope home
 npx -y mcporter call codebase-blog-mcp.check_auth`
     : `npx -y mcporter auth codebase-blog-oauth --reset
 export CODEBASE_MCP_TOKEN="${apiKey}"
-npx -y mcporter config add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization=Bearer \${CODEBASE_MCP_TOKEN}" --header "Accept=application/json, text/event-stream" --scope home
+npx -y mcporter config add codebase-blog-mcp --url ${MCP_URL} --header "Authorization=Bearer \${CODEBASE_MCP_TOKEN}" --header "Accept=application/json, text/event-stream" --scope home
 npx -y mcporter call codebase-blog-mcp.check_auth`;
 
 export const getCodexEnvSnippet = (apiKey: string, includeComment: boolean = true) =>
@@ -240,7 +244,7 @@ model_reasoning_effort = "high"
 rmcp_client = true
 
 [mcp_servers.codebase-blog-mcp]
-url = "https://mcp.codebase.blog/mcp"
+url = "${MCP_URL}"
 bearer_token_env_var = "CODEBASE_MCP_TOKEN"
 http_headers = { Accept = "application/json, text/event-stream" }`
     : `model = "gpt-5-codex"
@@ -250,6 +254,6 @@ model_reasoning_effort = "high"
 rmcp_client = true
 
 [mcp_servers.codebase-blog-mcp]
-url = "https://mcp.codebase.blog/mcp"
+url = "${MCP_URL}"
 bearer_token_env_var = "CODEBASE_MCP_TOKEN"
 http_headers = { Accept = "application/json, text/event-stream" }`;

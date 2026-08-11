@@ -1,0 +1,318 @@
+name: ${COMPOSE_PROJECT_NAME:-codebase-selfhost}
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    command:
+      - postgres
+      - -c
+      - max_connections=20
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - work_mem=4MB
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-codebase}
+      PGDATA: /var/lib/postgresql/18/docker
+    ports:
+      - "${PRIVATE_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-codebase}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+    networks:
+      - codebase
+
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAX_MEMORY:-128mb}
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - "${PRIVATE_BIND_ADDRESS:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 160M
+    networks:
+      - codebase
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_API_CORS_ALLOW_ORIGIN:-*}
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-127.0.0.1}:${MINIO_API_PORT:-9000}:9000"
+      - "${PRIVATE_BIND_ADDRESS:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 192M
+    networks:
+      - codebase
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      MINIO_BUCKET: ${MINIO_BUCKET:-blog}
+    volumes:
+      - ./deploy/minio:/opt/minio:ro
+    entrypoint: ["/bin/sh", "/opt/minio/init.sh"]
+    restart: "no"
+    networks:
+      - codebase
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    env_file:
+      - path: .env.selfhost
+        required: false
+    environment:
+      NODE_ENV: production
+      DOCKERIZED: "true"
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_DATABASE: ${POSTGRES_DB:-codebase}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      REDIS_MAX_MEMORY: ${REDIS_MAX_MEMORY:-128mb}
+      REDIS_MAX_MEMORY_POLICY: ${REDIS_MAX_MEMORY_POLICY:-noeviction}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-dummy-client-id}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-dummy-client-secret}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3000/api/v1/auth/google/callback}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-dummy-client-id}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-dummy-client-secret}
+      KAKAO_CALLBACK_URL: ${KAKAO_CALLBACK_URL:-http://localhost:3000/api/v1/auth/kakao/callback}
+      AWS_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_S3_BUCKET: ${MINIO_BUCKET:-blog}
+      AWS_REGION: us-east-1
+      STORAGE_PROVIDER: minio
+      S3_INTERNAL_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      PUBLIC_BACKEND_URL: ${BACKEND_PUBLIC_URL:-http://localhost:3000}
+      CDN_ENABLED: "false"
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    command: ["sh", "-c", "pnpm migration:run:prod:nobuild && exec node dist/src/main.js"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 512M
+    networks:
+      - codebase
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      target: runner
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:3000}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3001}
+        NEXT_PUBLIC_CDN_BASE_URL: ${NEXT_PUBLIC_CDN_BASE_URL:-}
+        NEXT_PUBLIC_STORAGE_PUBLIC_URL: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+        NEXT_PUBLIC_MCP_BASE_URL: ${NEXT_PUBLIC_MCP_BASE_URL:-http://localhost:3002}
+        BACKEND_INTERNAL_URL: http://backend:3000
+    env_file:
+      - path: .env.selfhost
+        required: false
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
+      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:3000}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3001}
+      NEXT_PUBLIC_CDN_BASE_URL: ${NEXT_PUBLIC_CDN_BASE_URL:-}
+      NEXT_PUBLIC_STORAGE_PUBLIC_URL: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
+      NEXT_PUBLIC_MCP_BASE_URL: ${NEXT_PUBLIC_MCP_BASE_URL:-http://localhost:3002}
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-3001}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    networks:
+      - codebase
+
+  mcp-proxy:
+    build:
+      context: ./mcp-proxy-server
+      dockerfile: Dockerfile
+      target: production
+    env_file:
+      - path: .env.selfhost
+        required: false
+    environment:
+      NODE_ENV: development
+      MCP_PROXY_PORT: 3002
+      BACKEND_BASE_URL: http://backend:3000
+      BACKEND_API_URL: http://backend:3000/api/v1
+      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-http://localhost:3000}
+      PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-http://localhost:3001}
+      MCP_BASE_URL: ${MCP_BASE_URL:-http://localhost:3002}
+      CORS_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3001}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-127.0.0.1}:${MCP_PROXY_PORT:-3002}:3002"
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3002/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+    networks:
+      - codebase
+
+  victoriametrics:
+    profiles: ["monitoring"]
+    image: victoriametrics/victoria-metrics:v1.97.0
+    command:
+      - --storageDataPath=/storage
+      - --retentionPeriod=7d
+      - --promscrape.config=/etc/victoriametrics/scrape_config.yml
+      - --promscrape.config.strictParse=false
+      - --memory.allowedPercent=70
+    volumes:
+      - ./deploy/monitoring/scrape_config.yml:/etc/victoriametrics/scrape_config.yml:ro
+      - victoriametrics_data:/storage
+    ports:
+      - "${PRIVATE_BIND_ADDRESS:-127.0.0.1}:${VICTORIAMETRICS_PORT:-8428}:8428"
+    depends_on:
+      backend:
+        condition: service_healthy
+      mcp-proxy:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 192M
+    networks:
+      - codebase
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-before-monitoring}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3030}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${PRIVATE_BIND_ADDRESS:-127.0.0.1}:${GRAFANA_PORT:-3030}:3000"
+    depends_on:
+      victoriametrics:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+    networks:
+      - codebase
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  victoriametrics_data:
+  grafana_data:
+
+networks:
+  codebase:
+    driver: bridge

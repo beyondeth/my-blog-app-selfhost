@@ -191,6 +191,16 @@ export class EmailService {
     const html = getAWSStyleEmailTemplate(code);
 
     try {
+      if (
+        String(this.configService.get("EMAIL_MODE", "smtp")).toLowerCase() ===
+        "console"
+      ) {
+        this.logger.warn(
+          `[EMAIL_MODE=console] Verification code for ${email}: ${code}`,
+        );
+        return;
+      }
+
       // 개발 환경에서만 상세 로그 출력
       if (process.env.NODE_ENV === "development") {
         this.logger.debug(`이메일 발송 시도: ${email}`, {
@@ -481,6 +491,9 @@ export class EmailService {
    * 계정 삭제 이메일 템플릿
    */
   private getAccountDeletionTemplate(): string {
+    const publicSiteUrl =
+      process.env.PUBLIC_SITE_URL || process.env.FRONTEND_URL || "http://localhost:3001";
+
     return `
       <!DOCTYPE html>
       <html>
@@ -633,13 +646,13 @@ export class EmailService {
                 그동안 이용해 주셔서 감사합니다<br>
                 언제든 다시 만나요!
               </p>
-              <a href="https://codebase.blog" class="button">
-                codebase.blog 방문
+              <a href="${publicSiteUrl}" class="button">
+                블로그 방문
               </a>
             </div>
             <div class="footer">
               <p class="footer-text">
-                © 2024 <a href="https://codebase.blog" class="footer-link">codebase.blog</a>
+                © 2024 <a href="${publicSiteUrl}" class="footer-link">블로그</a>
               </p>
             </div>
           </div>
@@ -660,6 +673,16 @@ export class EmailService {
     const html = getAWSStylePasswordResetTemplate(username, resetUrl);
 
     try {
+      if (
+        String(this.configService.get("EMAIL_MODE", "smtp")).toLowerCase() ===
+        "console"
+      ) {
+        this.logger.warn(
+          `[EMAIL_MODE=console] Password reset URL for ${email}: ${resetUrl}`,
+        );
+        return;
+      }
+
       await this.mailerService.sendMail({
         to: email,
         subject: "[codebase.blog] 비밀번호 재설정",

@@ -45,6 +45,7 @@ export interface ToolContext {
     MCP_BASE_URL: string;
     BACKEND_BASE_URL: string;
     BACKEND_PUBLIC_URL: string;
+    PUBLIC_SITE_URL: string;
     MCP_SHARED_SECRET?: string;
   };
 }
@@ -72,7 +73,7 @@ export async function registerAllTools(
         name: 'codebase-blog-mcp',
         version: '8.0.0',
         title: 'Codebase.blog MCP Server',
-        websiteUrl: 'https://codebase.blog'
+        websiteUrl: context.config.PUBLIC_SITE_URL,
       },
       instructions: MCP_SERVER_INSTRUCTIONS,
     };
@@ -241,9 +242,9 @@ async function handleCheckAuth(context: ToolContext): Promise<any> {
     content: [
       {
         type: 'text',
-        text: `✅ *** CODEBASE.BLOG 유저 인증이 완료됨 ***
+        text: `✅ *** BLOG 유저 인증이 완료됨 ***
 ✅ ${context.userData.user.username} (${context.userData.user.email})
-✅ 블로그 주소 : https://www.codebase.blog/${context.userData.blog.slug}
+✅ 블로그 주소 : ${context.config.PUBLIC_SITE_URL}/${context.userData.blog.slug}
 ✅ 인증 방식 : ${authMode}`,
       },
     ],
@@ -370,7 +371,7 @@ async function handleCreatePost(
 
 **Title:** ${post.title}
 **Slug:** ${post.slug}
-**URL:** https://codebase.blog${post.url}
+**URL:** ${context.config.PUBLIC_SITE_URL}${post.url}
 
 The post has been published to your blog "${context.userData.blog.name}".
 ${post._meta ? `\n_Processing in background: ${post._meta.processingTime || 'ongoing'}_` : ''}`,
@@ -505,7 +506,7 @@ async function handleFinalizeUploadedImage(
   }
 
   const backendUrl = context.config.BACKEND_BASE_URL || 'http://localhost:3000';
-  const fileUrl = `https://cdn.codebase.blog/${args.fileKey}`;
+  const fileUrl = `${context.config.BACKEND_PUBLIC_URL.replace(/\/$/, '')}/api/v1/files/proxy/${encodeURI(args.fileKey)}`;
   const mimeType = args.mimeType || 'image/png';
   const fileSize = args.fileSize || 0;
 

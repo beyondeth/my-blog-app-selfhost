@@ -32,6 +32,8 @@
     "migration:check": "ts-node -r tsconfig-paths/register scripts/check-migrations.ts",
     "migration:status": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:show -d ./src/data-source.ts",
     "migration:status:prod": "node ./node_modules/typeorm/cli.js migration:show -d ./dist/src/data-source.js",
+    "admin:create": "node dist/src/commands/create-admin.command.js",
+    "admin:create:dev": "ts-node -r tsconfig-paths/register src/commands/create-admin.command.ts",
     "migrate:files": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts",
     "migrate:files:dry": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts --dry-run",
     "migrate:files:execute": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts --execute",

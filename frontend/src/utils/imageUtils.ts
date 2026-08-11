@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 // 환경변수에서 설정값 가져오기
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-const CDN_BASE_URL = (process.env.NEXT_PUBLIC_CDN_BASE_URL || 'https://cdn.codebase.blog').replace(/\/$/, '');
+const CDN_BASE_URL = (process.env.NEXT_PUBLIC_CDN_BASE_URL || '').replace(/\/$/, '');
 const USE_UUID_FILENAMES = process.env.NEXT_PUBLIC_USE_UUID_FILENAMES === 'true';
 // 디버그 로그 비활성화 (필요 시 true로 변경)
 const DEBUG_MODE = false;
@@ -89,8 +89,8 @@ export function normalizeImageUrl(url: string): string {
     // 디버깅을 위한 입력 로그
     if (DEBUG_MODE) console.log('[normalizeImageUrl] Input:', url);
 
-    // CDN URL은 그대로 사용 (프록시 불필요)
-    if (url.includes('cdn.codebase.blog')) {
+    // Configured CDN URL은 그대로 사용 (프록시 불필요)
+    if (CDN_BASE_URL && url.startsWith(CDN_BASE_URL)) {
       if (DEBUG_MODE) console.log('[normalizeImageUrl] CDN URL, using directly');
       return url;
     }
@@ -212,9 +212,15 @@ export function normalizeImageUrl(url: string): string {
 
     // 이미 S3 키인 경우 (uploads/로 시작)
     if (url.startsWith('uploads/') || url.startsWith('v2/')) {
-      const cdnUrl = `${CDN_BASE_URL}/${url}`;
-      if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 key → CDN:', cdnUrl);
-      return cdnUrl;
+      if (CDN_BASE_URL) {
+        const cdnUrl = `${CDN_BASE_URL}/${url}`;
+        if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 key → CDN:', cdnUrl);
+        return cdnUrl;
+      }
+
+      const proxyUrl = getProxyImageUrl(url);
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 key → Proxy:', proxyUrl);
+      return proxyUrl;
     }
 
     // Bare 파일명 감지 (경로 구분자가 없고 확장자만 있는 경우)
@@ -664,11 +670,19 @@ export function shouldOptimizeImage(url: string): boolean {
   if (isGeminiImageUrl(url)) return false;
 
   // 최적화 가능한 도메인 목록 (next.config.js remotePatterns에 등록된 도메인)
+  let configuredCdnHost: string | null = null;
+  if (CDN_BASE_URL) {
+    try {
+      configuredCdnHost = new URL(CDN_BASE_URL).hostname;
+    } catch {
+      configuredCdnHost = null;
+    }
+  }
+
   const optimizedDomains = [
-    'cdn.codebase.blog',
     'lh3.googleusercontent.com',
     '/api/v1/files/proxy/',
-    'axricjc5utqz.compat.objectstorage.ap-singapore-1.oraclecloud.com'
+    ...(configuredCdnHost ? [configuredCdnHost] : []),
   ];
 
   // 알려진 도메인인 경우만 최적화

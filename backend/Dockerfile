@@ -46,6 +46,8 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
+ARG TARGETARCH
+
 # pnpm 설치
 RUN npm install -g pnpm@latest
 
@@ -69,7 +71,8 @@ COPY package.json pnpm-lock.yaml* ./
 # 의존성 설치 (프로덕션 전용, 캐시 마운트)
 # Sharp를 위한 플랫폼별 빌드 활성화
 RUN --mount=type=cache,target=/root/.npm \
-    npm_config_arch=arm64 \
+    NPM_ARCH=$(if [ "$TARGETARCH" = "amd64" ]; then echo x64; else echo "$TARGETARCH"; fi) && \
+    npm_config_arch=$NPM_ARCH \
     npm_config_platform=linux \
     npm_config_libc=glibc \
     SHARP_IGNORE_GLOBAL_LIBVIPS=1 \
@@ -85,7 +88,8 @@ RUN rm -rf dist && pnpm run build
 # Sharp 네이티브 모듈 빌드를 위해 플랫폼별로 재빌드
 RUN --mount=type=cache,target=/root/.npm \
     rm -rf node_modules && \
-    npm_config_arch=arm64 \
+    NPM_ARCH=$(if [ "$TARGETARCH" = "amd64" ]; then echo x64; else echo "$TARGETARCH"; fi) && \
+    npm_config_arch=$NPM_ARCH \
     npm_config_platform=linux \
     npm_config_libc=glibc \
     SHARP_IGNORE_GLOBAL_LIBVIPS=1 \
@@ -124,6 +128,9 @@ COPY --from=builder --chown=nestjs:nodejs /app/package.json ./package.json
 
 # PM2 Ecosystem 설정 파일 복사
 COPY --chown=nestjs:nodejs ecosystem.config.js ./ecosystem.config.js
+
+# pnpm creates a temporary file in the working directory during migrations.
+RUN chown nestjs:nodejs /app
 
 # 비-루트 사용자로 전환
 USER nestjs

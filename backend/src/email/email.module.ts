@@ -12,6 +12,9 @@ import { User } from "../users/entities/user.entity";
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
+        const emailMode = String(
+          configService.get("EMAIL_MODE", "smtp"),
+        ).toLowerCase();
         // 이메일 설정 유효성 검증
         const host =
           configService.get("SMTP_HOST") || configService.get("EMAIL_HOST");
@@ -55,6 +58,22 @@ import { User } from "../users/entities/user.entity";
               ? process.env.SMTP_PASS.length
               : 0,
           });
+        }
+
+        if (emailMode === "console") {
+          console.warn(
+            "EMAIL_MODE=console: email codes and reset links will be written to the backend log.",
+          );
+
+          return {
+            transport: {
+              streamTransport: true,
+              buffer: true,
+            },
+            defaults: {
+              from: from || '"codebase.blog" <noreply@localhost>',
+            },
+          };
         }
 
         // 필수 환경 변수 검증

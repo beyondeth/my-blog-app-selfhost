@@ -117,7 +117,10 @@ app.use((req, res, next) => {
   }
 
   res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-API-Key, Mcp-Session-Id',
+  );
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(isAllowed ? 204 : 403);
@@ -245,6 +248,7 @@ async function createMcpServer(userData: {
       MCP_BASE_URL: config.MCP_BASE_URL,
       BACKEND_BASE_URL: config.BACKEND_BASE_URL,
       BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
+      PUBLIC_SITE_URL: config.PUBLIC_SITE_URL,
       MCP_SHARED_SECRET: config.MCP_SHARED_SECRET,
     },
   });

@@ -58,7 +58,8 @@ export class RemoveViewCountFromPosts1775000000000
                 p.title,
                 p.slug,
                 p.excerpt,
-                p.thumbnail,
+                p."thumbnail_image_id",
+                COALESCE(f."file_url", NULL) AS thumbnail,
                 p."blogId",
                 p."authorId",
                 p."publishedAt",
@@ -69,6 +70,7 @@ export class RemoveViewCountFromPosts1775000000000
                 ps."viewCount" + ps."likeCount" * 3 + ps."commentCount" * 2 AS "popularityScore"
             FROM posts p
             LEFT JOIN post_stats ps ON p.id = ps."postId"
+            LEFT JOIN files f ON p."thumbnail_image_id" = f.id
             WHERE p."isPublished" = true AND p."isDeleted" = false
             ORDER BY (ps."viewCount" + ps."likeCount" * 3 + ps."commentCount" * 2) DESC, p."publishedAt" DESC
         `);

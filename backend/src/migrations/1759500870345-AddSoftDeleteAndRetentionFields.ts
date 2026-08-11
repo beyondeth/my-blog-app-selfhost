@@ -83,13 +83,13 @@ export class AddSoftDeleteAndRetentionFields1759500870345
       `DROP TYPE "public"."payment_history_status_enum_old"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "bookmarks" ADD CONSTRAINT "UQ_e1decdf2b2a71358f5acd16f586" UNIQUE ("user_id", "post_id")`,
+      `ALTER TABLE "bookmarks" ADD CONSTRAINT "UQ_e1decdf2b2a71358f5acd16f586" UNIQUE ("userId", "postId")`,
     );
     await queryRunner.query(
-      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_58a0fbaee65cd8959a870ee678c" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_58a0fbaee65cd8959a870ee678c" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
-      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_51f539993ae903a927bd44dbe49" FOREIGN KEY ("post_id") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_51f539993ae903a927bd44dbe49" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
       `ALTER TABLE "email_approvals" ADD CONSTRAINT "FK_f4e1556a9b2e8bc12a20cd78f49" FOREIGN KEY ("approvedBy") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
@@ -174,10 +174,10 @@ export class AddSoftDeleteAndRetentionFields1759500870345
       `CREATE INDEX "idx_posts_search_vector" ON "posts" ("search_vector") `,
     );
     await queryRunner.query(
-      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_user" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_user" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
-      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_post" FOREIGN KEY ("post_id") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_post" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
   }
 }
