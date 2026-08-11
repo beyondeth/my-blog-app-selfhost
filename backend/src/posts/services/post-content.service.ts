@@ -201,11 +201,6 @@ export class PostContentService {
       return url;
     }
 
-    // CDN URL이 이미 있으면 그대로 반환
-    if (url.indexOf("cdn.codebase.blog") !== -1) {
-      return url;
-    }
-
     // 외부 HTTP/HTTPS URL은 그대로 반환
     if (url.startsWith("http://") || url.startsWith("https://")) {
       return url;

@@ -1,4 +1,4 @@
-const DEFAULT_ALLOWED_HOSTS = new Set<string>(['cdn.codebase.blog']);
+const DEFAULT_ALLOWED_HOSTS = new Set<string>();
 
 function addHostFromEnv(value?: string | null) {
   if (!value) return;

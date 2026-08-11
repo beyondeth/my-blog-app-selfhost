@@ -16,7 +16,7 @@ const router = Router();
 /**
  * 서버 기본 URL 가져오기
  * - 개발: http://localhost:3002
- * - 프로덕션: https://mcp.codebase.blog
+ * - 프로덕션: 설치자가 지정한 MCP_BASE_URL
  */
 function getServerUrl(): string {
   return config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
@@ -48,7 +48,7 @@ router.get('/oauth-protected-resource', (req, res) => {
     bearer_methods_supported: ['header'],
 
     // 문서 URL
-    resource_documentation: 'https://codebase.blog/docs/mcp-oauth',
+    resource_documentation: `${config.PUBLIC_SITE_URL}/docs/mcp-oauth`,
   };
 
   res.json(metadata);
@@ -107,9 +107,9 @@ router.get('/oauth-authorization-server', (req, res) => {
     code_challenge_methods_supported: ['S256'],
 
     // 서비스 정보
-    service_documentation: 'https://codebase.blog/docs/mcp',
-    op_policy_uri: 'https://codebase.blog/privacy',
-    op_tos_uri: 'https://codebase.blog/terms',
+    service_documentation: `${config.PUBLIC_SITE_URL}/docs/mcp`,
+    op_policy_uri: `${config.PUBLIC_SITE_URL}/privacy`,
+    op_tos_uri: `${config.PUBLIC_SITE_URL}/terms`,
 
     // UI 로케일
     ui_locales_supported: ['en', 'ko'],

@@ -10,7 +10,7 @@ import { Metadata } from 'next';
  * - 전환율 최적화를 위한 메타데이터
  */
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
 export const metadata: Metadata = {
   title: 'MCP 자동 블로그 포스팅 - Codebase',

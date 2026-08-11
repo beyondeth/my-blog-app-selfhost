@@ -242,6 +242,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
           MCP_BASE_URL: config.MCP_BASE_URL,
           BACKEND_BASE_URL: config.BACKEND_BASE_URL,
           BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
+          PUBLIC_SITE_URL: config.PUBLIC_SITE_URL,
           MCP_SHARED_SECRET: config.MCP_SHARED_SECRET,
         },
       });

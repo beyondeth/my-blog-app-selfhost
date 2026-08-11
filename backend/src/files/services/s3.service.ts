@@ -26,8 +26,9 @@ export interface PresignedUrlResponse {
 export class S3Service {
   private readonly logger = new Logger(S3Service.name);
   private readonly s3Client: S3Client;
+  private readonly presignClient: S3Client;
   private readonly bucket: string;
-  private readonly storageProvider: "aws" | "oci"; // AWS S3 또는 Oracle Object Storage
+  private readonly storageProvider: string; // AWS S3, Oracle Object Storage, or S3-compatible storage
   private readonly ociNamespace?: string; // OCI Object Storage Namespace
   private readonly region: string;
 
@@ -54,10 +55,12 @@ export class S3Service {
 
     this.bucket = bucket;
     this.region = region || "us-east-1";
-    this.storageProvider = this.configService.get("STORAGE_PROVIDER", "aws"); // 기본값: AWS
+    this.storageProvider = String(
+      this.configService.get("STORAGE_PROVIDER", "aws"),
+    ).toLowerCase();
     this.ociNamespace = this.configService.get("OCI_NAMESPACE"); // OCI 전용
 
-    // S3 호환 클라이언트 생성 (AWS S3 또는 OCI Object Storage)
+    // Server-side client. For MinIO, this uses the Docker-internal endpoint.
     const clientConfig: any = {
       region: this.region,
       credentials: {
@@ -65,6 +68,13 @@ export class S3Service {
         secretAccessKey,
       },
     };
+
+    const configuredEndpoint = this.configService.get<string>(
+      "AWS_S3_ENDPOINT",
+    );
+    const internalEndpoint = this.configService.get<string>(
+      "S3_INTERNAL_ENDPOINT",
+    );
 
     // OCI Object Storage 사용 시 엔드포인트 설정
     if (this.storageProvider === "oci") {
@@ -84,6 +94,17 @@ export class S3Service {
       this.logger.log(`   Region: ${this.region}`);
       this.logger.log(`   Bucket: ${this.bucket}`);
       this.logger.log(`   Endpoint: ${ociEndpoint}`);
+    } else if (internalEndpoint || configuredEndpoint) {
+      clientConfig.endpoint = internalEndpoint || configuredEndpoint;
+      clientConfig.forcePathStyle =
+        this.storageProvider === "minio" ||
+        this.configService.get("AWS_S3_FORCE_PATH_STYLE", "false") === "true";
+
+      this.logger.log(
+        `✅ S3-compatible storage initialized (${this.storageProvider})`,
+      );
+      this.logger.log(`   Bucket: ${this.bucket}`);
+      this.logger.log(`   Internal endpoint: ${clientConfig.endpoint}`);
     } else {
       this.logger.log(`✅ AWS S3 initialized`);
       this.logger.log(`   Region: ${this.region}`);
@@ -91,6 +112,23 @@ export class S3Service {
     }
 
     this.s3Client = new S3Client(clientConfig);
+
+    // Presigned URLs must contain a host reachable by the browser. This is
+    // intentionally a separate client from the server-side client so a
+    // container can use http://minio:9000 while the browser uses
+    // http://localhost:9000 (or a public reverse-proxy URL).
+    const publicEndpoint = this.configService.get<string>(
+      "S3_PUBLIC_ENDPOINT",
+    );
+    const publicClientConfig = { ...clientConfig };
+    if (publicEndpoint) {
+      publicClientConfig.endpoint = publicEndpoint;
+      publicClientConfig.forcePathStyle =
+        this.storageProvider === "minio" ||
+        this.storageProvider === "oci" ||
+        this.configService.get("AWS_S3_FORCE_PATH_STYLE", "false") === "true";
+    }
+    this.presignClient = new S3Client(publicClientConfig);
   }
 
   /**
@@ -141,7 +179,7 @@ export class S3Service {
 
       // Presigned URL 생성 (15분 유효)
       const expiresIn = 15 * 60; // 15분
-      const uploadUrl = await getSignedUrl(this.s3Client, putObjectCommand, {
+      const uploadUrl = await getSignedUrl(this.presignClient, putObjectCommand, {
         expiresIn,
         signableHeaders: new Set(["content-type"]),
       });
@@ -160,6 +198,37 @@ export class S3Service {
       );
       throw new InternalServerErrorException("Failed to generate upload URL");
     }
+  }
+
+  /**
+   * 내부 네트워크에서 이미지 후처리가 사용할 업로드 URL을 생성합니다.
+   */
+  async generateInternalPresignedUploadUrl(
+    s3Key: string,
+    mimeType: string,
+    fileSize: number,
+    fileType: string = "general",
+  ): Promise<PresignedUrlResponse> {
+    this.validateMimeType(mimeType, fileType);
+
+    const putObjectCommand = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: s3Key,
+      ContentType: mimeType,
+      ContentLength: fileSize,
+      Metadata: {
+        "file-type": fileType,
+        "upload-date": new Date().toISOString(),
+      },
+    });
+
+    const expiresIn = 15 * 60;
+    const uploadUrl = await getSignedUrl(this.s3Client, putObjectCommand, {
+      expiresIn,
+      signableHeaders: new Set(["content-type"]),
+    });
+
+    return { uploadUrl, fileKey: s3Key, expiresIn };
   }
 
   /**
@@ -206,7 +275,7 @@ export class S3Service {
         Key: fileKey,
       });
 
-      const url = await getSignedUrl(this.s3Client, getObjectCommand, {
+      const url = await getSignedUrl(this.presignClient, getObjectCommand, {
         expiresIn: 3600, // 1시간
       });
 
@@ -215,6 +284,29 @@ export class S3Service {
     } catch (error) {
       this.logger.error(
         `Failed to generate download URL: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException("Failed to generate download URL");
+    }
+  }
+
+  /**
+   * 내부 네트워크에서 파일 프록시가 사용할 다운로드 URL을 생성합니다.
+   * 브라우저용 URL과 달리 Docker 서비스 이름을 사용할 수 있습니다.
+   */
+  async generateInternalPresignedDownloadUrl(fileKey: string): Promise<string> {
+    try {
+      const getObjectCommand = new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+      });
+
+      return await getSignedUrl(this.s3Client, getObjectCommand, {
+        expiresIn: 3600,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate internal download URL: ${error.message}`,
         error.stack,
       );
       throw new InternalServerErrorException("Failed to generate download URL");
@@ -342,12 +434,28 @@ export class S3Service {
    * @returns Public URL
    */
   private generatePublicUrl(fileKey: string): string {
+    const cleanKey = fileKey.replace(/^\/+/, "");
+    const publicBackendUrl = this.configService.get<string>(
+      "PUBLIC_BACKEND_URL",
+    );
+
+    if (this.storageProvider === "minio" && publicBackendUrl) {
+      return `${publicBackendUrl.replace(/\/$/, "")}/api/v1/files/proxy/${encodeURI(cleanKey)}`;
+    }
+
+    const publicStorageUrl = this.configService.get<string>(
+      "STORAGE_PUBLIC_URL",
+    );
+    if (publicStorageUrl) {
+      return `${publicStorageUrl.replace(/\/$/, "")}/${encodeURI(cleanKey)}`;
+    }
+
     if (this.storageProvider === "oci") {
       // OCI Object Storage URL 형식
-      return `https://${this.ociNamespace}.compat.objectstorage.${this.region}.oraclecloud.com/${this.bucket}/${fileKey}`;
+      return `https://${this.ociNamespace}.compat.objectstorage.${this.region}.oraclecloud.com/${this.bucket}/${cleanKey}`;
     } else {
       // AWS S3 URL 형식
-      return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${fileKey}`;
+      return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${cleanKey}`;
     }
   }
 

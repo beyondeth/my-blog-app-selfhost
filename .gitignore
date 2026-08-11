@@ -37,6 +37,7 @@ mobile/android/**/*.aab
 **/.env.test.local
 **/.env.production.local
 **/.env.monitoring
+**/.env.selfhost
 
 # IDE
 **/.vscode/
@@ -151,4 +152,7 @@ backend/cors-config.json
 /data/ 
 # Documentation
 docs/
+!/docs/
+docs/*
+!/docs/self-hosting.md
 .env

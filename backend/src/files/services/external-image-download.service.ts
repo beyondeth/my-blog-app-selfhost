@@ -7,6 +7,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { FilesService } from "../files.service";
 import { S3Service } from "./s3.service";
+import { CdnService } from "./cdn.service";
 import { File } from "../entities/file.entity";
 import {
   FileContext,
@@ -38,6 +39,7 @@ export class ExternalImageDownloadService {
     private readonly configService: ConfigService,
     private readonly filesService: FilesService,
     private readonly s3Service: S3Service,
+    private readonly cdnService: CdnService,
     @InjectRepository(File)
     private readonly fileRepository: Repository<File>,
     @InjectRepository(FileContext)
@@ -101,7 +103,7 @@ export class ExternalImageDownloadService {
         const file = await this.downloadAndProcessImage(imageUrl, userId);
         if (file) {
           // 성공한 경우
-          const cdnUrl = `https://cdn.codebase.blog/${file.fileKey}`;
+          const cdnUrl = this.cdnService.generateCdnUrl(file).url;
           results.push({
             originalUrl: imageUrl,
             success: true,
@@ -233,7 +235,11 @@ export class ExternalImageDownloadService {
           validateStatus: (status) => status === 200, // 200 상태만 성공으로 처리
           headers: {
             "User-Agent":
-              "Mozilla/5.0 (compatible; CodebaseBlog/1.0; +https://codebase.blog)",
+              `Mozilla/5.0 (compatible; CodebaseBlog/1.0; +${
+                this.configService.get("PUBLIC_SITE_URL") ||
+                this.configService.get("FRONTEND_URL") ||
+                "http://localhost:3001"
+              })`,
             Accept: "image/webp,image/avif,image/*,*/*;q=0.8",
             // Gemini URL의 경우 추가 헤더
             ...(isGeminiUrl && {

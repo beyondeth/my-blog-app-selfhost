@@ -584,7 +584,7 @@ export class FilesController {
   @ApiOperation({
     summary: "이미지 프록시 - S3 파일로 리다이렉트 (UUID 기반) - DEPRECATED",
     description:
-      "⚠️ 이 엔드포인트는 곧 제거될 예정입니다. 직접 CDN URL을 사용하세요 (https://cdn.codebase.blog/...)",
+      "⚠️ 레거시 호환용 파일 프록시입니다. 저장소 public URL 대신 사용할 수 있습니다.",
   })
   @ApiResponse({
     status: 302,
@@ -643,8 +643,13 @@ export class FilesController {
       //   throw new Error('File not found in S3');
       // }
 
+      // The public presigned URL may contain localhost or a public reverse
+      // proxy that is not reachable from this container. Use the internal
+      // storage endpoint when the backend proxies the object.
       const presignedUrl =
-        await this.s3Service.generatePresignedDownloadUrl(processedFileKey);
+        await this.s3Service.generateInternalPresignedDownloadUrl(
+          processedFileKey,
+        );
 
       this.logger.log(
         `🔗 [PROXY] Generated presigned URL: ${presignedUrl.substring(0, 100)}...`,

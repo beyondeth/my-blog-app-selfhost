@@ -22,7 +22,7 @@ Claude Code CLI → MCP Server (Streamable HTTP) → Backend API (OAuth2 + Beare
 **Key Design Decisions:**
 - **Modern Streamable HTTP**: Single /mcp endpoint with JSON-RPC 2.0 protocol
 - **Remote MCP**: Code stays on cloud server, never exposed to users
-- **Separate Instance**: Independent deployment (mcp.codebase.blog)
+- **Separate Instance**: Independent deployment (local or behind the installer's HTTPS proxy)
 - **Backend Integration**: Uses existing OAuth2 PKCE system
 - **Session-based Preferences**: User settings stored in Redis
 - **Two Session Types**:
@@ -235,7 +235,7 @@ Create or update `~/.config/claude-code/.mcp.json`:
 {
   "mcpServers": {
     "codebase_blog": {
-      "url": "https://mcp.codebase.blog/api/v1/mcp",
+      "url": "https://mcp.example.com/mcp",
       "transport": "http"
     }
   }
@@ -247,7 +247,7 @@ Create or update `~/.config/claude-code/.mcp.json`:
 {
   "mcpServers": {
     "codebase_blog": {
-      "url": "http://localhost:8000/api/v1/mcp",
+      "url": "http://localhost:3002/mcp",
       "transport": "http"
     }
   }
@@ -576,7 +576,7 @@ docker build -t mcp-proxy-server .
 docker run -d \
   -p 8000:8000 \
   -e NODE_ENV=production \
-  -e BACKEND_BASE_URL=https://api.codebase.blog \
+  -e BACKEND_BASE_URL=https://api.example.com \
   -e REDIS_HOST=redis \
   --name mcp-proxy \
   mcp-proxy-server
@@ -589,7 +589,7 @@ docker run -d \
 - Set appropriate session TTL
 - Enable session strict mode if needed
 - Configure CORS origins for production
-- Set up DNS for mcp.codebase.blog
+- Set up DNS for the installer's MCP domain
 
 ### Monitoring
 
