@@ -1,0 +1,166 @@
+name: PR Quality
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pr-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22
+  PNPM_VERSION: 9.0.0
+
+jobs:
+  backend-unit:
+    name: Backend build and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install backend dependencies
+        run: pnpm --dir backend install --frozen-lockfile
+
+      - name: Build backend
+        run: pnpm --dir backend build
+
+      - name: Run service-independent unit/spec tests
+        run: pnpm --dir backend test --runInBand
+
+      - name: Document e2e boundary
+        if: always()
+        run: |
+          {
+            echo '## Backend test boundary'
+            echo
+            echo '- Unit/spec tests run in this job without external services.'
+            echo '- `backend test:e2e` is service-dependent and is not part of the pull-request unit gate.'
+            echo '- Run `backend test:e2e` only in an environment that provides PostgreSQL, Redis, object storage, and application configuration.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  frontend-quality:
+    name: Frontend type-check, lint, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+
+      - name: Type-check frontend
+        run: pnpm --dir frontend type-check
+
+      - name: Lint frontend
+        run: pnpm --dir frontend lint
+
+      - name: Enforce clean lint for Track C files
+        run: >-
+          pnpm --dir frontend exec eslint
+          'src/app/(auth)/reset-password/page.tsx'
+          'src/app/admin/editor-picks/page.tsx'
+          'src/app/c/[slug]/settings/analytics/page.tsx'
+          'src/components/admin/ModerationModal.tsx'
+          'src/providers/SocketProvider.tsx'
+          --max-warnings=0
+
+      - name: Build frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000/api/v1
+          NEXT_PUBLIC_BACKEND_URL: http://localhost:3000
+          NEXT_PUBLIC_SITE_URL: http://localhost:3001
+          NEXT_PUBLIC_STORAGE_PUBLIC_URL: http://localhost:9000
+          BACKEND_INTERNAL_URL: http://localhost:3000
+        run: pnpm --dir frontend build
+
+  mcp-quality:
+    name: MCP build and tool parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: mcp-proxy-server/pnpm-lock.yaml
+
+      - name: Install MCP proxy dependencies
+        run: pnpm --dir mcp-proxy-server install --frozen-lockfile
+
+      - name: Build MCP proxy
+        run: pnpm --dir mcp-proxy-server build
+
+      - name: Verify MCP tool parity
+        run: pnpm --dir mcp-proxy-server verify:tool-parity
+
+  dependency-audit:
+    name: Production dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: |
+            backend/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
+            mcp-proxy-server/pnpm-lock.yaml
+
+      - name: Install locked dependencies
+        run: |
+          pnpm --dir backend install --frozen-lockfile
+          pnpm --dir frontend install --frozen-lockfile
+          pnpm --dir mcp-proxy-server install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: node scripts/quality-dependency-audit.mjs backend frontend mcp-proxy-server
