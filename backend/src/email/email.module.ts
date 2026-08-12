@@ -30,39 +30,17 @@ import { User } from "../users/entities/user.entity";
         const from =
           configService.get("SMTP_FROM") || configService.get("EMAIL_FROM");
 
-        // 개발 환경에서 디버그 로그
         if (process.env.NODE_ENV === "development") {
-          console.log("Email Module Configuration:", {
-            host,
-            port,
-            user: user ? `${user.substring(0, 3)}***` : "undefined",
-            userFull: user,
-            userLength: user ? user.length : 0,
-            pass: pass ? `${pass.substring(0, 2)}***` : "undefined",
-            passLength: pass ? pass.length : 0,
-            from,
-            env: process.env.NODE_ENV,
-          });
-
-          // 환경 변수 직접 확인
-          console.log("Direct environment check:", {
-            SMTP_HOST: process.env.SMTP_HOST,
-            SMTP_USER: process.env.SMTP_USER,
-            SMTP_USER_LENGTH: process.env.SMTP_USER
-              ? process.env.SMTP_USER.length
-              : 0,
-            SMTP_PASS: process.env.SMTP_PASS
-              ? `${process.env.SMTP_PASS.substring(0, 2)}***`
-              : "undefined",
-            SMTP_PASS_LENGTH: process.env.SMTP_PASS
-              ? process.env.SMTP_PASS.length
-              : 0,
-          });
+          console.log("Email module initialized", { mode: emailMode, port });
         }
 
         if (emailMode === "console") {
+          if (process.env.NODE_ENV === "production") {
+            throw new Error("EMAIL_MODE=console is not allowed in production");
+          }
+
           console.warn(
-            "EMAIL_MODE=console: email codes and reset links will be written to the backend log.",
+            "EMAIL_MODE=console: email delivery is disabled; sensitive values remain redacted.",
           );
 
           return {
@@ -99,7 +77,7 @@ import { User } from "../users/entities/user.entity";
             },
             // TLS 설정 추가
             tls: {
-              rejectUnauthorized: false, // 개발 환경에서만
+              rejectUnauthorized: process.env.NODE_ENV === "production",
             },
             // 디버그 옵션 비활성화
             debug: false,
