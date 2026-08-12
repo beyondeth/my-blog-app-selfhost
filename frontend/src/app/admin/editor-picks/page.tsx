@@ -96,7 +96,10 @@ export default function EditorPicksAdminPage() {
     isLoading: isEditorPicksLoading,
     refetch: refetchEditorPicks,
   } = useAdminEditorPicks(10);
-  const editorPickPosts = editorPickData?.posts ?? [];
+  const editorPickPosts = useMemo(
+    () => editorPickData?.posts ?? [],
+    [editorPickData?.posts],
+  );
   const pickLimitReached = editorPickPosts.length >= 5;
   const reorderMutation = useReorderEditorPicks(() => refetchEditorPicks());
   const reorderIsPending =
