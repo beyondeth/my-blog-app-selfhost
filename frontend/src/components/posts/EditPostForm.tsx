@@ -6,9 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
   Form,
   FormControl,
@@ -18,7 +15,7 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Save, Plus, ImageIcon, FileText, Github } from 'lucide-react';
+import { Save, Plus, ImageIcon, FileText } from 'lucide-react';
 import type { FileUpload } from '@/types';
 import { FloatingTitleField, TagInputField, EditCategoryField } from '@/components/posts/form-fields';
 import { toast } from 'sonner';
@@ -27,27 +24,11 @@ import { BlogSimpleEditor } from '@/editor'; // 정적 import로 변경하여 fl
 import { validateUUID } from '@/lib/utils/uuid';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { useUploadFile } from '@/hooks/useFiles';
-import {
-  convertMarkdownToHtml,
-  convertHtmlToMarkdown,
-  getRichEditorCompatibilityIssues,
-} from '@/utils/markdownConversion';
-import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
+import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownConversion';
 import { apiClient } from '@/lib/api';
 import { validateContentSecurity } from '@/utils/contentSecurity';
 import ReactMarkdown from 'react-markdown';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import type { MarkdownImageInfo } from '@/types/image-metadata.types';
-import { MarkdownImageCard } from '@/components/posts/MarkdownImageCard';
-import { HybridMarkdownEditor, HybridMarkdownEditorRef } from '@/components/posts/HybridMarkdownEditor';
-import { MarkdownYouTubeCard } from '@/components/posts/MarkdownYouTubeCard';
-import {
-  appendYouTubeThumbnailMarker,
-  extractYouTubeIdsFromMarkdown,
-  extractYouTubeThumbnailMarker,
-  stripYouTubeThumbnailMarker,
-} from '@/utils/youtubeMarkdown';
-import GithubResourcePopover from '@/components/posts/GithubResourcePopover';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,35 +43,32 @@ import {
 // 폼 스키마 정의
 const postFormSchema = z.object({
   title: z.string()
-    .min(1, { message: "Please enter a title." })
-    .max(200, { message: "Title must be 200 characters or fewer." }),
+    .min(1, { message: "제목을 입력해주세요." })
+    .max(200, { message: "제목은 200자 이하로 입력해주세요." }),
   categories: z.array(
       z.string()
-        .min(1, 'Category must be at least 1 character.')
-        .max(15, 'Category must be 15 characters or fewer.')
+        .min(1, '카테고리는 최소 1글자 이상이어야 합니다.')
+        .max(15, '카테고리는 최대 15글자까지 입력 가능합니다.')
     )
-    .min(1, 'Add at least 1 category.')
-    .max(2, 'You can add up to 2 categories.')
+    .min(1, '카테고리를 최소 1개 입력해주세요.')
+    .max(2, '카테고리는 최대 2개까지만 입력 가능합니다.')
     .refine(
       (arr) => arr.every(cat => !cat.includes('/')),
-      { message: 'Categories cannot include a slash (/).' }
+      { message: '카테고리에 슬래시(/)를 포함할 수 없습니다.' }
     ),
   content: z.string()
-    .min(1, { message: "Please enter the content." }),
+    .min(1, { message: "내용을 입력해주세요." }),
   tags: z.array(z.string()).optional(),
-  githubUrl: z.string().optional(),
-  githubDescription: z.string().optional(),
   thumbnail: z.string().optional(),
   thumbnailImageId: z.string().optional(),
   attachedFileIds: z.array(z.string()).optional(),
-  visibility: z.enum(['public', 'private']).optional(),
   version: z.number().optional(),
 });
 
 type PostFormValues = z.infer<typeof postFormSchema>;
 type EditorMode = 'rich' | 'markdown';
 const IMAGE_URL_PATTERN = /\.(png|jpe?g|gif|webp|svg)$/i;
-// MarkdownImageInfo 타입은 @/types/image-metadata.types에서 import
+type MarkdownImageInfo = { id: string; url: string; name?: string };
 interface MarkdownImageMeta {
   url: string;
   name?: string;
@@ -124,48 +102,6 @@ function convertInlineLinksToImages(markdown: string): string {
   });
 }
 
-function normalizeComparableImageUrl(url: string): string {
-  const normalized = normalizeImageUrl(url || '').trim();
-  if (!normalized) {
-    return '';
-  }
-
-  try {
-    const parsed = new URL(normalized);
-    return `${parsed.origin}${parsed.pathname}`;
-  } catch {
-    return normalized.split('?')[0].split('#')[0];
-  }
-}
-
-function extractImageUrlsFromMarkdown(markdown: string): Set<string> {
-  const urls = new Set<string>();
-  if (!markdown) {
-    return urls;
-  }
-
-  const markdownImageRegex = /!\[[^\]]*]\(([^)]+)\)/g;
-  let markdownMatch: RegExpExecArray | null;
-  while ((markdownMatch = markdownImageRegex.exec(markdown)) !== null) {
-    const rawCandidate = (markdownMatch[1] || '').trim().split(/\s+/)[0];
-    const normalized = normalizeComparableImageUrl(rawCandidate);
-    if (normalized) {
-      urls.add(normalized);
-    }
-  }
-
-  const htmlImageRegex = /<img[^>]*src=["']([^"']+)["'][^>]*>/gi;
-  let htmlMatch: RegExpExecArray | null;
-  while ((htmlMatch = htmlImageRegex.exec(markdown)) !== null) {
-    const normalized = normalizeComparableImageUrl(htmlMatch[1] || '');
-    if (normalized) {
-      urls.add(normalized);
-    }
-  }
-
-  return urls;
-}
-
 interface EditPostFormProps {
   initialData?: {
     id?: string;
@@ -175,14 +111,11 @@ interface EditPostFormProps {
     content_markdown?: string;
     content_type?: 'html' | 'markdown';
     tags?: string[];
-    githubUrl?: string | null;
-    githubDescription?: string | null;
     thumbnail?: string;
     thumbnailImageId?: string;
     attachedFiles?: FileUpload[];
     version?: number;
     isPublished?: boolean;
-    visibility?: 'public' | 'private';
   };
   isLoading?: boolean;
   onSubmit: (data: PostFormValues, isPublished?: boolean) => void;
@@ -193,7 +126,6 @@ interface EditPostFormProps {
   blogInfo?: {
     name: string;
     slug: string;
-    isPublic?: boolean;
   };
 }
 
@@ -202,8 +134,8 @@ export default function EditPostForm({
   isLoading = false,
   onSubmit,
   onCancel,
-  submitButtonText = "Save",
-  title = "Edit post",
+  submitButtonText = "저장",
+  title = "게시글 수정",
   blogInfo
 }: EditPostFormProps) {
   const isSubmittingRef = useRef(false); // 동기적 중복 제출 방지 플래그
@@ -211,21 +143,24 @@ export default function EditPostForm({
   // 현재 발행 상태 확인 (기본값은 true로 설정하여 기존 글 수정 시 문제 없도록 함)
   const isPublished = initialData?.isPublished ?? true;
 
-  const rawMarkdownContent = initialData?.content_markdown ?? '';
-  const initialYouTubeThumbnailId = extractYouTubeThumbnailMarker(rawMarkdownContent);
-  const cleanedMarkdownContent = stripYouTubeThumbnailMarker(rawMarkdownContent);
-  const initialEditorMode: EditorMode = rawMarkdownContent ? 'markdown' : 'rich';
+  // 폼 제출 핸들러 래퍼
+  const handleFormSubmit = (targetIsPublished: boolean) => {
+    return form.handleSubmit((data) => {
+      // 3차 방어: 버튼 클릭 시 Form 제출 차단 (동기적 플래그 체크)
+      if (isSubmittingRef.current || isLoading || isLocalSubmitting) {
+        return;
+      }
+      onSubmit(data, targetIsPublished);
+    })();
+  };
+
+  const initialEditorMode: EditorMode = initialData?.content_markdown ? 'markdown' : 'rich';
   const [editorMode, setEditorMode] = useState<EditorMode>(initialEditorMode);
   const [isSwitchingEditorMode, setIsSwitchingEditorMode] = useState(false);
   const [isLocalSubmitting, setIsLocalSubmitting] = useState(false);
-  const [postVisibility, setPostVisibility] = useState<'public' | 'private'>(
-    initialData?.visibility === 'private' ? 'private' : 'public',
-  );
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [pendingEditorMode, setPendingEditorMode] = useState<EditorMode | null>(null);
-  const [selectedYouTubeThumbnailId, setSelectedYouTubeThumbnailId] = useState<string | null>(initialYouTubeThumbnailId);
-  const [markdownYouTubeIds, setMarkdownYouTubeIds] = useState<string[]>([]);
-  const markdownEditorRef = useRef<HybridMarkdownEditorRef | null>(null);
+  const markdownTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const markdownImageInputRef = useRef<HTMLInputElement | null>(null);
   const [markdownImages, setMarkdownImages] = useState<MarkdownImageInfo[]>([]);
   const [isMarkdownImageUploading, setIsMarkdownImageUploading] = useState(false);
@@ -240,23 +175,17 @@ export default function EditPostForm({
     const targetId = initialData?.thumbnailImageId || '';
     return targetId ? attachedFileIds.indexOf(targetId) : -1;
   });
-  const isBlogPublic = blogInfo?.isPublic !== false;
-  const isPublicTransitionLocked =
-    blogInfo?.isPublic === false && postVisibility === 'private';
 
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
     defaultValues: {
       title: initialData?.title || '',
       categories: [],  // useEffect에서 파싱하여 설정
-      content: initialEditorMode === 'markdown' ? cleanedMarkdownContent : (initialData?.content ?? ''),
+      content: initialData?.content_markdown ?? initialData?.content ?? '',
       tags: initialData?.tags || [],
-      githubUrl: initialData?.githubUrl || '',
-      githubDescription: initialData?.githubDescription || '',
       thumbnail: initialData?.thumbnail || '',
       thumbnailImageId: initialData?.thumbnailImageId || undefined, // 빈 문자열 대신 undefined 사용
       attachedFileIds: initialData?.attachedFiles?.map((file) => file.id).filter(Boolean) ?? [],
-      visibility: initialData?.visibility === 'private' ? 'private' : 'public',
     },
   });
   const watchedFileIds = form.watch('attachedFileIds');
@@ -274,16 +203,6 @@ export default function EditPostForm({
       form.setValue('categories', categories);
     }
   }, [initialData?.category, form]);
-
-  useEffect(() => {
-    const nextVisibility =
-      initialData?.visibility === 'private' ? 'private' : 'public';
-    setPostVisibility(nextVisibility);
-    form.setValue('visibility', nextVisibility, {
-      shouldDirty: false,
-      shouldTouch: false,
-    });
-  }, [form, initialData?.visibility]);
 
   useEffect(() => {
     const attachedFiles = initialData?.attachedFiles ?? [];
@@ -395,10 +314,6 @@ export default function EditPostForm({
       timestamp: new Date().toISOString()
     });
 
-    if (thumbnailImageId) {
-      setSelectedYouTubeThumbnailId(null);
-    }
-
     const currentIds = form.getValues('attachedFileIds') || [];
     const nextIndex = thumbnailImageId ? currentIds.indexOf(thumbnailImageId) : -1;
     setThumbnailIndex(nextIndex);
@@ -413,18 +328,11 @@ export default function EditPostForm({
     const currentIds = form.getValues('attachedFileIds') || [];
     const index = currentIds.indexOf(fileId);
     if (index === -1) {
-      toast.warning('Could not find the image to use as the thumbnail.');
+      toast.warning('썸네일로 지정할 이미지를 찾을 수 없습니다.');
       return;
     }
     handleThumbnailChange(fileId);
   }, [form, handleThumbnailChange]);
-
-  const handleYouTubeThumbnailSelect = useCallback((videoId: string) => {
-    if (!videoId) return;
-    setSelectedYouTubeThumbnailId(videoId);
-    handleThumbnailChange(null);
-    toast.success('YouTube video set as the thumbnail.');
-  }, [handleThumbnailChange]);
 
   const executeEditorModeChange = useCallback((mode: EditorMode) => {
     setIsSwitchingEditorMode(true);
@@ -435,11 +343,6 @@ export default function EditPostForm({
         form.setValue('content', markdown, { shouldDirty: true, shouldTouch: true });
         autoConversionSkipRef.current = true;
       } else {
-        const issues = getRichEditorCompatibilityIssues(currentContent);
-        if (issues.length > 0) {
-          toast.error(`Some elements cannot be converted safely to the rich editor: ${issues.join(', ')}`);
-          return;
-        }
         const html = convertMarkdownToHtml(currentContent);
         form.setValue('content', html || '<p></p>', { shouldDirty: true, shouldTouch: true });
       }
@@ -447,7 +350,7 @@ export default function EditPostForm({
       setEditorMode(mode);
     } catch (error) {
       console.error('Failed to switch editor mode', error);
-      toast.error('Failed to switch editor modes.');
+      toast.error('편집 모드를 전환하지 못했습니다.');
     } finally {
       setIsSwitchingEditorMode(false);
       setIsConfirmDialogOpen(false);
@@ -576,60 +479,6 @@ export default function EditPostForm({
   }, [editorMode, form, watchedContent]);
 
   useEffect(() => {
-    if (editorMode !== 'markdown') {
-      setMarkdownYouTubeIds([]);
-      return;
-    }
-
-    const ids = extractYouTubeIdsFromMarkdown(watchedContent || '');
-    setMarkdownYouTubeIds(ids);
-
-    if (selectedYouTubeThumbnailId && !ids.includes(selectedYouTubeThumbnailId)) {
-      setSelectedYouTubeThumbnailId(null);
-    }
-  }, [editorMode, watchedContent, selectedYouTubeThumbnailId]);
-
-  useEffect(() => {
-    if (editorMode !== 'markdown') {
-      return;
-    }
-
-    if (!Array.isArray(watchedFileIds) || watchedFileIds.length === 0) {
-      return;
-    }
-
-    const referencedUrls = extractImageUrlsFromMarkdown(watchedContent || '');
-    const nextFileIds = watchedFileIds.filter((fileId) => {
-      const metadata = fileMetadataRef.current.get(fileId);
-      if (!metadata?.url) {
-        return true;
-      }
-      const normalized = normalizeComparableImageUrl(metadata.url);
-      return normalized ? referencedUrls.has(normalized) : true;
-    });
-
-    if (nextFileIds.length === watchedFileIds.length) {
-      return;
-    }
-
-    handleFileIdsChange(nextFileIds);
-    syncMarkdownImages(nextFileIds);
-
-    if (watchedThumbnailImageId && !nextFileIds.includes(watchedThumbnailImageId)) {
-      const fallbackThumbnailId = nextFileIds[0] || null;
-      handleThumbnailChange(fallbackThumbnailId);
-    }
-  }, [
-    editorMode,
-    handleFileIdsChange,
-    handleThumbnailChange,
-    syncMarkdownImages,
-    watchedContent,
-    watchedFileIds,
-    watchedThumbnailImageId,
-  ]);
-
-  useEffect(() => {
     if (!watchedThumbnailImageId) {
       setThumbnailIndex(-1);
       return;
@@ -638,37 +487,7 @@ export default function EditPostForm({
     setThumbnailIndex(ids.indexOf(watchedThumbnailImageId));
   }, [form, watchedThumbnailImageId]);
 
-  const buildSubmissionPayload = useCallback((data: PostFormValues) => {
-    const isMarkdownMode = editorMode === 'markdown';
-    const canonicalMarkdown = appendYouTubeThumbnailMarker(
-      isMarkdownMode ? data.content : convertHtmlToMarkdown(data.content),
-      selectedYouTubeThumbnailId,
-    );
-    const convertedHtml = convertMarkdownToHtml(canonicalMarkdown);
-    const hasPreferredYouTube = /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(
-      isMarkdownMode ? convertedHtml : data.content,
-    );
-
-    const formData: any = {
-      ...data,
-      content: convertedHtml,
-      content_type: 'markdown',
-      content_markdown: canonicalMarkdown,
-      visibility: postVisibility,
-    };
-
-    if (hasPreferredYouTube) {
-      formData.thumbnailImageId = '';
-    }
-
-    // stale detail cache로 인한 optimistic lock 충돌(409)을 줄이기 위해
-    // 편집 화면 payload에서는 version을 전달하지 않는다.
-    delete formData.version;
-
-    return formData;
-  }, [editorMode, postVisibility, selectedYouTubeThumbnailId]);
-
-  const submitPreparedData = useCallback((data: PostFormValues, targetIsPublished?: boolean) => {
+  const handleSubmit = (data: PostFormValues) => {
     // useRef를 통한 동기적 중복 제출 차단
     if (isSubmittingRef.current || isLoading || isLocalSubmitting) {
       return;
@@ -681,43 +500,75 @@ export default function EditPostForm({
       return;
     }
 
+    // 제출 시작
     isSubmittingRef.current = true;
     setIsLocalSubmitting(true);
 
+    // 카테고리 배열 → 문자열 변환 (백엔드는 "메인/서브" 형식 기대)
+    const categoryString = data.categories.join('/');
+
+    const formData: any = {
+      ...data,
+      category: categoryString,
+    };
+
+    if (isMarkdownMode) {
+      formData.content_markdown = data.content;
+      delete formData.content;
+    }
+
+    // categories 필드 제거 (백엔드는 category 필드만 사용)
+    delete formData.categories;
+
+    if (typeof formData.version !== 'number') {
+      formData.version =
+        typeof data.version === 'number'
+          ? data.version
+          : typeof initialData?.version === 'number'
+            ? initialData.version
+            : undefined;
+    }
+
     try {
-      const formData = buildSubmissionPayload(data);
-      onSubmit(formData, targetIsPublished);
+      onSubmit(formData);
     } catch (error) {
       isSubmittingRef.current = false;
       setIsLocalSubmitting(false);
       throw error;
     }
-  }, [buildSubmissionPayload, editorMode, isLoading, isLocalSubmitting, onSubmit]);
-
-  // 저장 버튼 클릭과 엔터 제출이 동일한 변환 파이프라인을 타도록 강제한다.
-  const handleFormSubmit = (targetIsPublished: boolean) => {
-    return form.handleSubmit((data) => {
-      submitPreparedData(data, targetIsPublished);
-    })();
   };
 
   const insertMarkdownSnippet = useCallback((snippet: string) => {
-    if (markdownEditorRef.current) {
-      markdownEditorRef.current.insertText(snippet);
+    const textarea = markdownTextareaRef.current;
+    const fallbackValue = form.getValues('content') || '';
+    const sanitizedSnippet = snippet.endsWith('\n') ? snippet : `${snippet}\n`;
+
+    if (!textarea) {
+      const needsNewline = fallbackValue && !fallbackValue.endsWith('\n');
+      const nextValue = `${fallbackValue}${needsNewline ? '\n' : ''}${sanitizedSnippet}`;
+      form.setValue('content', nextValue, { shouldDirty: true, shouldTouch: true });
       autoConversionSkipRef.current = true;
       return;
     }
 
-    const currentContent = form.getValues('content') || '';
-    const needsNewline = currentContent && !currentContent.endsWith('\n');
-    const nextValue = `${currentContent}${needsNewline ? '\n' : ''}${snippet.endsWith('\n') ? snippet : snippet + '\n'}`;
+    const { selectionStart = textarea.value.length, selectionEnd = textarea.value.length } = textarea;
+    const before = textarea.value.slice(0, selectionStart);
+    const after = textarea.value.slice(selectionEnd);
+    const needsNewlineBefore = before && !before.endsWith('\n');
+    const insertion = `${needsNewlineBefore ? '\n' : ''}${sanitizedSnippet}`;
+    const nextValue = `${before}${insertion}${after}`;
+
+    textarea.value = nextValue;
+    const cursor = before.length + insertion.length;
+    textarea.setSelectionRange(cursor, cursor);
+    textarea.focus();
     form.setValue('content', nextValue, { shouldDirty: true, shouldTouch: true });
     autoConversionSkipRef.current = true;
   }, [form]);
 
   const handleMarkdownImageFile = useCallback(async (file: File) => {
     if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
-      toast.error('SVG images cannot be uploaded.');
+      toast.error('SVG 이미지는 업로드할 수 없습니다.');
       return;
     }
     setIsMarkdownImageUploading(true);
@@ -731,32 +582,21 @@ export default function EditPostForm({
       const imageUrl = normalizeImageUrl(result.accessUrl || result.fileUrl || '');
 
       if (!fileId || !imageUrl) {
-        throw new Error('The image upload response was invalid.');
+        throw new Error('이미지 업로드 결과가 올바르지 않습니다.');
       }
 
       fileMetadataRef.current.set(fileId, { url: imageUrl, name: file.name });
       const { index: insertedIndex, fileIds: nextFileIds } = appendFileId(fileId);
       syncMarkdownImages(nextFileIds);
-      if (markdownEditorRef.current) {
-        markdownEditorRef.current.insertImageBlock({
-          url: imageUrl,
-          alt: file.name || 'image',
-          size: 'default',
-          caption: '',
-          fileId,
-        });
-        autoConversionSkipRef.current = true;
-      } else {
-        insertMarkdownSnippet(`![${file.name || 'image'}](${imageUrl})`);
-      }
+      insertMarkdownSnippet(`![${file.name || 'image'}](${imageUrl})`);
 
       if ((form.getValues('thumbnailImageId') || '').trim().length === 0 && insertedIndex >= 0) {
         handleThumbnailChange(fileId);
       }
 
-      toast.success('Image inserted into the post.');
+      toast.success('이미지를 본문에 삽입했습니다.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to upload the image.';
+      const message = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다.';
       toast.error(message);
     } finally {
       setIsMarkdownImageUploading(false);
@@ -770,11 +610,20 @@ export default function EditPostForm({
     void handleMarkdownImageFile(file);
   }, [handleMarkdownImageFile]);
 
+  const handleInsertImageFromList = useCallback((image: MarkdownImageInfo) => {
+    if (!image?.url) {
+      toast.error('이미지 정보를 불러오지 못했습니다.');
+      return;
+    }
+    insertMarkdownSnippet(`![${image.name || 'image'}](${image.url})`);
+    toast.success('이미지를 본문에 삽입했습니다.');
+  }, [insertMarkdownSnippet]);
+
   return (
     <div className="max-w-5xl mx-auto px-3 py-6">
       {/* 폼 */}
       <Form {...form}>
-        <form onSubmit={form.handleSubmit((data) => submitPreparedData(data))} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           <Card className="border-0 shadow-none bg-transparent">
             <CardContent className="space-y-4 pt-16 px-4">
               {/* 제목 */}
@@ -787,8 +636,8 @@ export default function EditPostForm({
                       <FloatingTitleField
                         field={field}
                         disabled={isLoading}
-                        label="Title"
-                        placeholder="Share your story..."
+                        label="제목"
+                        placeholder=" 당신의 이야기를 들려주세요..."
                       />
                     </FormControl>
                     <FormMessage />
@@ -817,50 +666,13 @@ export default function EditPostForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <TagInputField field={field} disabled={isLoading} label="Tags" />
+                      <TagInputField field={field} disabled={isLoading} label="태그" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="flex flex-col items-end gap-1.5">
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs font-medium">
-                    {isPublicTransitionLocked
-                      ? 'Private post (locked)'
-                      : postVisibility === 'public'
-                        ? 'Public post'
-                        : 'Private post'}
-                  </Label>
-                  <Switch
-                    checked={postVisibility === 'public'}
-                    onCheckedChange={(checked) => {
-                      if (checked && !isBlogPublic) {
-                        return;
-                      }
-                      const nextVisibility = checked ? 'public' : 'private';
-                      setPostVisibility(nextVisibility);
-                      form.setValue('visibility', nextVisibility, {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                      });
-                    }}
-                    disabled={
-                      isLoading ||
-                      isLocalSubmitting ||
-                      isPublicTransitionLocked
-                    }
-                    title={isPublicTransitionLocked ? 'Locked by blog privacy setting' : undefined}
-                    className="focus-visible:ring-gray-400 data-[state=checked]:bg-gray-500 dark:data-[state=checked]:bg-gray-500 [&>span:first-child]:bg-gray-500 dark:[&>span:first-child]:bg-gray-500"
-                  />
-                </div>
-                {isPublicTransitionLocked && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Tip: switch the blog itself to public in Blog Settings before making this post public.
-                  </p>
-                )}
-              </div>
-            </CardContent>
+                    </CardContent>
           </Card>
 
           {/* 내용 */}
@@ -874,14 +686,14 @@ export default function EditPostForm({
                   const previewContent =
                     field.value && field.value.trim().length > 0
                       ? field.value
-                      : 'The preview will appear here.';
+                      : '미리보기 내용이 여기에 표시됩니다.';
 
                   return (
                     <FormItem>
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
                           <Plus className="h-3 w-3" />
-                          <span>Write your post</span>
+                          <span>본문</span>
                         </div>
                         <div className="inline-flex rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1 text-xs font-medium">
                           {(['rich', 'markdown'] as EditorMode[]).map((mode) => (
@@ -896,12 +708,12 @@ export default function EditPostForm({
                               }`}
                               disabled={editorMode === mode || isSwitchingEditorMode}
                             >
-                              {mode === 'rich' ? 'Rich text' : 'Markdown'}
+                              {mode === 'rich' ? '리치 텍스트' : 'Markdown'}
                             </button>
                           ))}
                           {isSwitchingEditorMode && (
                             <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
-                              Switching...
+                              전환 중...
                             </span>
                           )}
                         </div>
@@ -913,7 +725,7 @@ export default function EditPostForm({
                             <input
                               ref={markdownImageInputRef}
                               type="file"
-                              accept="image/*"
+                              accept="image/jpeg,image/png,image/webp"
                               className="hidden"
                               onChange={handleMarkdownImageInputChange}
                             />
@@ -926,133 +738,103 @@ export default function EditPostForm({
                                 disabled={isMarkdownImageUploading}
                               >
                                 <ImageIcon className="h-4 w-4 mr-1.5" />
-                                Upload image
+                                이미지 업로드
                               </Button>
-                              <GithubResourcePopover
-                                githubUrl={form.watch('githubUrl') ?? ''}
-                                githubDescription={form.watch('githubDescription') ?? ''}
-                                onGithubUrlChange={(value) => form.setValue('githubUrl', value, { shouldDirty: true, shouldTouch: true })}
-                                onGithubDescriptionChange={(value) => form.setValue('githubDescription', value, { shouldDirty: true, shouldTouch: true })}
-                              >
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="px-2.5"
-                                  title="GitHub resource"
-                                >
-                                  <Github className="h-4 w-4" />
-                                </Button>
-                              </GithubResourcePopover>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  Uploading image...
+                                  이미지 업로드 중...
                                 </span>
                               )}
                               <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                Uploaded images appear immediately in the preview and the list below.
+                                업로드한 이미지는 아래 목록과 미리보기에서 즉시 확인할 수 있어요.
                               </span>
                             </div>
-                            <div className="space-y-4">
-                              <div className="grid gap-4 xl:grid-cols-2">
-                                <section className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/40 p-4">
-                                  <div className="mb-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
-                                    <p className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
-                                      <FileText className="h-3.5 w-3.5" />
-                                      <span>Editor</span>
-                                    </p>
-                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                      Markdown editing
-                                    </span>
-                                  </div>
-                                  <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
-                                    <HybridMarkdownEditor
-                                      key={`markdown-${initialData?.id ?? 'edit-post'}`}
-                                      ref={markdownEditorRef}
-                                      content={field.value}
-                                      onChange={(value) => field.onChange(value)}
-                                      className="min-h-[240px] lg:min-h-[340px]"
-                                    />
-                                  </div>
-                                  <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                                    Images can be edited visually, while text follows Markdown syntax.
-                                  </p>
-                                </section>
-
-                                <section className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
-                                  <div className="mb-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
-                                    <p className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
-                                      <ImageIcon className="h-3.5 w-3.5" />
-                                      <span>Live preview</span>
-                                    </p>
-                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                      Matches the published post style
-                                    </span>
-                                  </div>
-                                  <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-950/40 p-3">
-                                    <HtmlContentRenderer
-                                      content={!isConfirmDialogOpen ? convertMarkdownToHtml(previewContent) : ''}
-                                      options={{ enableImageModal: false }}
-                                      className="markdown-content prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words"
-                                    />
-                                  </div>
-                                </section>
+                            <div className="space-y-3">
+                              <Textarea
+                                ref={markdownTextareaRef}
+                                value={field.value}
+                                onChange={(event) => field.onChange(event.target.value)}
+                                placeholder="Markdown 문법으로 본문을 수정하세요..."
+                                className="min-h-[260px] lg:min-h-[360px] resize-y"
+                              />
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                기본 Markdown 문법을 지원하며, 이미지 링크는 자동으로 <code>![이미지]</code> 형식으로 변환됩니다.
+                              </p>
+                            </div>
+                            <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 lg:p-6 bg-white dark:bg-gray-900">
+                              <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between">
+                                <span>실시간 미리보기</span>
+                                <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                                  게시글과 동일한 스타일로 렌더링됩니다.
+                                </span>
+                              </p>
+                              <div className="prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words">
+                                <ReactMarkdown skipHtml>{previewContent}</ReactMarkdown>
                               </div>
                             </div>
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  Uploaded images
+                                  업로드한 이미지
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  Choose the thumbnail from an image or a YouTube video.
+                                  썸네일은 이 목록에서만 선택할 수 있습니다.
                                 </span>
                               </div>
                               {isResolvingFileMetadata && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  Loading image details...
+                                  이미지 정보를 불러오는 중입니다...
                                 </p>
                               )}
                               {markdownImages.length > 0 ? (
                                 <div className="grid gap-4 sm:grid-cols-2">
-                                  {markdownImages.map((image) => (
-                                    <MarkdownImageCard
-                                      key={image.id}
-                                      image={image}
-                                      isActiveThumbnail={!selectedYouTubeThumbnailId && watchedThumbnailImageId === image.id}
-                                      onSetThumbnail={setThumbnailByFileId}
-                                    />
-                                  ))}
+                                  {markdownImages.map((image) => {
+                                    const isActive = watchedThumbnailImageId === image.id;
+                                    return (
+                                      <div
+                                        key={image.id}
+                                        className="flex items-center gap-3 rounded-lg border border-gray-100 dark:border-gray-800 p-2"
+                                      >
+                                        <div className="h-16 w-16 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img
+                                            src={normalizeImageUrl(image.url)}
+                                            alt={image.name || '업로드한 이미지'}
+                                            className="h-full w-full object-cover"
+                                          />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                                            {image.name || '업로드한 이미지'}
+                                          </p>
+                                          <div className="flex flex-wrap gap-2">
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="outline"
+                                              className="gap-1.5"
+                                              onClick={() => handleInsertImageFromList(image)}
+                                            >
+                                              <FileText className="h-3.5 w-3.5" />
+                                              본문에 삽입
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant={isActive ? 'default' : 'secondary'}
+                                              onClick={() => setThumbnailByFileId(image.id)}
+                                            >
+                                              {isActive ? '썸네일 선택됨' : '썸네일로 지정'}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  No uploaded images yet. Add one above to preview it here and use it as the thumbnail.
-                                </p>
-                              )}
-                            </div>
-                            <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  YouTube in this post
-                                </p>
-                                <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  If the post contains a YouTube link, you can choose it as the thumbnail here.
-                                </span>
-                              </div>
-                              {markdownYouTubeIds.length > 0 ? (
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                  {markdownYouTubeIds.map((videoId) => (
-                                    <MarkdownYouTubeCard
-                                      key={videoId}
-                                      videoId={videoId}
-                                      isActiveThumbnail={selectedYouTubeThumbnailId === videoId}
-                                      onSetThumbnail={handleYouTubeThumbnailSelect}
-                                    />
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  Add a YouTube link to the post and it will appear here.
+                                  아직 업로드한 이미지가 없습니다. 위의 버튼으로 이미지를 추가하면 여기에서 미리보고 썸네일을 지정할 수 있어요.
                                 </p>
                               )}
                             </div>
@@ -1068,7 +850,7 @@ export default function EditPostForm({
                             <BlogSimpleEditor
                               content={field.value}
                               onChange={field.onChange}
-                              placeholder="Start writing..."
+                              placeholder=" 내용을 입력하세요..."
                               thumbnailImageId={watchedThumbnailImageId || undefined}
                               onThumbnailChange={handleThumbnailChange}
                               initialThumbnailIndex={thumbnailIndex}
@@ -1081,10 +863,6 @@ export default function EditPostForm({
                                 setThumbnailIndex(index);
                               }}
                               onFileIdsChange={handleFileIdsChange}
-                              githubUrl={form.watch('githubUrl') ?? ''}
-                              githubDescription={form.watch('githubDescription') ?? ''}
-                              onGithubUrlChange={(value) => form.setValue('githubUrl', value, { shouldDirty: true, shouldTouch: true })}
-                              onGithubDescriptionChange={(value) => form.setValue('githubDescription', value, { shouldDirty: true, shouldTouch: true })}
                             />
                           </div>
                         )}
@@ -1106,7 +884,7 @@ export default function EditPostForm({
               onClick={onCancel}
               disabled={isLoading || isLocalSubmitting}
             >
-              Cancel
+              취소
             </Button>
             {/* 초안 상태일 경우: 임시저장과 발행 버튼 분리 */}
             {!isPublished ? (
@@ -1122,7 +900,7 @@ export default function EditPostForm({
                   className="flex items-center gap-2"
                 >
                   <Save className="h-4 w-4" />
-                  Save draft
+                  임시저장
                 </Button>
                 <Button
                   type="button"
@@ -1138,7 +916,7 @@ export default function EditPostForm({
                   ) : (
                     <>
                       <FileText className="h-4 w-4" />
-                      Publish
+                      발행하기
                     </>
                   )}
                 </Button>
@@ -1153,7 +931,7 @@ export default function EditPostForm({
                   handleFormSubmit(true); // 계속 발행 상태 유지
                 }}
                 className="flex items-center gap-2 min-w-[120px]"
-                aria-label={isLoading ? "Saving" : submitButtonText}
+                aria-label={isLoading ? "저장 중" : submitButtonText}
               >
                 {isLoading ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -1181,9 +959,9 @@ export default function EditPostForm({
             executeEditorModeChange(pendingEditorMode);
           }
         }}
-        title="Change editor mode"
-        description="Switching editor modes may convert or remove some formatting. Do you want to continue?"
-        confirmText="Continue"
+        title="편집 모드 변경"
+        description="편집 모드를 변경하면 일부 서식이 변환되거나 유실될 수 있습니다. 계속하시겠습니까?"
+        confirmText="계속하기"
       />
     </div>
   );

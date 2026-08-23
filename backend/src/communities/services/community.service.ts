@@ -139,10 +139,17 @@ export class CommunityService {
    * 커뮤니티 생성
    * 생성자는 자동으로 OWNER 멤버가 됨
    */
-  async create(userId: string, dto: CreateCommunityDto): Promise<Community> {
+  async create(
+    userId: string,
+    dto: CreateCommunityDto,
+    organizationId?: string,
+  ): Promise<Community> {
     // 1인당 최대 5개 커뮤니티 생성 제한
     const existingCount = await this.communityRepository.count({
-      where: { creatorId: userId },
+      where: {
+        creatorId: userId,
+        ...(organizationId ? { organizationId } : {}),
+      },
     });
 
     if (existingCount >= 5) {
@@ -169,6 +176,7 @@ export class CommunityService {
       const community = manager.create(Community, {
         ...normalizedDto,
         creatorId: userId,
+        ...(organizationId ? { organizationId } : {}),
         memberCount: 1, // 생성자 포함
       });
 
@@ -284,9 +292,10 @@ export class CommunityService {
     communityId: string,
     operatorId: string,
     reason?: string,
+    organizationId?: string,
   ) {
     const community = await this.communityRepository.findOne({
-      where: { id: communityId },
+      where: { id: communityId, ...(organizationId ? { organizationId } : {}) },
       select: ["id", "slug", "isLocked"],
     });
 
@@ -325,9 +334,10 @@ export class CommunityService {
     communityId: string,
     operatorId: string,
     reason?: string,
+    organizationId?: string,
   ) {
     const community = await this.communityRepository.findOne({
-      where: { id: communityId },
+      where: { id: communityId, ...(organizationId ? { organizationId } : {}) },
       select: ["id", "slug", "isLocked"],
     });
 

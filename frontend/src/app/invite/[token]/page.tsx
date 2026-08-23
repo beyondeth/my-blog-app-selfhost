@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useInviteByToken, useAcceptInvite } from '@/hooks/community';
 import { useAuthV2 } from '@/hooks/useAuthV2';
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface InvitePageProps {
   params: Promise<{ token: string }>;
@@ -35,6 +36,9 @@ export default function InvitePage({ params }: InvitePageProps) {
   // 초대 정보 조회
   const { data: invite, isLoading, isError, error } = useInviteByToken(token);
   const acceptMutation = useAcceptInvite();
+  const communityIconUrl = invite?.community?.iconUrl
+    ? normalizeImageUrl(invite.community.iconUrl)
+    : '';
 
   // 수락 상태
   const [accepted, setAccepted] = useState(false);
@@ -229,23 +233,23 @@ export default function InvitePage({ params }: InvitePageProps) {
       <div className="max-w-md w-full bg-white dark:bg-[rgb(38,38,38)] rounded-2xl shadow-lg overflow-hidden">
         {/* 커뮤니티 배너/아이콘 */}
         <div className="relative h-24 bg-gradient-to-r from-blue-500 to-purple-600">
-          {invite.community?.iconUrl && (
+          {communityIconUrl && (
             <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
               <div
                 className={cn(
                   'w-20 h-20 rounded-full border-4 border-white dark:border-gray-800 overflow-hidden',
-                  invite.community.iconImageFit === 'cover'
+                  invite.community?.iconImageFit === 'cover'
                     ? 'bg-white dark:bg-gray-800'
                     : 'bg-white dark:bg-gray-900 p-1'
                 )}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={invite.community.iconUrl}
-                  alt={invite.community.name}
+                  src={communityIconUrl}
+                  alt={invite.community?.name ?? '커뮤니티'}
                   className={cn(
                     'w-full h-full',
-                    invite.community.iconImageFit === 'cover' ? 'object-cover' : 'object-contain'
+                    invite.community?.iconImageFit === 'cover' ? 'object-cover' : 'object-contain'
                   )}
                 />
               </div>
@@ -254,8 +258,8 @@ export default function InvitePage({ params }: InvitePageProps) {
         </div>
 
         {/* 내용 */}
-        <div className={cn('p-8 text-center', invite.community?.iconUrl && 'pt-14')}>
-          {!invite.community?.iconUrl && (
+        <div className={cn('p-8 text-center', communityIconUrl && 'pt-14')}>
+          {!communityIconUrl && (
             <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
               <Users className="w-8 h-8 text-blue-600 dark:text-blue-400" />
             </div>

@@ -29,6 +29,8 @@ export class ApiClient {
   private client: AxiosInstance;
   private userId?: string;
   private refreshPromise: Promise<void> | null = null;
+  private csrfToken: string | null = null;
+  private csrfPromise: Promise<string> | null = null;
 
   /**
    * ApiClient 생성자
@@ -58,7 +60,14 @@ export class ApiClient {
   private setupInterceptors(): void {
     // 요청 인터셉터
     this.client.interceptors.request.use(
-      (config) => {
+      async (config) => {
+        const method = config.method?.toUpperCase();
+        if (method && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+          const csrfToken = await this.getCsrfToken();
+          config.headers = config.headers || {};
+          config.headers['X-CSRF-Token'] = csrfToken;
+        }
+
         // 보안 로깅 - 민감한 정보 제외
         apiLogger.apiRequest(
           config.method?.toUpperCase() || 'GET',
@@ -105,6 +114,26 @@ export class ApiClient {
         return this.handleTokenRefresh(originalRequest, error);
       }
     );
+  }
+
+  private async getCsrfToken(): Promise<string> {
+    if (this.csrfToken) {
+      return this.csrfToken;
+    }
+
+    if (!this.csrfPromise) {
+      this.csrfPromise = this.client
+        .get<{ csrfToken: string }>('/auth/csrf-token')
+        .then((response) => {
+          this.csrfToken = response.data.csrfToken;
+          return response.data.csrfToken;
+        })
+        .finally(() => {
+          this.csrfPromise = null;
+        });
+    }
+
+    return this.csrfPromise;
   }
 
   /**

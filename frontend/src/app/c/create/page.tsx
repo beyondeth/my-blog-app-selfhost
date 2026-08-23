@@ -424,7 +424,7 @@ export default function CreateCommunityPage() {
               <input
                 id="banner-input"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleBannerSelect}
                 className="hidden"
               />
@@ -482,7 +482,7 @@ export default function CreateCommunityPage() {
               <input
                 id="icon-input"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleIconSelect}
                 className="hidden"
               />

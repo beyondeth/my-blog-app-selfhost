@@ -253,7 +253,7 @@ export class TossCheckoutController {
           },
         );
       } catch (chargeError: unknown) {
-        // 결제 실패 — 구독이 아직 생성되지 않았으므로 롤백 불필요
+        // 결제 실패 — 빌링키와 구독 상태를 함께 정리한다.
         const errorData = (chargeError as { response?: { data?: { code?: string } } })?.response?.data;
         const tossErrorCode = errorData?.code || "";
 
@@ -268,6 +268,18 @@ export class TossCheckoutController {
           this.logger.error(
             `빌링키 비활성화 실패: billingKeyId=${billingKeyEntity.id}`,
           );
+        }
+
+        // 인증 과정에서 남은 구독 상태도 무료 플랜으로 되돌려
+        // 부분적으로 생성된 결제 상태가 남지 않도록 한다.
+        try {
+          await this.subscriptionFacade.updateUserSubscription(
+            userId,
+            SubscriptionTier.FREE,
+            undefined,
+          );
+        } catch {
+          this.logger.error(`결제 실패 후 구독 상태 롤백 실패: userId=${userId}`);
         }
 
         const userMessage = this.getUserFriendlyErrorMessage(tossErrorCode);

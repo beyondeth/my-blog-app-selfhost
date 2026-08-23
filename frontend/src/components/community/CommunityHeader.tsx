@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import type { Community } from '@/types/community';
 import { isModeratorOrAbove, isOwner } from '@/types/community';
 import CommunityLockBanner from './CommunityLockBanner';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface CommunityHeaderProps {
   community: Community;
@@ -41,6 +42,8 @@ const CommunityHeader = React.memo(function CommunityHeader({
     : `c/${community.slug}`;
   const iconFit = community.iconImageFit ?? 'contain';
   const bannerFit = community.bannerImageFit ?? 'cover';
+  const bannerUrl = community.bannerUrl ? normalizeImageUrl(community.bannerUrl) : '';
+  const iconUrl = community.iconUrl ? normalizeImageUrl(community.iconUrl) : '';
   const iconContainerClass = cn(
     'relative z-10 flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white dark:border-gray-900 overflow-hidden shadow-lg flex items-center justify-center',
     iconFit === 'cover' ? 'bg-white dark:bg-gray-800' : 'bg-white dark:bg-gray-900 p-2'
@@ -59,12 +62,12 @@ const CommunityHeader = React.memo(function CommunityHeader({
             : 'bg-white dark:bg-gray-900'
         )}
       >
-        {community.bannerUrl && (
+        {bannerUrl && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={community.bannerUrl}
-              alt={`${community.name} banner`}
+              src={bannerUrl}
+              alt={`${community.name} 배너`}
               className={cn('w-full h-full', bannerImageClass)}
             />
           </>
@@ -76,11 +79,11 @@ const CommunityHeader = React.memo(function CommunityHeader({
         <div className="relative flex flex-col sm:flex-row sm:items-end gap-4 -mt-8 sm:-mt-12 pb-4 border-b border-gray-200 dark:border-gray-700">
           {/* 커뮤니티 아이콘 */}
           <div className={iconContainerClass}>
-            {community.iconUrl ? (
+            {iconUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={community.iconUrl}
+                  src={iconUrl}
                   alt={community.name}
                   className={cn('w-full h-full', iconImageClass)}
                 />
@@ -127,11 +130,11 @@ const CommunityHeader = React.memo(function CommunityHeader({
               <Button
                 onClick={() => router.push(`/c/${community.slug}/submit`)}
                 disabled={isCommunityLocked}
-                title={isCommunityLocked ? 'Posting is disabled while the community is locked.' : undefined}
+                title={isCommunityLocked ? '커뮤니티가 잠금 상태에서는 게시물을 작성할 수 없습니다.' : undefined}
                 className="inline-flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
               >
                 <Plus className="w-4 h-4" />
-                <span className="text-xs sm:text-sm font-semibold">Create post</span>
+                <span className="text-xs sm:text-sm font-semibold">게시물 만들기</span>
               </Button>
             )}
 
@@ -141,7 +144,7 @@ const CommunityHeader = React.memo(function CommunityHeader({
                 variant="outline"
                 size="icon"
                 onClick={() => router.push(`/c/${community.slug}/settings`)}
-                title="Community settings"
+                title="커뮤니티 설정"
                 className="border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700"
               >
                 <Settings className="w-4 h-4" />

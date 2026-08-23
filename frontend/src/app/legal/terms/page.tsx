@@ -1,23 +1,18 @@
 import { Metadata } from 'next';
 import LegalPageLayout from '@/components/legal/LegalPageLayout';
-import { getRequestLocale } from '@/lib/i18n/server';
-import { getLegalCopy } from '@/lib/legal';
-import { getLegalPageMetadata } from '../_shared';
 
-export async function generateMetadata(): Promise<Metadata> {
-  return getLegalPageMetadata('terms-of-service');
-}
+export const metadata: Metadata = {
+  title: '이용약관 | Aigory',
+  description: 'Aigory의 서비스 이용약관을 확인하세요.',
+};
 
 /**
  * 이용약관 페이지
  */
-export default async function TermsPage() {
-  const locale = await getRequestLocale();
-  const copy = getLegalCopy(locale, 'terms-of-service');
-
+export default function TermsPage() {
   return (
     <LegalPageLayout
-      title={copy.title}
+      title="이용약관"
       documentType="terms-of-service"
     />
   );

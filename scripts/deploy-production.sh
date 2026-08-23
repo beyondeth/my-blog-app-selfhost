@@ -109,7 +109,7 @@ docker compose -f docker-compose.prod.oracle.yml \
 # Backend 헬스체크
 log_info "Backend 헬스체크 대기..."
 for i in {1..20}; do
-    if docker exec codebase-prod-backend curl -s http://localhost:3000/health >/dev/null 2>&1; then
+    if docker exec aigory-blog-prod-backend curl -s http://localhost:3000/health >/dev/null 2>&1; then
         log_info "✓ Backend 헬스체크 통과"
         break
     fi
@@ -117,10 +117,10 @@ for i in {1..20}; do
 done
 
 # PM2 워커 스케일업 확인
-docker exec codebase-prod-backend pm2 scale codebase-backend 4 || true
+docker exec aigory-blog-prod-backend pm2 scale aigory-blog-backend 4 || true
 
 # 데이터베이스 마이그레이션
-docker exec codebase-prod-backend npm run migration:run:prod:nobuild || log_info "마이그레이션 없음"
+docker exec aigory-blog-prod-backend npm run migration:run:prod:nobuild || log_info "마이그레이션 없음"
 
 # Frontend 재시작
 docker compose -f docker-compose.prod.oracle.yml \
@@ -137,7 +137,7 @@ log_info "✓ 모든 컨테이너 재시작 완료"
 # 6. 최종 상태 확인
 log_info "Step 6: 최종 상태 확인"
 docker compose -f docker-compose.prod.oracle.yml --env-file .env.production ps
-docker exec codebase-prod-backend pm2 status
+docker exec aigory-blog-prod-backend pm2 status
 
 # 7. 배포 완료
 DEPLOY_END_TIME=$(date +%s)

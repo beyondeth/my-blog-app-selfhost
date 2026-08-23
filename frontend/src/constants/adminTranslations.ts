@@ -9,7 +9,7 @@ export const adminTranslations = {
     reports: '신고 관리',
     settings: '설정',
     logout: '로그아웃',
-    adminPanel: 'Codebase',
+    adminPanel: 'Aigory',
   },
 
   // Common Actions

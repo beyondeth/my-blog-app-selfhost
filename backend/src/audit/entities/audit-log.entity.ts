@@ -8,6 +8,7 @@ import {
   Index,
 } from "typeorm";
 import { User } from "../../users/entities/user.entity";
+import { Organization } from "../../organizations/entities/organization.entity";
 
 export const AuditAction = {
   USER_CREATED: "user_created",
@@ -36,6 +37,10 @@ export const AuditAction = {
   IP_EXPORT: "ip_export",
   IP_BLOCK: "ip_block",
   IP_UNBLOCK: "ip_unblock",
+  REFRESH_TOKEN_REUSE: "refresh_token_reuse",
+  ORGANIZATION_ACCESS_DENIED: "organization_access_denied",
+  INTERNAL_AUTH_FAILED: "internal_auth_failed",
+  OUTBOX_DEAD_LETTERED: "outbox_dead_lettered",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
@@ -44,6 +49,7 @@ export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
 @Index(["action"])
 @Index(["entityType", "entityId"])
 @Index(["performedById"])
+@Index(["requestId"])
 @Index(["createdAt"])
 export class AuditLog {
   @PrimaryGeneratedColumn("uuid")
@@ -73,6 +79,13 @@ export class AuditLog {
   @Column({ type: "uuid", nullable: true })
   performedById: string;
 
+  @Column({ type: "uuid", nullable: true })
+  organizationId: string | null;
+
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "organizationId" })
+  organization: Organization | null;
+
   @Column({ type: "varchar", nullable: true })
   ipAddress: string;
 
@@ -81,6 +94,9 @@ export class AuditLog {
 
   @Column({ type: "varchar", nullable: true })
   sessionId: string;
+
+  @Column({ type: "varchar", length: 128, nullable: true })
+  requestId: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -147,7 +147,7 @@ export default function MockHomeShellKoPage() {
                 <span className="absolute -bottom-1 left-2 h-3 w-3 rotate-45 bg-slate-900 dark:bg-emerald-400" />
               </div>
               <div>
-                <p className="text-base font-semibold">codebase.blog</p>
+                <p className="text-base font-semibold">aigory.com</p>
                 <p className="text-xs text-slate-600 dark:text-slate-300">
                   AI + 오픈소스 커뮤니티 뉴스룸
                 </p>

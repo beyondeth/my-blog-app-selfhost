@@ -24,7 +24,6 @@ import { BlogsModule } from "./blogs/blogs.module";
 import { TagsModule } from "./tags/tags.module";
 import { McpModule } from "./mcp/mcp.module";
 import { EmailModule } from "./email/email.module";
-import { FeedbackModule } from "./feedback/feedback.module";
 import { ReportsModule } from "./reports/reports.module";
 import { AuditModule } from "./audit/audit.module";
 import { AdminModule } from "./admin/admin.module";
@@ -36,13 +35,12 @@ import { MetricsModule } from "./metrics/metrics.module";
 import { CommonModule } from "./common/common.module";
 import { EventsModule } from "./common/events/events.module";
 // import { AnalyticsModule } from './analytics/analytics.module';
-import { SubscriptionModule } from './subscription/subscription.module';
-import { PaymentModule } from './payment/payment.module';
-import { UsageModule } from './usage/usage.module';
-// PaymentEventsModule은 빈 모듈 — EventEmitterModule.forRoot()이 대신 사용됨
-import { SharedSubscriptionModule } from './shared/shared-subscription.module';
-import { MarketplaceModule } from './marketplace/marketplace.module';
-import { KnowledgeModule } from "./knowledge/knowledge.module";
+// FUTURE: 구독제 기능 활성화 시 주석 해제
+// import { SubscriptionModule } from './subscription/subscription.module';
+// import { PaymentModule } from './payment/payment.module';
+// import { UsageModule } from './usage/usage.module';
+// import { PaymentEventsModule } from './payment/payment-events.module';
+// import { SharedSubscriptionModule } from './shared/shared-subscription.module';
 
 // Guards
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
@@ -58,6 +56,7 @@ import { OpenGraphModule } from "./opengraph/opengraph.module";
 import { RateLimitModule } from "./rate-limit/rate-limit.module";
 import { ReputationModule } from "./reputation/reputation.module"; // 사용자 평판(Ranking) 시스템
 import { ModerationModule } from "./moderation/moderation.module"; // 모더레이션 시스템
+import { OrganizationsModule } from "./organizations/organizations.module";
 import { RateLimitGuard } from "./rate-limit/rate-limit.guard";
 // import { TestBlogStatsController } from './test/test-blog-stats.controller'; // Temporarily disabled due to dependency issues
 // import { SimpleTestController } from './test/simple-test.controller';
@@ -117,12 +116,9 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
     // BullMQ configuration for Redis connection
     BullModule.forRoot({
       connection: {
-        // Core Redis only: queue data must not be evicted.
-        host:
-          process.env.REDIS_CORE_HOST || process.env.REDIS_HOST || "localhost",
-        port: parseInt(
-          process.env.REDIS_CORE_PORT || process.env.REDIS_PORT || "6379",
-        ),
+        host: process.env.REDIS_HOST || "localhost",
+        port: parseInt(process.env.REDIS_PORT || "6379"),
+        password: process.env.REDIS_PASSWORD || undefined,
       },
     }),
 
@@ -130,17 +126,13 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
     ScheduleModule.forRoot(),
 
     // Event-driven architecture (캐시 무효화용)
-    EventEmitterModule.forRoot({
-      wildcard: false,
-      delimiter: ".",
-      maxListeners: 50,
-      verboseMemoryLeak: true,
-    }),
+    EventEmitterModule.forRoot(),
 
     // Feature modules
     RedisModule, // Global Redis module for distributed state management
     CacheModule, // Global cache module with Redis support
     CommonModule, // Common services (BlogResolverService, UnifiedRedisService)
+    OrganizationsModule, // Organization/Membership tenant boundary
     EventsModule, // Event system (BlogEventEmitter)
     MonitoringModule, // Global monitoring module for suspicious requests
     MetricsModule, // Prometheus metrics module
@@ -157,7 +149,6 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
     BookmarksModule,
     McpModule,
     EmailModule,
-    FeedbackModule,
     ReportsModule,
     AuditModule,
     AdminModule,
@@ -169,15 +160,14 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
     CommunitiesModule, // Reddit 스타일 커뮤니티 시스템
     FeedModule, // 통합 피드 (블로그 + 커뮤니티 포스트)
     OpenGraphModule, // URL 메타데이터 추출 (링크 카드용)
-    KnowledgeModule, // Async shadow knowledge graph
     ReputationModule, // 사용자 평판(Ranking) 시스템
     ModerationModule, // 모더레이션 시스템
     // AnalyticsModule,
-    SubscriptionModule, // UsersModule 이후에 로드
-    UsageModule, // SubscriptionModule과 UsersModule 이후에 로드
-    SharedSubscriptionModule, // UsageModule 이후에 로드
-    PaymentModule, // 마지막에 로드 (이벤트 기반으로 다른 모듈과 통신)
-    MarketplaceModule, // 마켓플레이스 (상품 브라우징, 구매, 판매자 대시보드)
+    // FUTURE: 구독제 기능 활성화 시 주석 해제
+    // SubscriptionModule, // UsersModule 이후에 로드
+    // UsageModule, // SubscriptionModule과 UsersModule 이후에 로드
+    // SharedSubscriptionModule, // UsageModule 이후에 로드 (UsageLimitGuard 제공)
+    // PaymentModule, // 마지막에 로드 (이벤트 기반으로 다른 모듈과 통신)
   ],
   providers: [
     // Global guards
@@ -201,6 +191,6 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(IpBlockMiddleware).forRoutes("*");
+    consumer.apply(IpBlockMiddleware).forRoutes("{*splat}");
   }
 }

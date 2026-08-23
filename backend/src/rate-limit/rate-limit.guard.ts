@@ -22,11 +22,8 @@ export class RateLimitGuard implements CanActivate {
     const classRef = context.getClass();
     const group =
       this.reflector.get<string>(RATE_LIMIT_METADATA_KEY, handler) ??
-      this.reflector.get<string>(RATE_LIMIT_METADATA_KEY, classRef);
-
-    if (!group) {
-      return true;
-    }
+      this.reflector.get<string>(RATE_LIMIT_METADATA_KEY, classRef) ??
+      "default";
 
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();

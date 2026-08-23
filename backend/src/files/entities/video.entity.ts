@@ -19,6 +19,7 @@ import {
   Index,
 } from "typeorm";
 import { User } from "../../users/entities/user.entity";
+import { Organization } from "../../organizations/entities/organization.entity";
 
 export enum VideoStatus {
   UPLOADING = "uploading", // 원본 업로드 중
@@ -29,6 +30,7 @@ export enum VideoStatus {
 
 @Entity("videos")
 @Index(["userId"])
+@Index(["organizationId"])
 @Index(["status"])
 @Index(["createdAt"])
 export class Video {
@@ -41,6 +43,13 @@ export class Video {
   @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
   user: User;
+
+  @Column({ type: "uuid", nullable: true })
+  organizationId: string | null;
+
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "organizationId" })
+  organization: Organization | null;
 
   // R2 스토리지 경로
   @Column({ name: "storage_key_raw" })

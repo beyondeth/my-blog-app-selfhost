@@ -7,27 +7,18 @@ type InputSchema = {
 export const WRITING_STYLE_PRESETS = [
   'default',
   'novel',
+  'tutorial',
+  'comedy',
   'podcast',
   'vibe',
   'research',
-  'pm',
-  'designer',
-  'marketer',
-  'sell',
+  'human',
 ] as const;
 
 export type WritingStylePreset = (typeof WRITING_STYLE_PRESETS)[number];
 
 export const TOOL_NAMES = [
   'check_auth',
-  'list_my_published_posts',
-  'search_my_published_posts',
-  'read_my_published_post',
-  'get_knowledge_manifest',
-  'search_knowledge_nodes',
-  'read_knowledge_node',
-  'list_followup_suggestions',
-  'dismiss_followup_suggestion',
   'get_writing_style_guide',
   'create_post',
   'get_image_upload_url',
@@ -55,175 +46,6 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
     },
   },
   {
-    name: 'list_my_published_posts',
-    description:
-      'List the authenticated user\'s published blog posts. Supports pagination and optional tag/category/date filters.',
-    discoveryDescription: 'List your published blog posts',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        page: {
-          type: 'number',
-          description: 'Page number (default: 1)',
-        },
-        limit: {
-          type: 'number',
-          description: 'Items per page (default: 20, max: 50)',
-        },
-        category: {
-          type: 'string',
-          description: 'Optional category filter',
-        },
-        tag: {
-          type: 'string',
-          description: 'Optional tag filter',
-        },
-        dateFrom: {
-          type: 'string',
-          description: 'Optional ISO date lower bound for publishedAt',
-        },
-        dateTo: {
-          type: 'string',
-          description: 'Optional ISO date upper bound for publishedAt',
-        },
-      },
-    },
-  },
-  {
-    name: 'search_my_published_posts',
-    description:
-      'Search the authenticated user\'s published blog posts by keyword, with optional pagination and metadata filters.',
-    discoveryDescription: 'Search your published blog posts',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Search query',
-        },
-        page: {
-          type: 'number',
-          description: 'Page number (default: 1)',
-        },
-        limit: {
-          type: 'number',
-          description: 'Items per page (default: 20, max: 50)',
-        },
-        category: {
-          type: 'string',
-          description: 'Optional category filter',
-        },
-        tag: {
-          type: 'string',
-          description: 'Optional tag filter',
-        },
-        dateFrom: {
-          type: 'string',
-          description: 'Optional ISO date lower bound for publishedAt',
-        },
-        dateTo: {
-          type: 'string',
-          description: 'Optional ISO date upper bound for publishedAt',
-        },
-      },
-      required: ['query'],
-    },
-  },
-  {
-    name: 'read_my_published_post',
-    description:
-      'Read a single published blog post owned by the authenticated user, including full content and metadata.',
-    discoveryDescription: 'Read one of your published blog posts',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        postId: {
-          type: 'string',
-          description: 'Published post ID',
-        },
-      },
-      required: ['postId'],
-    },
-  },
-  {
-    name: 'get_knowledge_manifest',
-    description:
-      'Read the authenticated user\'s compact knowledge manifest generated from published posts.',
-    discoveryDescription: 'Read your compact knowledge manifest',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'search_knowledge_nodes',
-    description:
-      'Search the authenticated user\'s knowledge nodes by title, slug, or path.',
-    discoveryDescription: 'Search your knowledge nodes',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Search query',
-        },
-        limit: {
-          type: 'number',
-          description: 'Items per page (default: 10, max: 20)',
-        },
-      },
-      required: ['query'],
-    },
-  },
-  {
-    name: 'read_knowledge_node',
-    description:
-      'Read a single knowledge node owned by the authenticated user, including linked posts and edges.',
-    discoveryDescription: 'Read one of your knowledge nodes',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slug: {
-          type: 'string',
-          description: 'Knowledge node slug',
-        },
-      },
-      required: ['slug'],
-    },
-  },
-  {
-    name: 'list_followup_suggestions',
-    description:
-      'List follow-up post suggestions derived from the authenticated user\'s knowledge graph.',
-    discoveryDescription: 'List your follow-up post suggestions',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        status: {
-          type: 'string',
-          enum: ['pending', 'dismissed', 'accepted'],
-          description: 'Optional status filter',
-        },
-      },
-    },
-  },
-  {
-    name: 'dismiss_followup_suggestion',
-    description:
-      'Dismiss one follow-up post suggestion from the authenticated user\'s knowledge graph.',
-    discoveryDescription: 'Dismiss a follow-up post suggestion',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        suggestionId: {
-          type: 'string',
-          description: 'Suggestion ID',
-        },
-      },
-      required: ['suggestionId'],
-    },
-  },
-  {
     name: 'get_writing_style_guide',
     description:
       'Retrieve writing style guidelines for blog posts. Returns comprehensive style guide with instructions and validation requirements.',
@@ -236,11 +58,6 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
           description:
             'User-provided custom style markdown (highest priority). Use this when user provides their own style guide in the conversation.',
         },
-        styleAlias: {
-          type: 'string',
-          description:
-            'Optional alias for a custom style markdown. Use this when customMarkdown came from a local skill or named custom preset.',
-        },
         style: {
           type: 'string',
           enum: WRITING_STYLE_PRESETS,
@@ -252,8 +69,8 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
   },
   {
     name: 'create_post',
-    description: 'Create and publish a new blog post to codebase.blog.',
-    discoveryDescription: 'Create and publish blog posts to codebase.blog',
+    description: 'Create and publish a new blog post to aigory.com.',
+    discoveryDescription: 'Create and publish blog posts to aigory.com',
     inputSchema: {
       type: 'object',
       properties: {
@@ -275,39 +92,15 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
           description:
             'Category (required) - Select exactly 1 category that best describes the post content',
         },
-        visibility: {
+        attachedFileIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Finalized file IDs to attach to the post. Include thumbnailImageId here as well.',
+        },
+        thumbnailImageId: {
           type: 'string',
-          enum: ['public', 'private'],
-          description:
-            'Post visibility (optional). If omitted, backend applies the user/blog default.',
-        },
-        writingStyle: {
-          type: 'string',
-          description:
-            'Writing style identifier for analytics or traceability. Use a preset id, or pass custom:<alias> when a custom markdown style was used.',
-        },
-        sell: {
-          type: 'boolean',
-          description:
-            '판매 상품으로 등록. true면 마켓플레이스에 등록됩니다. price와 productCategory가 필수입니다.',
-        },
-        price: {
-          type: 'number',
-          description:
-            '상품 가격 (KRW, 최소 100). sell=true일 때 필수.',
-        },
-        productCategory: {
-          type: 'string',
-          enum: [
-            'ai_prompts',
-            'coding_templates',
-            'tech_guides',
-            'ai_workflows',
-            'data_analytics',
-            'others',
-          ],
-          description:
-            '상품 카테고리. sell=true일 때 필수.',
+          description: 'Finalized file ID to use as the post cover image',
         },
       },
       required: ['title', 'content_markdown', 'category'],
@@ -316,32 +109,45 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
   {
     name: 'get_image_upload_url',
     description:
-      'Step 1: Request an S3 Presigned URL to upload a local file. Returns uploadUrl and fileKey. You must use curl to upload provided file to the uploadUrl.',
+      'Step 1: Request a signed presigned URL for one WebP image. Returns uploadUrl, tempId, fileKey, fileName, mimeType, and fileSize. PUT exactly those bytes to uploadUrl.',
     discoveryDescription: 'Get image upload URL (step 1 of image upload)',
     inputSchema: {
       type: 'object',
       properties: {
-        mimeType: { type: 'string', default: 'image/png' },
-        fileSize: { type: 'number' },
+        mimeType: {
+          type: 'string',
+          enum: ['image/webp'],
+          default: 'image/webp',
+        },
+        fileSize: { type: 'number', minimum: 1, maximum: 10485760 },
       },
+      required: ['mimeType', 'fileSize'],
     },
   },
   {
     name: 'finalize_uploaded_image',
     description:
-      'Step 2: Notify server that the file has been uploaded via curl asynchronously.',
+      'Step 2: Finalize the uploaded WebP using every value returned by get_image_upload_url. Returns fileId, publicUrl, and a file descriptor.',
     discoveryDescription: 'Finalize uploaded image (step 2 of image upload)',
     inputSchema: {
       type: 'object',
       properties: {
+        tempId: {
+          type: 'string',
+          description: 'Signed upload intent returned by get_image_upload_url',
+        },
         fileKey: {
           type: 'string',
           description: 'Returned from get_image_upload_url',
         },
-        mimeType: { type: 'string' },
-        fileSize: { type: 'number' },
+        fileName: {
+          type: 'string',
+          description: 'Returned from get_image_upload_url',
+        },
+        mimeType: { type: 'string', enum: ['image/webp'] },
+        fileSize: { type: 'number', minimum: 1, maximum: 10485760 },
       },
-      required: ['fileKey'],
+      required: ['tempId', 'fileKey', 'fileName', 'mimeType', 'fileSize'],
     },
   },
 ];
@@ -356,37 +162,28 @@ export function getDiscoveryTools(): Array<{
   }));
 }
 
-export const MCP_SERVER_INSTRUCTIONS = `# Codebase.blog Auto-posting MCP Server
+export const MCP_SERVER_INSTRUCTIONS = `# Aigory Auto-posting MCP Server
 
 ## Workflow
 
 1. Call check_auth() first
-2. During auto-posting, do not call list_my_published_posts(), search_my_published_posts(), or read_my_published_post() unless the user explicitly asks to review previous posts
-3. To create a new post, call get_writing_style_guide() without arguments first so the user can choose a style
-4. Write content
-   - If you have a local custom style file, pass it via customMarkdown (+ styleAlias when available)
-5. If image upload is needed:
+2. Call get_writing_style_guide(style)
+3. Write content
+4. If image upload is needed:
    - get_image_upload_url(...)
    - upload with local curl PUT
    - finalize_uploaded_image(...)
-6. Call create_post() to publish
+5. Call create_post() to publish
 
 ## Important Rules
 
 - create_post() must execute even if image upload fails.
 - If image upload fails, stop retrying and continue with text-only create_post().
 - Category is required and tags are optional (max 10).
-- Do not inspect previous posts to infer category or style during auto-posting. Pick the best fitting category from the current request.
-- For any structure diagram, workflow, flowchart, architecture map, or "mermaid" request, author visuals with \`diagram\` fenced blocks for the D2 renderer.
-- Do not generate raw \`mermaid\` fenced blocks in new posts.
-- Treat "mermaid" in the user request as visual intent, not as a requirement to emit Mermaid syntax.
 
 ## Available Tools
 
 - check_auth
-- list_my_published_posts
-- search_my_published_posts
-- read_my_published_post
 - get_writing_style_guide
 - create_post
 - get_image_upload_url

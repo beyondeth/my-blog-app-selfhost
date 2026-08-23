@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import CommunityAdminLayout from '@/components/community/CommunityAdminLayout';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 // ApexCharts SSR 방지
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
@@ -182,10 +183,10 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
   };
 
   const lineChartSeries = [
-    { name: 'Posts', data: trends.map((t) => t.posts) },
-    { name: 'Upvotes', data: trends.map((t) => t.upvotes) },
-    { name: 'Comments', data: trends.map((t) => t.comments) },
-    { name: 'New members', data: trends.map((t) => t.members) },
+    { name: '게시물', data: trends.map((t) => t.posts) },
+    { name: '업보트', data: trends.map((t) => t.upvotes) },
+    { name: '댓글', data: trends.map((t) => t.comments) },
+    { name: '신규 멤버', data: trends.map((t) => t.members) },
   ];
 
   if (communityLoading || loading) {
@@ -205,14 +206,14 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
 
   const statCards = [
     {
-      title: 'Total views',
+      title: '전체 조회수',
       value: stats?.totalViews ?? 0,
       icon: Eye,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100 dark:bg-blue-900/30',
     },
     {
-      title: 'Net score',
+      title: '순 투표',
       value: stats?.netScore ?? 0,
       icon: ThumbsUp,
       color: 'text-emerald-600',
@@ -220,19 +221,19 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
       subtitle: `↑${stats?.totalUpvotes ?? 0} ↓${stats?.totalDownvotes ?? 0}`,
     },
     {
-      title: 'Total comments',
+      title: '전체 댓글',
       value: stats?.totalComments ?? 0,
       icon: MessageSquare,
       color: 'text-amber-600',
       bgColor: 'bg-amber-100 dark:bg-amber-900/30',
     },
     {
-      title: 'Active members',
+      title: '활성 멤버',
       value: stats?.activeMemberCount ?? 0,
       icon: Users,
       color: 'text-violet-600',
       bgColor: 'bg-violet-100 dark:bg-violet-900/30',
-      subtitle: 'Last 30 days',
+      subtitle: '최근 30일',
     },
   ];
 
@@ -244,10 +245,10 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
           <div className="space-y-1">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
               <BarChart3 className="w-5 h-5" />
-              Community analytics
+              커뮤니티 분석
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Monitor your community performance at a glance.
+              커뮤니티 성과를 한눈에 확인하세요
             </p>
           </div>
           <Button
@@ -257,7 +258,7 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
             disabled={refreshing}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            새로고침
           </Button>
         </div>
 
@@ -296,18 +297,18 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
           <div className="mb-4">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-500" />
-              Weekly highlights
+              주간 하이라이트
             </h3>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 bg-gray-50 dark:bg-[#1F2229] rounded-xl border border-gray-100 dark:border-[#2F3440]">
-              <p className="text-xs text-gray-500 dark:text-gray-300">Posts this week</p>
+              <p className="text-xs text-gray-500 dark:text-gray-300">이번 주 게시물</p>
               <p className="text-xl font-bold text-gray-900 dark:text-gray-50 mt-1">
                 {(stats?.weeklyPosts ?? 0).toLocaleString()}
               </p>
             </div>
             <div className="p-4 bg-gray-50 dark:bg-[#1F2229] rounded-xl border border-gray-100 dark:border-[#2F3440]">
-              <p className="text-xs text-gray-500 dark:text-gray-300">New members this week</p>
+              <p className="text-xs text-gray-500 dark:text-gray-300">이번 주 신규 멤버</p>
               <p className="text-xl font-bold text-gray-900 dark:text-gray-50 mt-1">
                 {(stats?.weeklyMembers ?? 0).toLocaleString()}
               </p>
@@ -320,7 +321,7 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
           <div className="mb-6 flex items-center justify-between">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              Daily trends
+              일별 추이
             </h3>
             <div className="flex gap-1">
               {(['7', '30', '90'] as const).map((p) => (
@@ -331,7 +332,7 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
                   onClick={() => setPeriod(p)}
                   className="h-7 px-2 text-xs"
                 >
-                  {p}d
+                  {p}일
                 </Button>
               ))}
             </div>
@@ -350,8 +351,8 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
               <div className="h-[300px] flex items-center justify-center text-gray-500 dark:text-gray-300">
                 <div className="text-center">
                   <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No data yet</p>
-                  <p className="text-xs mt-1">Stats will appear once community activity starts.</p>
+                  <p>아직 데이터가 없습니다</p>
+                  <p className="text-xs mt-1">커뮤니티 활동이 시작되면 통계가 표시됩니다</p>
                 </div>
               </div>
             )}
@@ -365,7 +366,7 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
             <div className="mb-4">
               <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-orange-500" />
-                Top posts
+                인기 게시물
               </h3>
             </div>
             <div>
@@ -400,7 +401,7 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
                 </div>
               ) : (
                 <div className="py-8 text-center text-gray-500 dark:text-gray-300">
-                  <p>No posts yet</p>
+                  <p>아직 게시물이 없습니다</p>
                 </div>
               )}
             </div>
@@ -411,7 +412,7 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
             <div className="mb-4">
               <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-yellow-500" />
-                Contributor leaderboard
+                기여자 랭킹
               </h3>
             </div>
             <div>
@@ -425,13 +426,14 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
                       <span className="text-lg font-bold text-gray-400 w-6 text-center">
                         {index + 1}
                       </span>
-                      <div className="relative w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                         {contributor.profileImage ? (
                           <Image
-                            src={contributor.profileImage}
+                            src={normalizeImageUrl(contributor.profileImage)}
                             alt={contributor.username}
-                            fill
-                            className="object-cover"
+                            width={32}
+                            height={32}
+                            className="w-full h-full object-cover"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-300 text-sm font-medium">
@@ -444,8 +446,8 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
                           @{contributor.username}
                         </p>
                         <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-300 mt-0.5">
-                          <span>Posts {contributor.postCount}</span>
-                          <span>Upvotes {contributor.upvoteCount}</span>
+                          <span>게시물 {contributor.postCount}</span>
+                          <span>업보트 {contributor.upvoteCount}</span>
                         </div>
                       </div>
                     </div>
@@ -453,7 +455,7 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
                 </div>
               ) : (
                 <div className="py-8 text-center text-gray-500 dark:text-gray-300">
-                  <p>No contributors yet</p>
+                  <p>아직 기여자가 없습니다</p>
                 </div>
               )}
             </div>

@@ -17,18 +17,22 @@ import {
   FiSettings,
   FiLogOut,
   FiChevronDown,
+  FiShield,
   FiBell,
-  FiBookOpen,
   FiHelpCircle,
-  FiCreditCard,
-  FiTrendingUp,
+  FiUsers,
+  FiMessageCircle,
   FiKey,
   FiFileText,
   FiBookmark
 } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
-import { canAccessSubscriptionUi } from '@/lib/subscription-access';
-import { routes } from '@/lib/navigation';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useMyCommunities } from '@/hooks/community/useCommunities';
 
 interface ProfileDropdownProps {
@@ -52,9 +56,6 @@ export default function ProfileDropdown({
   };
 
   const { data: myCommunities } = useMyCommunities({ enabled: !!user && mounted });
-  const canManageSubscription = canAccessSubscriptionUi(
-    user?.role?.toLowerCase() === 'admin'
-  );
 
   // 관리 중인 커뮤니티 필터링 (Owner or Moderator)
   const managedCommunities = myCommunities?.filter(community => 
@@ -71,25 +72,29 @@ export default function ProfileDropdown({
   }
 
   return (
-    <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label="Account menu"
-            className="flex items-center space-x-2 px-3 py-2 text-sm text-foreground rounded-md border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-gray-600"
-          >
-            <div className="flex items-center space-x-2">
-              <Avatar
-                src={user.profileImage}
-                alt={user.username}
-                fallback={user.username}
-                size="sm"
-              />
-              <span className="font-medium">{user.username}</span>
-              <FiChevronDown className="w-4 h-4" />
-            </div>
-          </button>
-        </DropdownMenuTrigger>
+    <TooltipProvider delayDuration={300}>
+      <DropdownMenu modal={false}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center space-x-2 px-3 py-2 text-sm text-foreground rounded-md border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-gray-600">
+                <div className="flex items-center space-x-2">
+                  <Avatar
+                    src={user.profileImage}
+                    alt={user.username}
+                    fallback={user.username}
+                    size="sm"
+                  />
+                  <span className="font-medium">{user.username}</span>
+                  <FiChevronDown className="w-4 h-4" />
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={5}>
+            <p className="text-sm">계정</p>
+          </TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>
           <div className="flex flex-col space-y-1">
@@ -99,38 +104,13 @@ export default function ProfileDropdown({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {/* 구독 관련 메뉴 (Feature Flag) */}
-        {canManageSubscription && (
-        <>
-        {/* 구독 관리 */}
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/account/subscription')}
-          className="cursor-pointer"
-        >
-          <FiCreditCard className="mr-2 h-4 w-4" />
-          <span>Manage subscription</span>
-        </DropdownMenuItem>
-
-        {/* 요금제 */}
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/pricing')}
-          className="cursor-pointer"
-        >
-          <FiTrendingUp className="mr-2 h-4 w-4" />
-          <span>Pricing</span>
-        </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-        </>
-        )}
-
         {/* Settings */}
         <DropdownMenuItem 
           onClick={() => handleNavigation('/settings')}
           className="cursor-pointer"
         >
           <FiUser className="mr-2 h-4 w-4" />
-          <span>Profile settings</span>
+          <span>프로필 설정</span>
         </DropdownMenuItem>
 
         {/* Blog Settings */}
@@ -139,15 +119,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiSettings className="mr-2 h-4 w-4" />
-          <span>Blog settings</span>
-        </DropdownMenuItem>
-
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/settings/api-keys')}
-          className="cursor-pointer"
-        >
-          <FiKey className="mr-2 h-4 w-4" />
-          <span>Auto-posting connection</span>
+          <span>블로그 설정</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -158,7 +130,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiFileText className="mr-2 h-4 w-4" />
-          <span>My drafts</span>
+          <span>내 초안</span>
         </DropdownMenuItem>
 
         {/* 북마크 */}
@@ -167,7 +139,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiBookmark className="mr-2 h-4 w-4" />
-          <span>Bookmarks</span>
+          <span>북마크</span>
         </DropdownMenuItem>
         
         {/* Managed Communities */}
@@ -175,7 +147,7 @@ export default function ProfileDropdown({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1.5">
-              Manage communities
+              커뮤니티 관리
             </DropdownMenuLabel>
             {managedCommunities.map((community) => (
               <DropdownMenuItem
@@ -196,19 +168,11 @@ export default function ProfileDropdown({
 
         {/* Customer Support */}
         <DropdownMenuItem
-          onClick={() => handleNavigation(routes.docs())}
-          className="cursor-pointer"
-        >
-          <FiBookOpen className="mr-2 h-4 w-4" />
-          <span>Guides</span>
-        </DropdownMenuItem>
-
-        <DropdownMenuItem
           onClick={() => handleNavigation('/support')}
           className="cursor-pointer"
         >
           <FiHelpCircle className="mr-2 h-4 w-4" />
-          <span>Support</span>
+          <span>고객센터</span>
         </DropdownMenuItem>
 
         {/* Notifications (Feature Flag) */}
@@ -218,7 +182,7 @@ export default function ProfileDropdown({
           className="cursor-pointer"
         >
           <FiBell className="mr-2 h-4 w-4" />
-          <span>Notifications</span>
+          <span>알림</span>
         </DropdownMenuItem>
         )}
 
@@ -230,9 +194,10 @@ export default function ProfileDropdown({
           className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
         >
           <FiLogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
+          <span>로그아웃</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
-    </DropdownMenu>
+      </DropdownMenu>
+    </TooltipProvider>
   );
 }

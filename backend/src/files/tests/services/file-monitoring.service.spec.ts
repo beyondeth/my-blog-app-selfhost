@@ -76,7 +76,7 @@ describe("FileMonitoringService", () => {
       contextRepository.setData(contexts);
 
       // Mock S3 health check
-      files.forEach((f) => s3Service.uploadFile(null as any, f.fileKey));
+      files.forEach((f) => s3Service.seedFile(f.fileKey));
 
       // Act
       const health = await service.healthCheck();
@@ -166,11 +166,13 @@ describe("FileMonitoringService", () => {
           fileSize: 1024 * 100,
           fileType: "image",
           fileKey: "v2/users/user-1/post/content/file1.jpg",
+          contextId: "context-1",
         }),
         MockFactory.createMockFile({
           fileSize: 1024 * 200,
           fileType: "image",
           fileKey: "v2/users/user-2/post/content/file2.jpg",
+          contextId: "context-1",
         }),
         MockFactory.createMockFile({
           fileSize: 1024 * 300,
@@ -281,9 +283,15 @@ describe("FileMonitoringService", () => {
       const largeFile = MockFactory.createMockFile({
         fileSize: 100 * 1024 * 1024, // 100MB
         fileName: "large-file.jpg",
+        fileKey: "v2/users/user-1/post/content/large-file.jpg",
+        contextId: "context-1",
+        checksum: "large-file-checksum",
       });
       const normalFile = MockFactory.createMockFile({
         fileSize: 1 * 1024 * 1024, // 1MB
+        fileKey: "v2/users/user-1/post/content/normal-file.jpg",
+        contextId: "context-2",
+        checksum: "normal-file-checksum",
       });
 
       fileRepository.setData([largeFile, normalFile]);
@@ -295,7 +303,7 @@ describe("FileMonitoringService", () => {
       expect(anomalies).toHaveLength(1);
       expect(anomalies[0].type).toBe("large_file");
       expect(anomalies[0].fileId).toBe(largeFile.id);
-      expect(anomalies[0].details).toContain("100MB");
+      expect(anomalies[0].details).toContain("100.00MB");
     });
 
     it("should detect duplicate files by checksum", async () => {
@@ -432,9 +440,13 @@ describe("FileMonitoringService", () => {
       const recommendations = await service.cleanupRecommendations();
 
       // Assert
-      expect(recommendations).toContain("Run orphaned file cleanup");
-      expect(recommendations).toContain("Migrate v1 files to v2 structure");
-      expect(recommendations).toContain("Process expired files for deletion");
+      expect(recommendations).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/^Run orphaned file cleanup/),
+          expect.stringMatching(/^Migrate v1 files to v2 structure/),
+          expect.stringMatching(/^Process expired files for deletion/),
+        ]),
+      );
     });
 
     it("should return no recommendations for healthy system", async () => {

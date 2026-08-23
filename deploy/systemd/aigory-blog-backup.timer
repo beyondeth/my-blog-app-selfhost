@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Aigory PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 18:25:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+Unit=aigory-blog-backup.service
+
+[Install]
+WantedBy=timers.target

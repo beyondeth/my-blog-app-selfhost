@@ -14,6 +14,7 @@ import { FilesAPI, createFilesAPI } from './endpoints/files';
 import { UsersAPI, createUsersAPI } from './endpoints/users';
 import { ChatAPI, createChatAPI } from './endpoints/chat';
 import { AdminAPI, createAdminAPI } from './endpoints/admin';
+import type { CreatePostRequest, PostForm } from '@/types';
 
 // Types re-export
 export * from './types';
@@ -71,8 +72,10 @@ export class ExtendedApiClient extends ApiClient {
   async getPostBySlug(slug: string, options?: { fresh?: boolean }) {
     return this.posts.getPostBySlug(slug, options);
   }
-  async createPost(data: any) { return this.posts.createPost(data); }
-  async updatePost(id: string, data: any) { return this.posts.updatePost(id, data); }
+  async createPost(data: CreatePostRequest | Record<string, unknown>) {
+    return this.posts.createPost(data as CreatePostRequest);
+  }
+  async updatePost(id: string, data: Partial<PostForm>) { return this.posts.updatePost(id, data); }
   async updatePostVisibility(
     id: string,
     visibility: 'public' | 'private',
@@ -230,8 +233,9 @@ export const getPosts = (params?: any) => apiClient.getPosts(params);
 export const getPost = (id: string) => apiClient.getPost(id);
 export const getPostBySlug = (slug: string, options?: { fresh?: boolean }) =>
   apiClient.getPostBySlug(slug, options);
-export const createPost = (data: any) => apiClient.createPost(data);
-export const updatePost = (id: string, data: any) => apiClient.updatePost(id, data);
+export const createPost = (data: CreatePostRequest | Record<string, unknown>) =>
+  apiClient.createPost(data);
+export const updatePost = (id: string, data: Partial<PostForm>) => apiClient.updatePost(id, data);
 export const updatePostVisibility = (
   id: string,
   visibility: 'public' | 'private',
@@ -270,8 +274,9 @@ export const postsAPI = {
   getPost: (id: string) => apiClient.getPost(id),
   getPostBySlug: (slug: string, options?: { fresh?: boolean }) =>
     apiClient.getPostBySlug(slug, options),
-  createPost: (data: any) => apiClient.createPost(data),
-  updatePost: (id: string, data: any) => apiClient.updatePost(id, data),
+  createPost: (data: CreatePostRequest | Record<string, unknown>) =>
+    apiClient.createPost(data),
+  updatePost: (id: string, data: Partial<PostForm>) => apiClient.updatePost(id, data),
   updatePostVisibility: (
     id: string,
     visibility: 'public' | 'private',

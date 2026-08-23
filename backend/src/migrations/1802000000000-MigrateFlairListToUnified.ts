@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class MigrateFlairListToUnified1801000000001
+export class MigrateFlairListToUnified1802000000000
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {

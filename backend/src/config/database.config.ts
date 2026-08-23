@@ -1,15 +1,27 @@
 import { registerAs } from "@nestjs/config";
 import { TypeOrmModuleOptions } from "@nestjs/typeorm";
+import { ORDERED_MIGRATIONS } from "../migrations/migration-manifest";
 
 export default registerAs("database", (): TypeOrmModuleOptions => {
   const dbUrl = process.env.DB_URL || process.env.DATABASE_URL;
+  const isProduction = process.env.NODE_ENV === "production";
+  const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false";
+
+  const getSslConfig = (enabled: boolean) =>
+    enabled
+      ? {
+          rejectUnauthorized,
+          ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : {}),
+        }
+      : undefined;
 
   const baseConfig: TypeOrmModuleOptions = {
     type: "postgres",
     entities: [__dirname + "/../**/*.entity{.ts,.js}"],
-    synchronize: process.env.NODE_ENV === "development",
+    // Schema changes must always go through reviewed TypeORM migrations.
+    synchronize: false,
     logging: process.env.NODE_ENV === "development",
-    migrations: [__dirname + "/../migrations/*{.ts,.js}"],
+    migrations: ORDERED_MIGRATIONS,
     migrationsRun: false,
     // 추가 TypeORM 옵션
     maxQueryExecutionTime: 1000, // 1초 이상 걸리는 쿼리 로깅
@@ -23,12 +35,19 @@ export default registerAs("database", (): TypeOrmModuleOptions => {
   // DB_URL이 있는 경우 (AWS RDS 등)
   if (dbUrl) {
     // 로컬 데이터베이스인 경우 SSL 비활성화
-    const isLocal = dbUrl.includes("localhost") || dbUrl.includes("127.0.0.1");
+    const isLocal =
+      dbUrl.includes("localhost") ||
+      dbUrl.includes("127.0.0.1") ||
+      dbUrl.includes("[::1]");
+    const sslEnabled =
+      process.env.DB_SSL_ENABLED === "true" ||
+      (process.env.DB_SSL_ENABLED === undefined && !isLocal);
+    const ssl = getSslConfig(sslEnabled);
 
     return {
       ...baseConfig,
       url: dbUrl,
-      ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
+      ...(ssl ? { ssl } : {}),
       extra: {
         // Connection Pool 설정
         max: parseInt(process.env.DB_POOL_SIZE || "100", 10), // 동시 요청 처리를 위해 증가
@@ -43,19 +62,29 @@ export default registerAs("database", (): TypeOrmModuleOptions => {
           10,
         ),
         query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || "30000", 10),
-        ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
+        ...(ssl ? { ssl } : {}),
       },
     };
   }
 
   // 개별 환경 변수 사용 (로컬 개발)
+  const host = process.env.DB_HOST || "localhost";
+  const isLocalHost = ["localhost", "127.0.0.1", "::1", "postgres"].includes(
+    host,
+  );
+  const ssl = getSslConfig(
+    process.env.DB_SSL_ENABLED === "true" ||
+      (isProduction && !isLocalHost && process.env.DOCKERIZED !== "true"),
+  );
+
   return {
     ...baseConfig,
-    host: process.env.DB_HOST || "localhost",
+    host,
     port: parseInt(process.env.DB_PORT || "5432", 10),
     username: process.env.DB_USERNAME || "postgres",
     password: process.env.DB_PASSWORD || "postgres",
     database: process.env.DB_DATABASE || "blog-db",
+    ...(ssl ? { ssl } : {}),
     extra: {
       // Connection Pool 설정
       max: parseInt(process.env.DB_POOL_SIZE || "20", 10),
@@ -70,6 +99,7 @@ export default registerAs("database", (): TypeOrmModuleOptions => {
         10,
       ),
       query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || "30000", 10),
+      ...(ssl ? { ssl } : {}),
     },
   };
 });

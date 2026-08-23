@@ -108,6 +108,12 @@ export class CdnService {
     s3Key: string,
     mimeType: string = "image/jpeg",
   ): string {
+    // 캐릭터 이미지는 프론트엔드 public 폴더의 정적 리소스입니다.
+    // Object Storage 프록시 URL로 변환하면 존재하지 않는 uploads/ 키를 조회하게 됩니다.
+    if (s3Key.startsWith("/character/") || s3Key.startsWith("character/")) {
+      return s3Key.startsWith("/") ? s3Key : `/${s3Key}`;
+    }
+
     // 캐시 키 생성 (s3Key + mimeType로 고유 키)
     const cacheKey = `${s3Key}:${mimeType}`;
 
@@ -313,18 +319,6 @@ export class CdnService {
    * Private: Object Storage 직접 URL 생성 (AWS S3 또는 OCI)
    */
   private generateS3Url(key: string): string {
-    // Docker 개발 환경 감지
-    const isDockerDev =
-      process.env.NODE_ENV === "development" &&
-      process.env.DOCKERIZED === "true";
-
-    if (isDockerDev) {
-      // Docker 환경에서는 내부 네트워크 URL을 통한 파일 프록시 사용
-      const backendUrl =
-        process.env.INTERNAL_BACKEND_URL || "http://backend:3000";
-      return `${backendUrl}/api/v1/files/proxy/${key}`;
-    }
-
     // 환경변수 직접 읽기 (ConfigService 네임스페이스가 없을 경우 대비)
     const bucket =
       this.configService.get("AWS_S3_BUCKET") ||
@@ -332,15 +326,33 @@ export class CdnService {
     const region =
       this.configService.get("AWS_REGION") ||
       this.configService.get("s3.region");
-    const storageProvider = this.configService.get("STORAGE_PROVIDER", "aws");
+    const storageProvider = String(
+      this.configService.get("STORAGE_PROVIDER", "aws"),
+    ).toLowerCase();
     const ociNamespace = this.configService.get("OCI_NAMESPACE");
+    const cleanKey = key.replace(/^\/+/, "");
+
+    // MinIO is private by default in the self-hosted stack. Render it through
+    // the public backend proxy so the browser never needs direct bucket read
+    // permissions and never sees a Docker-only hostname.
+    const publicBackendUrl =
+      this.configService.get<string>("PUBLIC_BACKEND_URL");
+    if (storageProvider === "minio" && publicBackendUrl) {
+      return `${publicBackendUrl.replace(/\/$/, "")}/api/v1/files/proxy/${encodeURI(cleanKey)}`;
+    }
+
+    const publicStorageUrl =
+      this.configService.get<string>("STORAGE_PUBLIC_URL");
+    if (publicStorageUrl) {
+      return `${publicStorageUrl.replace(/\/$/, "")}/${encodeURI(cleanKey)}`;
+    }
 
     if (storageProvider === "oci" && ociNamespace) {
       // OCI Object Storage URL 형식 (Path-style)
-      return `https://${ociNamespace}.compat.objectstorage.${region}.oraclecloud.com/${bucket}/${key}`;
+      return `https://${ociNamespace}.compat.objectstorage.${region}.oraclecloud.com/${bucket}/${cleanKey}`;
     } else {
       // AWS S3 URL 형식
-      return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+      return `https://${bucket}.s3.${region}.amazonaws.com/${cleanKey}`;
     }
   }
 

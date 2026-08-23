@@ -9,6 +9,7 @@ import { McpApiKeyService } from "../services/mcp-api-key.service";
 import { UsersService } from "../../users/users.service";
 import { BlogsService } from "../../blogs/blogs.service";
 import { ConfigService } from "@nestjs/config";
+import { assertInternalMcpSecret } from "../../common/guards/internal-mcp.guard";
 
 /**
  * API Key / OAuth 인증 가드
@@ -31,21 +32,18 @@ import { ConfigService } from "@nestjs/config";
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   private readonly logger = new Logger(ApiKeyGuard.name);
-  private readonly sharedSecret?: string;
 
   constructor(
     private readonly mcpApiKeyService: McpApiKeyService,
     private readonly usersService: UsersService,
     private readonly blogsService: BlogsService,
     private readonly configService: ConfigService,
-  ) {
-    this.sharedSecret = this.configService.get<string>("MCP_SHARED_SECRET");
-  }
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
-    this.validateSharedSecret(request);
+    assertInternalMcpSecret(request, this.configService, this.logger);
 
     // 1. X-API-Key 헤더 확인 (기존 API Key 인증)
     const apiKey = request.headers["x-api-key"];
@@ -86,6 +84,8 @@ export class ApiKeyGuard implements CanActivate {
         keyId: mcpApiKey.id,
         userId: mcpApiKey.userId,
         blogId: mcpApiKey.blogId,
+        organizationId:
+          mcpApiKey.organizationId || mcpApiKey.blog.organizationId,
         user: {
           id: mcpApiKey.user.id,
           username: mcpApiKey.user.username,
@@ -150,6 +150,7 @@ export class ApiKeyGuard implements CanActivate {
         keyId: `oauth:${userId}`,
         userId: user.id,
         blogId: blog.id,
+        organizationId: blog.organizationId,
         user: {
           id: user.id,
           username: user.username,
@@ -174,21 +175,6 @@ export class ApiKeyGuard implements CanActivate {
       }
       this.logger.warn(`❌ OAuth validation failed: ${error.message}`);
       throw new UnauthorizedException("OAuth validation failed");
-    }
-  }
-
-  private validateSharedSecret(request: any): void {
-    if (!this.sharedSecret) {
-      return;
-    }
-
-    const providedSecret =
-      request.headers["x-internal-secret"] ||
-      request.headers["X-Internal-Secret"];
-
-    if (!providedSecret || providedSecret !== this.sharedSecret) {
-      this.logger.warn("Missing or invalid internal MCP secret");
-      throw new UnauthorizedException("Invalid internal signature");
     }
   }
 }

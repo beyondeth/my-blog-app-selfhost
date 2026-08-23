@@ -43,7 +43,7 @@ export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
 // 리소스 타입 열거형 (사용량 추적용)
 export const ResourceType = {
   POST: "post", // 일반 사용자 작성 포스트 (무제한)
-  MCP_POST: "mcp_post", // MCP 자동포스팅 (제한 적용)
+  MCP_POST: "mcp_post", // MCP 자동포스팅 (v1 self-hosted usage is unlimited)
   BLOG: "blog", // 블로그 (모든 플랜 1개)
   STORAGE: "storage",
   VIEWS: "views",

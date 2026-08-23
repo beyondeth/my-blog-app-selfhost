@@ -147,7 +147,7 @@ export default function MockHomeShellPage() {
                 <span className="absolute -bottom-1 left-2 h-3 w-3 rotate-45 bg-slate-900 dark:bg-emerald-400" />
               </div>
               <div>
-                <p className="text-base font-semibold">codebase.blog</p>
+                <p className="text-base font-semibold">aigory.com</p>
                 <p className="text-xs text-slate-600 dark:text-slate-300">
                   AI + OSS community newsroom
                 </p>

@@ -3,7 +3,6 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
-  Logger,
 } from "@nestjs/common";
 import * as crypto from "crypto";
 
@@ -15,7 +14,6 @@ import * as crypto from "crypto";
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
-  private readonly logger = new Logger(CsrfGuard.name);
   private readonly TOKEN_HEADER = "x-csrf-token";
 
   /**
@@ -41,6 +39,24 @@ export class CsrfGuard implements CanActivate {
 
     // GET, HEAD, OPTIONS 요청은 검증하지 않음
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+      return true;
+    }
+
+    // Bearer/API-key/internal service requests do not rely on browser cookies.
+    // CSRF protection is for cookie-authenticated browser requests only.
+    if (
+      req.headers.authorization ||
+      req.headers["x-api-key"] ||
+      req.headers["x-internal-secret"] ||
+      req.headers["x-oauth-user-id"]
+    ) {
+      return true;
+    }
+
+    // Mobile clients may submit a refresh token in the body and do not have
+    // browser cookies to protect. Cookie-authenticated requests continue
+    // through the session-backed token check below.
+    if (!req.cookies?.access_token && !req.cookies?.refresh_token) {
       return true;
     }
 
@@ -87,14 +103,17 @@ export class CsrfGuard implements CanActivate {
     const referer = req.headers.referer || req.headers.origin;
     if (referer) {
       const expectedHost = req.get("host");
-      const refererUrl = new URL(referer);
+      let refererUrl: URL;
+
+      try {
+        refererUrl = new URL(referer);
+      } catch {
+        throw new UnauthorizedException("CSRF origin이 유효하지 않습니다");
+      }
 
       // Referer가 같은 호스트에서 온 것인지 확인
       if (refererUrl.host !== expectedHost) {
-        this.logger.warn(
-          `CSRF: Referer 불일치 - Expected: ${expectedHost}, Got: ${refererUrl.host}`,
-        );
-        // 경고만 하고 통과시킴 (일부 브라우저는 Referer를 보내지 않을 수 있음)
+        throw new UnauthorizedException("CSRF origin이 일치하지 않습니다");
       }
     }
 

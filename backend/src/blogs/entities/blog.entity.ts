@@ -12,6 +12,7 @@ import {
 import { v7 as uuidv7 } from "uuid";
 import { User } from "../../users/entities/user.entity";
 import { Post } from "../../posts/entities/post.entity";
+import { Organization } from "../../organizations/entities/organization.entity";
 
 export type BlogImageFit = "cover" | "contain";
 
@@ -88,6 +89,14 @@ export class Blog {
 
   @Column({ nullable: true })
   description: string; // 블로그 설명
+
+  /** Tenant boundary. Nullable during the migration/backfill window. */
+  @Column({ type: "uuid", nullable: true })
+  organizationId: string | null;
+
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "organizationId" })
+  organization: Organization | null;
 
   @Column({ nullable: true, name: "thumbnailUrl" })
   thumbnailUrl: string; // 블로그 썸네일

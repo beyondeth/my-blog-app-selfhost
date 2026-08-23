@@ -15,7 +15,6 @@ import { CdnService } from "../../files/services/cdn.service";
 import { R2Service } from "../../files/services/r2.service";
 import { VoteType } from "../enums/vote-type.enum";
 import { UrlSanitizerUtil } from "../../common/utils/url-sanitizer.util";
-import { PostAccessPolicyService } from "./post-access-policy.service";
 
 /**
  * Post 관련 DTO 변환을 담당하는 서비스
@@ -35,7 +34,6 @@ export class PostMapperService {
     private readonly filesRepository: Repository<File>,
     @InjectRepository(Video)
     private readonly videoRepository: Repository<Video>,
-    private readonly postAccessPolicyService: PostAccessPolicyService,
     private readonly filesService: FilesService,
     private readonly cdnService: CdnService,
     private readonly r2Service: R2Service,
@@ -58,6 +56,7 @@ export class PostMapperService {
       viewer?: User;
       blog?: Blog;
       exposeGithubResourceUrl?: boolean;
+      attachedFiles?: File[];
     },
   ): Promise<PostResponseDto> {
     // plainToInstance로 자동 변환 (@Expose 필드만 포함됨)
@@ -78,20 +77,6 @@ export class PostMapperService {
     dto.title = sanitizeString(dto.title, 500) ?? "";
     dto.excerpt = sanitizeString(dto.excerpt, 2000) ?? "";
     dto.category = sanitizeString(dto.category, 120) ?? "";
-    const githubDescriptionSource =
-      post.metadata?.githubDescription ?? (post as any).githubDescription;
-    const githubUrlSource = post.metadata?.githubUrl ?? (post as any).githubUrl;
-    const hasGithubResourceSource =
-      typeof (post as any).hasGithubResource === "boolean"
-        ? (post as any).hasGithubResource
-        : Boolean(githubUrlSource);
-
-    dto.githubDescription = sanitizeString(githubDescriptionSource, 240) ?? null;
-    dto.hasGithubResource = hasGithubResourceSource;
-    dto.githubUrl =
-      options?.exposeGithubResourceUrl && options.viewer && githubUrlSource
-        ? sanitizeString(githubUrlSource, 500) ?? null
-        : null;
 
     // 추가 필드 설정
     if (options) {
@@ -132,19 +117,6 @@ export class PostMapperService {
       .map((tag: string) => UrlSanitizerUtil.sanitizeDisplayText(tag, 64))
       .filter((tag) => !!tag);
 
-    // 포스트 유형 + 상품 상세 정보
-    dto.postType = post.postType || "blog";
-    if (post.productDetail) {
-      dto.productDetail = {
-        price: post.productDetail.price,
-        currency: post.productDetail.currency,
-        productCategory: post.productDetail.productCategory,
-        salesCount: post.productDetail.salesCount,
-        isActive: post.productDetail.isActive,
-        deliveryType: post.productDetail.deliveryType,
-      };
-    }
-
     // Editor's Pick 정보는 PostMetadata가 단일 소스이므로 명시적으로 덮어씀
     dto.isEditorPick =
       post.metadata?.isEditorPick ?? post.isEditorPick ?? false;
@@ -164,19 +136,6 @@ export class PostMapperService {
     if (dto.userVote === undefined) {
       dto.userVote = null;
     }
-
-    // 저장 visibility와 실제 노출 visibility를 분리해 응답한다.
-    // (blog 전체 비공개 게이트가 개별 공개를 막는 경우를 프론트에서 명확히 안내하기 위함)
-    const sourceBlog = options?.blog || post.blog;
-    dto.effectiveVisibility = this.postAccessPolicyService.getEffectiveVisibility(
-      post,
-      sourceBlog,
-    );
-    dto.visibilityBlockedByBlogPrivacy =
-      this.postAccessPolicyService.isVisibilityBlockedByBlogPrivacy(
-        post,
-        sourceBlog,
-      );
 
     // 썸네일 URL 처리
     if (process.env.NODE_ENV === "development") {
@@ -218,14 +177,9 @@ export class PostMapperService {
             this.logger.debug(`  - Generated CDN URL: ${thumbnailUrl}`);
           }
 
-          // 캐시 버스팅을 위한 타임스탬프 추가
-          if (post.updatedAt && thumbnailUrl && !thumbnailUrl.includes("v=")) {
-            const timestamp = new Date(post.updatedAt).getTime();
-            const separator = thumbnailUrl.includes("?") ? "&" : "?";
-            dto.thumbnail = `${thumbnailUrl}${separator}v=${timestamp}`;
-          } else {
-            dto.thumbnail = thumbnailUrl;
-          }
+          // 업로드 키는 UUID 기반 불변 키이므로 URL도 안정적으로 유지한다.
+          // Next.js 16은 로컬 이미지 URL의 임의 query string을 기본 차단한다.
+          dto.thumbnail = thumbnailUrl;
 
           if (process.env.NODE_ENV === "development") {
             this.logger.log(
@@ -272,18 +226,7 @@ export class PostMapperService {
               thumbnailFile.mimeType || "image/jpeg",
             );
 
-            // 캐시 버스팅을 위한 타임스탬프 추가
-            if (
-              post.updatedAt &&
-              thumbnailUrl &&
-              !thumbnailUrl.includes("v=")
-            ) {
-              const timestamp = new Date(post.updatedAt).getTime();
-              const separator = thumbnailUrl.includes("?") ? "&" : "?";
-              dto.thumbnail = `${thumbnailUrl}${separator}v=${timestamp}`;
-            } else {
-              dto.thumbnail = thumbnailUrl;
-            }
+            dto.thumbnail = thumbnailUrl;
 
             if (process.env.NODE_ENV === "development") {
               this.logger.log(
@@ -361,9 +304,13 @@ export class PostMapperService {
       }
     }
 
+    const attachedFiles = options?.attachedFiles ?? post.attachedFiles;
+    const attachedFilesLoaded =
+      options?.attachedFiles !== undefined || post.attachedFiles !== undefined;
+
     // 첨부 파일 처리
-    if (post.attachedFiles) {
-      dto.attachedFiles = post.attachedFiles.map((file) => ({
+    if (attachedFiles) {
+      dto.attachedFiles = attachedFiles.map((file) => ({
         id: file.id,
         fileName: file.fileName,
         originalName: file.originalName,
@@ -378,15 +325,15 @@ export class PostMapperService {
     }
 
     // 포스트 내용의 이미지에 data-image-id 속성 추가 (기존 이미지들)
-    if (dto.content && post.attachedFiles && post.attachedFiles.length > 0) {
+    if (dto.content && attachedFiles && attachedFiles.length > 0) {
       this.logger.log(
-        `[POST_MAPPER] Processing post ${post.id} with ${post.attachedFiles.length} attached files`,
+        `[POST_MAPPER] Processing post ${post.id} with ${attachedFiles.length} attached files`,
       );
       this.logger.debug(
         `[POST_MAPPER] Sample content snippet: ${dto.content.substring(0, 200)}...`,
       );
       const originalContent = dto.content;
-      dto.content = this.addImageIdAttributes(dto.content, post.attachedFiles);
+      dto.content = this.addImageIdAttributes(dto.content, attachedFiles);
 
       // 변경이 있었는지 확인
       if (originalContent !== dto.content) {
@@ -406,11 +353,15 @@ export class PostMapperService {
       }
     } else if (!dto.content) {
       this.logger.debug(`[POST_MAPPER] Post ${post.id} has no content`);
-    } else if (!post.attachedFiles || post.attachedFiles.length === 0) {
+    } else if (!attachedFiles || attachedFiles.length === 0) {
       this.logger.debug(`[POST_MAPPER] Post ${post.id} has no attached files`);
     }
 
-    dto.images = await this.resolvePostImageUrls(post);
+    dto.images = await this.resolvePostImageUrls(
+      post,
+      attachedFiles,
+      attachedFilesLoaded,
+    );
     if (
       (!dto.images || dto.images.length === 0) &&
       (post.content || post.content_markdown)
@@ -504,13 +455,15 @@ export class PostMapperService {
       return null;
     }
 
-    if (file.fileUrl && file.fileUrl.startsWith("http")) {
-      return file.fileUrl;
-    }
-
     const key = file.fileKey || file.fileUrl;
     if (!key) {
       return file.fileUrl || null;
+    }
+
+    // fileUrl can contain a stale provider-specific URL (for example an old
+    // AWS S3 URL). Prefer the canonical storage key whenever it is available.
+    if (key.startsWith("http")) {
+      return key;
     }
 
     try {
@@ -527,14 +480,63 @@ export class PostMapperService {
     }
   }
 
-  private async resolvePostImageUrls(post: Post): Promise<string[]> {
+  async getAttachedImageFilesByPostIds(
+    postIds: string[],
+  ): Promise<Map<string, File[]>> {
+    const filesByPostId = new Map<string, File[]>();
+    for (const postId of postIds) {
+      filesByPostId.set(postId, []);
+    }
+
+    if (postIds.length === 0) {
+      return filesByPostId;
+    }
+
+    const rows: Array<File & { postId: string }> =
+      await this.filesRepository.query(
+        `SELECT
+           pf."postId" AS "postId",
+           f.id,
+           f.original_name AS "originalName",
+           f.file_name AS "fileName",
+           f.file_key AS "fileKey",
+           f.file_url AS "fileUrl",
+           f.file_size AS "fileSize",
+           f.mime_type AS "mimeType",
+           f.file_type AS "fileType",
+           f.created_at AS "createdAt",
+           f.updated_at AS "updatedAt"
+         FROM post_files pf
+         INNER JOIN files f ON f.id = pf."fileId"
+         WHERE pf."postId" = ANY($1::uuid[])
+           AND (f.mime_type ILIKE 'image/%' OR f.file_type = 'image')
+         ORDER BY
+           pf."postId" ASC,
+           pf.image_order ASC NULLS LAST,
+           f.created_at ASC,
+           f.id ASC`,
+        [postIds],
+      );
+
+    for (const row of rows) {
+      filesByPostId.get(row.postId)?.push(row);
+    }
+
+    return filesByPostId;
+  }
+
+  private async resolvePostImageUrls(
+    post: Post,
+    attachedFiles: File[] | undefined = post.attachedFiles,
+    attachedFilesLoaded: boolean = post.attachedFiles !== undefined,
+  ): Promise<string[]> {
     if (!post?.id) {
       return [];
     }
 
-    let files: File[] = post.attachedFiles ?? [];
+    let files: File[] = attachedFiles ?? [];
 
-    if (!files.length) {
+    if (!files.length && !attachedFilesLoaded) {
       files = await this.filesRepository
         .createQueryBuilder("file")
         .innerJoin("post_files", "pf", 'pf."fileId" = file.id')
@@ -546,7 +548,9 @@ export class PostMapperService {
             imageType: "image",
           },
         )
-        .orderBy("file.createdAt", "ASC")
+        .orderBy("pf.image_order", "ASC", "NULLS LAST")
+        .addOrderBy("file.createdAt", "ASC")
+        .addOrderBy("file.id", "ASC")
         .getMany();
     }
 

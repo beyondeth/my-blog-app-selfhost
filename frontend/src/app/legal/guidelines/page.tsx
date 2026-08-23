@@ -1,23 +1,18 @@
 import { Metadata } from 'next';
 import LegalPageLayout from '@/components/legal/LegalPageLayout';
-import { getRequestLocale } from '@/lib/i18n/server';
-import { getLegalCopy } from '@/lib/legal';
-import { getLegalPageMetadata } from '../_shared';
 
-export async function generateMetadata(): Promise<Metadata> {
-  return getLegalPageMetadata('community-guidelines');
-}
+export const metadata: Metadata = {
+  title: '커뮤니티 가이드라인 | Aigory',
+  description: 'Aigory의 커뮤니티 운영 기준을 확인하세요.',
+};
 
 /**
  * 커뮤니티 가이드라인 페이지
  */
-export default async function GuidelinesPage() {
-  const locale = await getRequestLocale();
-  const copy = getLegalCopy(locale, 'community-guidelines');
-
+export default function GuidelinesPage() {
   return (
     <LegalPageLayout
-      title={copy.title}
+      title="커뮤니티 가이드라인"
       documentType="community-guidelines"
     />
   );

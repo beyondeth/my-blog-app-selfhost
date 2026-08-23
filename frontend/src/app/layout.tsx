@@ -1,17 +1,15 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
-import 'klaro/dist/klaro.css';
 import "./globals.css";
 import '@/editor/styles/editor.css';  // 전역 로드 - 포스트 페이지 CSS preload 경고 해결
 import LayoutClient from './layout-client';
 import { SocketProvider } from '@/providers/SocketProvider';
-import { LocaleProvider } from '@/providers/LocaleProvider';
 
 // 동적 렌더링 강제 - prerendering 시 useContext 오류 방지
 export const dynamic = 'force-dynamic';
 
 // metadataBase를 환경 변수에서 동적으로 설정
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
 /**
  * 루트 레이아웃 - 서버 컴포넌트
@@ -22,15 +20,14 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Codebase | AI knowledge publishing for builders',
-    template: '%s | Codebase',
+    default: 'Aigory - 블로그 자동포스팅 MCP',
+    template: '%s | Aigory',
   },
-  description:
-    'Turn AI conversations into structured posts, docs, and reusable knowledge for teams and builders.',
-  keywords: ['AI publishing', 'MCP', 'AI community', 'prompt workflows', 'knowledge base'],
-  authors: [{ name: 'Codebase' }],
-  creator: 'Codebase',
-  publisher: 'Codebase',
+  description: 'AI 자동포스팅 전문 블로그 플랫폼. MCP 를 이용한 블로그 자동화.',
+  keywords: ['개발 블로그', '기술 블로그', '바이브코딩', '일상공유', '커뮤니티'],
+  authors: [{ name: 'Aigory' }],
+  creator: 'Aigory',
+  publisher: 'Aigory',
   robots: {
     index: true,
     follow: true,
@@ -44,27 +41,25 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    locale: 'en_US',
+    locale: 'ko_KR',
     url: siteUrl,
-    title: 'Codebase | AI knowledge publishing for builders',
-    description:
-      'Turn AI conversations into structured posts, docs, and reusable knowledge for teams and builders.',
-    siteName: 'Codebase',
+    title: 'Aigory - 블로그 자동포스팅 MCP',
+    description: 'AI 자동포스팅 전문 블로그 플랫폼. MCP 를 이용한 블로그 자동화.',
+    siteName: 'Aigory',
     images: [
       {
-        url: '/og-image-v2.png',
+        url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Codebase product preview',
+        alt: '블로그 자동포스팅',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Codebase | AI knowledge publishing for builders',
-    description:
-      'Turn AI conversations into structured posts, docs, and reusable knowledge for teams and builders.',
-    images: ['/og-image-v2.png'],
+    title: 'Aigory - 블로그 자동포스팅 MCP',
+    description: 'AI 자동포스팅 전문 블로그 플랫폼. MCP 를 이용한 블로그 자동화.',
+    images: ['/og-image.png'],
   },
   icons: {
     icon: '/favicon.ico',
@@ -72,15 +67,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const locale = 'en';
-
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang="ko" suppressHydrationWarning>
       <head>
         {/* Pretendard Font - preload for LCP optimization */}
         <link
@@ -107,17 +100,6 @@ export default async function RootLayout({
         />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
-          rel="preload"
-          href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..600,0..100&family=Google+Sans+Code:ital,wght@0,400;0,500;1,400&display=swap"
-          as="style"
-        />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..600,0..100&family=Google+Sans+Code:ital,wght@0,400;0,500;1,400&display=swap"
-        />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />
@@ -135,17 +117,15 @@ export default async function RootLayout({
       <body
         className="bg-background text-foreground"
         style={{
-          fontFamily: 'Pretendard Variable, Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif'
+          fontFamily: 'Pretendard Variable, Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif'
         }}
         suppressHydrationWarning={true}
       >
-        <LocaleProvider locale={locale}>
-          <LayoutClient>
-            <SocketProvider>
-              {children}
-            </SocketProvider>
-          </LayoutClient>
-        </LocaleProvider>
+        <LayoutClient>
+          <SocketProvider>
+            {children}
+          </SocketProvider>
+        </LayoutClient>
       </body>
     </html>
   );

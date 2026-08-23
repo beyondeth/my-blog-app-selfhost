@@ -17,12 +17,17 @@ import { CdnService } from "./cdn.service";
 import { v4 as uuidv4 } from "uuid";
 import * as path from "path";
 import * as crypto from "crypto";
+import {
+  SAFE_IMAGE_MIME_TYPES,
+  validateImageBuffer,
+} from "../../common/utils/file.utils";
 
 export interface UploadContext {
   contextType: FileContextType;
   contextId?: string;
   ownerId: string;
   purpose: FilePurpose;
+  organizationId?: string;
   metadata?: Record<string, any>;
 }
 
@@ -57,12 +62,19 @@ export class ContextualFileService {
     userId: string,
     file: Express.Multer.File,
     purpose: "avatar" | "cover" = "avatar",
+    organizationId?: string,
   ): Promise<FileUploadResult> {
+    this.assertValidImageFile(
+      file,
+      this.getMaxFileSizeForContext(FileContextType.PROFILE),
+    );
+
     // 기존 프로필 이미지 비활성화
     await this.deactivatePreviousFiles(
       FileContextType.PROFILE,
       userId,
       purpose as FilePurpose,
+      organizationId,
     );
 
     const s3Key = this.generateS3Key(
@@ -76,6 +88,7 @@ export class ContextualFileService {
       contextId: userId,
       ownerId: userId,
       purpose: purpose as FilePurpose,
+      organizationId,
     });
 
     return this.uploadWithContextInternal(s3Key, file, context);
@@ -88,7 +101,13 @@ export class ContextualFileService {
     userId: string,
     postId: string,
     file: Express.Multer.File,
+    organizationId?: string,
   ): Promise<FileUploadResult> {
+    this.assertValidImageFile(
+      file,
+      this.getMaxFileSizeForContext(FileContextType.POST),
+    );
+
     const s3Key = this.generateS3Key(
       FileContextType.POST,
       userId,
@@ -101,6 +120,7 @@ export class ContextualFileService {
       contextId: postId,
       ownerId: userId,
       purpose: FilePurpose.CONTENT,
+      organizationId,
     });
 
     return this.uploadWithContextInternal(s3Key, file, context);
@@ -114,12 +134,19 @@ export class ContextualFileService {
     blogId: string,
     file: Express.Multer.File,
     purpose: "logo" | "banner" | "favicon",
+    organizationId?: string,
   ): Promise<FileUploadResult> {
+    this.assertValidImageFile(
+      file,
+      this.getMaxFileSizeForContext(FileContextType.BLOG),
+    );
+
     // 기존 브랜딩 이미지 비활성화
     await this.deactivatePreviousFiles(
       FileContextType.BLOG,
       blogId,
       purpose as FilePurpose,
+      organizationId,
     );
 
     const s3Key = this.generateS3Key(
@@ -133,6 +160,7 @@ export class ContextualFileService {
       contextId: blogId,
       ownerId: userId,
       purpose: purpose as FilePurpose,
+      organizationId,
     });
 
     return this.uploadWithContextInternal(s3Key, file, context);
@@ -146,12 +174,19 @@ export class ContextualFileService {
     communityId: string,
     file: Express.Multer.File,
     purpose: "icon" | "banner",
+    organizationId?: string,
   ): Promise<FileUploadResult> {
+    this.assertValidImageFile(
+      file,
+      this.getMaxFileSizeForContext(FileContextType.COMMUNITY),
+    );
+
     // 기존 이미지 비활성화
     await this.deactivatePreviousFiles(
       FileContextType.COMMUNITY,
       communityId,
       purpose as FilePurpose,
+      organizationId,
     );
 
     const s3Key = this.generateS3Key(
@@ -165,6 +200,7 @@ export class ContextualFileService {
       contextId: communityId,
       ownerId: userId,
       purpose: purpose as FilePurpose,
+      organizationId,
     });
 
     return this.uploadWithContextInternal(s3Key, file, context);
@@ -178,7 +214,13 @@ export class ContextualFileService {
     communityId: string,
     widgetId: string,
     file: Express.Multer.File,
+    organizationId?: string,
   ): Promise<FileUploadResult> {
+    this.assertValidImageFile(
+      file,
+      this.getMaxFileSizeForContext(FileContextType.COMMUNITY_WIDGET),
+    );
+
     const s3Key = this.generateS3Key(
       FileContextType.COMMUNITY_WIDGET,
       communityId,
@@ -192,6 +234,7 @@ export class ContextualFileService {
       contextId: widgetId,
       ownerId: userId,
       purpose: FilePurpose.WIDGET_ASSET,
+      organizationId,
       metadata: { communityId },
     });
 
@@ -219,6 +262,21 @@ export class ContextualFileService {
       );
     }
 
+    const allowedTypes = this.getAllowedTypesForContext(
+      uploadContext.contextType,
+      uploadContext.purpose,
+    );
+    if (
+      allowedTypes.length > 0 &&
+      !allowedTypes.includes(
+        mimeType.toLowerCase() === "image/jpg"
+          ? "image/jpeg"
+          : mimeType.toLowerCase(),
+      )
+    ) {
+      throw new BadRequestException("지원하지 않는 이미지 형식입니다.");
+    }
+
     // 기존 컨텍스트 확인 또는 생성
     let context = await this.contextRepository.findOne({
       where: {
@@ -227,6 +285,9 @@ export class ContextualFileService {
         ownerId: uploadContext.ownerId,
         purpose: uploadContext.purpose,
         isActive: true,
+        ...(uploadContext.organizationId
+          ? { organizationId: uploadContext.organizationId }
+          : {}),
       },
     });
 
@@ -272,6 +333,7 @@ export class ContextualFileService {
       mimeType,
       fileType: this.getFileTypeFromContext(context.contextType),
       userId,
+      organizationId: context.organizationId,
       contextId: context.id,
       s3Bucket: process.env.AWS_S3_BUCKET,
       s3Region: process.env.AWS_REGION || "us-east-1",
@@ -292,9 +354,14 @@ export class ContextualFileService {
   async completeUpload(
     fileId: string,
     userId: string,
+    organizationId?: string,
   ): Promise<FileUploadResult> {
     const file = await this.fileRepository.findOne({
-      where: { id: fileId, userId },
+      where: {
+        id: fileId,
+        userId,
+        ...(organizationId ? { organizationId } : {}),
+      },
       relations: ["context"],
     });
 
@@ -306,6 +373,27 @@ export class ContextualFileService {
     const exists = await this.s3Service.checkFileExists(file.fileKey);
     if (!exists) {
       throw new BadRequestException("File upload not completed");
+    }
+
+    if (file.mimeType.startsWith("image/")) {
+      const metadata = await this.s3Service.getObjectMetadata(file.fileKey);
+      const sample = await this.s3Service.getObjectSample(file.fileKey);
+      const validation = validateImageBuffer(
+        {
+          size: metadata?.contentLength ?? file.fileSize,
+          mimetype: metadata?.contentType ?? file.mimeType,
+          buffer: sample ?? undefined,
+        },
+        this.getMaxFileSizeForContext(file.context.contextType),
+        file.context.allowedTypes?.length
+          ? file.context.allowedTypes
+          : SAFE_IMAGE_MIME_TYPES,
+      );
+      if (!validation.valid) {
+        throw new BadRequestException(validation.error);
+      }
+      file.fileSize = metadata?.contentLength ?? file.fileSize;
+      file.mimeType = metadata?.contentType ?? file.mimeType;
     }
 
     // 만료 시간 제거 (영구 보관)
@@ -342,6 +430,7 @@ export class ContextualFileService {
   async getFilesByContext(
     contextType: FileContextType,
     contextId: string,
+    organizationId?: string,
   ): Promise<File[]> {
     return this.fileRepository.find({
       where: {
@@ -349,6 +438,7 @@ export class ContextualFileService {
           contextType,
           contextId,
           isActive: true,
+          ...(organizationId ? { organizationId } : {}),
         },
       },
       relations: ["context"],
@@ -361,9 +451,17 @@ export class ContextualFileService {
   /**
    * 파일 삭제 (소프트 삭제)
    */
-  async deleteFile(fileId: string, userId: string): Promise<void> {
+  async deleteFile(
+    fileId: string,
+    userId: string,
+    organizationId?: string,
+  ): Promise<void> {
     const file = await this.fileRepository.findOne({
-      where: { id: fileId, userId },
+      where: {
+        id: fileId,
+        userId,
+        ...(organizationId ? { organizationId } : {}),
+      },
       relations: ["context"],
     });
 
@@ -481,12 +579,14 @@ export class ContextualFileService {
     contextId: string,
     purpose: FilePurpose,
     ownerId: string,
+    organizationId?: string,
   ): Promise<FileContext> {
     const context = this.contextRepository.create({
       contextType,
       contextId,
       purpose,
       ownerId,
+      organizationId,
       fileCount: 0,
       totalSize: 0,
       version: 1,
@@ -506,6 +606,7 @@ export class ContextualFileService {
     contextId: string,
     purpose: FilePurpose,
     ownerId: string,
+    organizationId?: string,
   ): Promise<FileContext> {
     let context = await this.contextRepository.findOne({
       where: {
@@ -514,6 +615,7 @@ export class ContextualFileService {
         purpose,
         ownerId,
         isActive: true,
+        ...(organizationId ? { organizationId } : {}),
       },
     });
 
@@ -523,6 +625,7 @@ export class ContextualFileService {
         contextId,
         purpose,
         ownerId,
+        organizationId,
       );
     }
 
@@ -543,6 +646,9 @@ export class ContextualFileService {
         ownerId: uploadContext.ownerId,
         purpose: uploadContext.purpose,
         isActive: true,
+        ...(uploadContext.organizationId
+          ? { organizationId: uploadContext.organizationId }
+          : {}),
       },
     });
 
@@ -619,6 +725,7 @@ export class ContextualFileService {
       mimeType: file.mimetype,
       fileType: this.getFileTypeFromContext(context.contextType),
       userId,
+      organizationId: context.organizationId,
       contextId: context.id,
       context,
       s3Bucket: process.env.AWS_S3_BUCKET,
@@ -648,6 +755,14 @@ export class ContextualFileService {
     file: Express.Multer.File,
     context: FileContext,
   ): Promise<FileUploadResult> {
+    this.assertValidImageFile(
+      file,
+      context.maxFileSize ?? this.getMaxFileSizeForContext(context.contextType),
+      context.allowedTypes?.length
+        ? context.allowedTypes
+        : SAFE_IMAGE_MIME_TYPES,
+    );
+
     // S3에 실제 파일 업로드
     const s3Result = await this.s3Service.uploadFile(file, s3Key);
 
@@ -661,6 +776,7 @@ export class ContextualFileService {
       mimeType: file.mimetype,
       fileType: this.getFileTypeFromContext(context.contextType),
       userId: context.ownerId,
+      organizationId: context.organizationId,
       contextId: context.id,
       context,
       s3Bucket: process.env.AWS_S3_BUCKET,
@@ -699,6 +815,7 @@ export class ContextualFileService {
     contextType: FileContextType,
     contextId: string,
     purpose: FilePurpose,
+    organizationId?: string,
   ): Promise<void> {
     const previousContext = await this.contextRepository.findOne({
       where: {
@@ -706,6 +823,7 @@ export class ContextualFileService {
         contextId,
         purpose,
         isActive: true,
+        ...(organizationId ? { organizationId } : {}),
       },
     });
 
@@ -966,12 +1084,27 @@ export class ContextualFileService {
     contextType: FileContextType,
     purpose: FilePurpose,
   ): string[] {
-    if (
-      contextType === FileContextType.PROFILE &&
-      purpose === FilePurpose.AVATAR
-    ) {
-      return ["image/jpeg", "image/png", "image/webp"];
+    const imageContextTypes: FileContextType[] = [
+      FileContextType.PROFILE,
+      FileContextType.POST,
+      FileContextType.BLOG,
+      FileContextType.COMMUNITY,
+      FileContextType.COMMUNITY_WIDGET,
+    ];
+    if (imageContextTypes.includes(contextType)) {
+      return [...SAFE_IMAGE_MIME_TYPES];
     }
     return [];
+  }
+
+  private assertValidImageFile(
+    file: Express.Multer.File,
+    maxSize: number,
+    allowedTypes: readonly string[] = SAFE_IMAGE_MIME_TYPES,
+  ): void {
+    const validation = validateImageBuffer(file, maxSize, allowedTypes);
+    if (!validation.valid) {
+      throw new BadRequestException(validation.error);
+    }
   }
 }

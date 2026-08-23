@@ -10,6 +10,7 @@ import {
 } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Blog } from "../../blogs/entities/blog.entity";
+import { Organization } from "../../organizations/entities/organization.entity";
 
 /**
  * MCP API Key 엔티티
@@ -82,6 +83,13 @@ export class McpApiKey {
   @ManyToOne(() => Blog, { onDelete: "CASCADE" })
   @JoinColumn({ name: "blogId" })
   blog: Blog;
+
+  @Column({ type: "uuid", nullable: true })
+  organizationId: string | null;
+
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "organizationId" })
+  organization: Organization | null;
 
   /**
    * 활성 상태

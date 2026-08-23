@@ -1,318 +1,164 @@
+import { BadRequestException } from "@nestjs/common";
+import { McpProxyController } from "./mcp-proxy.controller";
+
 jest.mock("nanoid", () => ({
-  customAlphabet: () => () => "abcd1234",
+  customAlphabet: () => () => "mocked-api-key",
 }));
 
-import { McpProxyController } from "./mcp-proxy.controller";
-import { appendMcpAiDisclosureFooter } from "../utils/ai-disclosure-footer.util";
-import { MCP_RAW_MERMAID_ERROR_MESSAGE } from "../../common/utils/legacy-mermaid.util";
+describe("McpProxyController image contract", () => {
+  const postsService = {
+    createFast: jest.fn(),
+  };
+  const userRepository = {
+    findOne: jest.fn(),
+  };
+  const usageService = {
+    trackMcpPost: jest.fn(),
+  };
+  const externalImageDownloadService = {
+    extractExternalImageUrls: jest.fn(),
+  };
+  const filesService = {
+    createUploadUrl: jest.fn(),
+    uploadComplete: jest.fn(),
+  };
 
-describe("McpProxyController", () => {
-  const createController = () => {
-    const postsService = {
-      createFast: jest.fn(),
-      findMyPublishedPostsForMcp: jest.fn(),
-      findMyPublishedPostForMcp: jest.fn(),
-    };
-    const userRepository = {
-      findOne: jest.fn(),
-    };
-    const blogRepository = {
-      findOne: jest.fn(),
-    };
-    const usageService = {
-      checkMcpPostLimit: jest.fn(),
-      trackMcpPost: jest.fn(),
-    };
-    const externalImageDownloadService = {
-      extractExternalImageUrls: jest.fn(),
-      downloadExternalImages: jest.fn(),
-      replaceImageUrls: jest.fn(),
-      removeFailedImages: jest.fn(),
-    };
-    const filesService = {};
-    const knowledgeQueryService = {
-      getManifest: jest.fn(),
-      searchNodes: jest.fn(),
-      readNode: jest.fn(),
-      listFollowups: jest.fn(),
-      dismissFollowup: jest.fn(),
-    };
+  let controller: McpProxyController;
 
-    const dataSource = { getRepository: jest.fn() };
-
-    const controller = new McpProxyController(
+  beforeEach(() => {
+    jest.clearAllMocks();
+    controller = new McpProxyController(
       postsService as any,
       userRepository as any,
-      blogRepository as any,
       usageService as any,
       externalImageDownloadService as any,
       filesService as any,
-      dataSource as any,
-      knowledgeQueryService as any,
     );
-
-    return {
-      controller,
-      postsService,
-      userRepository,
-      blogRepository,
-      usageService,
-      externalImageDownloadService,
-    };
-  };
-
-  afterEach(() => {
-    jest.clearAllMocks();
   });
 
-  it("appends the AI disclosure footer before creating an MCP post", async () => {
-    const {
-      controller,
-      postsService,
-      userRepository,
-      blogRepository,
-      usageService,
-      externalImageDownloadService,
-    } = createController();
-
-    blogRepository.findOne.mockResolvedValue({
-      id: "blog-1",
-      isPublic: true,
-      userId: "user-1",
-    });
-    usageService.checkMcpPostLimit.mockResolvedValue({ canPost: true });
-    usageService.trackMcpPost.mockResolvedValue(undefined);
-    userRepository.findOne.mockResolvedValue({ id: "user-1" });
-    externalImageDownloadService.extractExternalImageUrls.mockReturnValue([]);
-    postsService.createFast.mockResolvedValue({
-      id: "post-1",
-      slug: "hello-world",
-      title: "Hello World",
-      blog: { slug: "codebase", isPublic: true },
-      isPublished: true,
-      visibility: "public",
-      effectiveVisibility: "public",
-      visibilityBlockedByBlogPrivacy: false,
+  it("passes the authenticated owner scope to the signed upload service", async () => {
+    filesService.createUploadUrl.mockResolvedValue({
+      uploadUrl: "https://storage.example/upload",
+      tempId: "signed-intent",
+      fileKey: "uploads/image/generated.webp",
     });
 
-    const result = await controller.createPost(
-      { apiKey: { userId: "user-1", blogId: "blog-1" } },
+    const result = await controller.createImageUploadUrl(
+      { apiKey: { userId: "user-1", organizationId: "org-1" } },
       {
-        title: "Hello World",
-        content_markdown: "## Hello\n\n본문입니다.",
-        category: "Tech",
-        tags: ["mcp"],
-      } as any,
+        fileName: "generated.webp",
+        mimeType: "image/webp",
+        fileSize: 1024,
+        fileType: "image",
+      },
     );
 
-    expect(postsService.createFast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        content_markdown:
-          appendMcpAiDisclosureFooter("## Hello\n\n본문입니다."),
-        visibility: "public",
-        tags: ["mcp"],
-        category: "Tech",
-      }),
-      expect.objectContaining({ id: "user-1" }),
+    expect(filesService.createUploadUrl).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({ mimeType: "image/webp", fileSize: 1024 }),
+      "org-1",
     );
-    expect(result).toMatchObject({
-      id: "post-1",
-      slug: "hello-world",
-      title: "Hello World",
-      url: "/codebase/hello-world",
-      blog: { slug: "codebase", isPublic: true },
-      isPublished: true,
-      visibility: "public",
-      effectiveVisibility: "public",
-      visibilityBlockedByBlogPrivacy: false,
-      _meta: expect.objectContaining({
-        status: "created",
-      }),
+    expect(result).toEqual({
+      uploadUrl: "https://storage.example/upload",
+      tempId: "signed-intent",
+      fileKey: "uploads/image/generated.webp",
+      fileName: "generated.webp",
+      mimeType: "image/webp",
+      fileSize: 1024,
     });
   });
 
-  it("keeps a pre-existing AI disclosure footer idempotent", async () => {
-    const {
-      controller,
-      postsService,
-      userRepository,
-      blogRepository,
-      usageService,
-      externalImageDownloadService,
-    } = createController();
+  it("returns the persisted file ID and URL after signed completion", async () => {
+    filesService.uploadComplete.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000001",
+      originalName: "generated.webp",
+      fileKey: "uploads/image/generated.webp",
+      mimeType: "image/webp",
+      fileSize: 1024,
+      accessUrl: "/api/v1/files/proxy/uploads/image/generated.webp",
+    });
+    const completion = {
+      tempId: "signed-intent",
+      fileKey: "uploads/image/generated.webp",
+      fileUrl: "uploads/image/generated.webp",
+      fileName: "generated.webp",
+      mimeType: "image/webp",
+      fileSize: 1024,
+      fileType: "image",
+    };
 
-    const contentWithFooter = appendMcpAiDisclosureFooter(
-      "## Hello\n\n이미 footer가 있습니다.",
+    const result = await controller.completeImageUpload(
+      { apiKey: { userId: "user-1", organizationId: "org-1" } },
+      completion,
     );
 
-    blogRepository.findOne.mockResolvedValue({
-      id: "blog-1",
-      isPublic: false,
-      userId: "user-1",
+    expect(filesService.uploadComplete).toHaveBeenCalledWith(
+      "user-1",
+      completion,
+      "org-1",
+    );
+    expect(result).toEqual({
+      fileId: "00000000-0000-4000-8000-000000000001",
+      publicUrl: "/api/v1/files/proxy/uploads/image/generated.webp",
+      descriptor: {
+        id: "00000000-0000-4000-8000-000000000001",
+        fileKey: "uploads/image/generated.webp",
+        fileName: "generated.webp",
+        mimeType: "image/webp",
+        fileSize: 1024,
+      },
     });
-    usageService.checkMcpPostLimit.mockResolvedValue({ canPost: true });
-    usageService.trackMcpPost.mockResolvedValue(undefined);
+  });
+
+  it("rejects non-WebP MCP image requests before issuing an intent", async () => {
+    await expect(
+      controller.createImageUploadUrl(
+        { apiKey: { userId: "user-1", organizationId: "org-1" } },
+        {
+          fileName: "generated.png",
+          mimeType: "image/png",
+          fileSize: 1024,
+          fileType: "image",
+        },
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(filesService.createUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it("attaches finalized file IDs and validates the thumbnail through the same owner-scoped path", async () => {
     userRepository.findOne.mockResolvedValue({ id: "user-1" });
     externalImageDownloadService.extractExternalImageUrls.mockReturnValue([]);
     postsService.createFast.mockResolvedValue({
-      id: "post-2",
-      slug: "already-footer",
-      title: "Already Footer",
-      blog: { slug: "codebase" },
+      id: "post-1",
+      slug: "post-slug",
+      title: "Post",
+      tags: [],
+      blog: { slug: "blog" },
     });
+    usageService.trackMcpPost.mockResolvedValue(undefined);
 
     await controller.createPost(
-      { apiKey: { userId: "user-1", blogId: "blog-1" } },
+      { apiKey: { userId: "user-1", organizationId: "org-1" } },
       {
-        title: "Already Footer",
-        content_markdown: `${contentWithFooter}\n\n`,
+        title: "Post",
+        content_markdown: "## Content",
         category: "Tech",
-      } as any,
+        attachedFileIds: ["00000000-0000-4000-8000-000000000001"],
+        thumbnailImageId: "00000000-0000-4000-8000-000000000002",
+      },
     );
 
     expect(postsService.createFast).toHaveBeenCalledWith(
       expect.objectContaining({
-        content_markdown: contentWithFooter,
-        visibility: "private",
+        attachedFileIds: [
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002",
+        ],
+        thumbnailImageId: "00000000-0000-4000-8000-000000000002",
       }),
-      expect.objectContaining({ id: "user-1" }),
+      { id: "user-1" },
+      "org-1",
     );
-  });
-
-  it("returns effective private visibility when blog privacy overrides a public post", async () => {
-    const {
-      controller,
-      postsService,
-      userRepository,
-      blogRepository,
-      usageService,
-      externalImageDownloadService,
-    } = createController();
-
-    blogRepository.findOne.mockResolvedValue({
-      id: "blog-1",
-      isPublic: false,
-      userId: "user-1",
-    });
-    usageService.checkMcpPostLimit.mockResolvedValue({ canPost: true });
-    usageService.trackMcpPost.mockResolvedValue(undefined);
-    userRepository.findOne.mockResolvedValue({ id: "user-1" });
-    externalImageDownloadService.extractExternalImageUrls.mockReturnValue([]);
-    postsService.createFast.mockResolvedValue({
-      id: "post-3",
-      slug: "private-blog-post",
-      title: "Private Blog Post",
-      blog: { slug: "codebase", alias: "codebase", isPublic: false },
-      isPublished: true,
-      visibility: "public",
-      effectiveVisibility: "private",
-      visibilityBlockedByBlogPrivacy: true,
-    });
-
-    const result = await controller.createPost(
-      { apiKey: { userId: "user-1", blogId: "blog-1" } },
-      {
-        title: "Private Blog Post",
-        content_markdown: "본문",
-        category: "Tech",
-        visibility: "public",
-      } as any,
-    );
-
-    expect(result).toMatchObject({
-      id: "post-3",
-      slug: "private-blog-post",
-      title: "Private Blog Post",
-      url: "/codebase/private-blog-post",
-      blog: { alias: "codebase", isPublic: false },
-      isPublished: true,
-      visibility: "public",
-      effectiveVisibility: "private",
-      visibilityBlockedByBlogPrivacy: true,
-      _meta: expect.objectContaining({
-        status: "created",
-      }),
-    });
-  });
-
-  it("rejects raw Mermaid fenced blocks on the direct MCP create path", async () => {
-    const { controller, postsService } = createController();
-
-    await expect(
-      controller.createPost(
-        { apiKey: { userId: "user-1", blogId: "blog-1" } },
-        {
-          title: "Legacy Mermaid",
-          content_markdown: [
-            "## Diagram",
-            "",
-            "```mermaid",
-            "flowchart LR",
-            "A[시작] --> B[끝]",
-            "```",
-          ].join("\n"),
-          category: "Tech",
-        } as any,
-      ),
-    ).rejects.toThrow(MCP_RAW_MERMAID_ERROR_MESSAGE);
-
-    expect(postsService.createFast).not.toHaveBeenCalled();
-  });
-
-  it("lists only the authenticated user's published posts for MCP read", async () => {
-    const { controller, postsService } = createController();
-
-    postsService.findMyPublishedPostsForMcp.mockResolvedValue({
-      items: [{ id: "post-1", title: "Published", slug: "published" }],
-      total: 1,
-      page: 1,
-      limit: 20,
-    });
-
-    const result = await controller.listPublishedPosts(
-      { apiKey: { userId: "user-1", blogId: "blog-1" } },
-      "1",
-      "20",
-      "react",
-      "Tech",
-      "mcp",
-      "2026-01-01",
-      "2026-03-01",
-    );
-
-    expect(postsService.findMyPublishedPostsForMcp).toHaveBeenCalledWith(
-      "user-1",
-      expect.objectContaining({
-        page: 1,
-        limit: 20,
-        search: "react",
-        category: "Tech",
-        tag: "mcp",
-        dateFrom: "2026-01-01",
-        dateTo: "2026-03-01",
-      }),
-    );
-    expect(result.total).toBe(1);
-  });
-
-  it("reads a single published post for the authenticated MCP user", async () => {
-    const { controller, postsService } = createController();
-
-    postsService.findMyPublishedPostForMcp.mockResolvedValue({
-      id: "post-9",
-      title: "Deep dive",
-      slug: "deep-dive",
-    });
-
-    const result = await controller.readPublishedPost(
-      { apiKey: { userId: "user-1", blogId: "blog-1" } },
-      "post-9",
-    );
-
-    expect(postsService.findMyPublishedPostForMcp).toHaveBeenCalledWith(
-      "user-1",
-      "post-9",
-    );
-    expect(result.slug).toBe("deep-dive");
   });
 });

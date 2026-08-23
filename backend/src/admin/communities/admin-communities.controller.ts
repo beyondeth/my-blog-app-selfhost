@@ -15,6 +15,12 @@ import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { Role } from "../../common/enums/role.enum";
+import { OrganizationContextGuard } from "../../organizations/guards/organization-context.guard";
+import {
+  OrganizationId,
+  RequireOrganizationContext,
+} from "../../organizations/decorators/organization-context.decorator";
+import { CommunityOrganizationGuard } from "../../communities/guards/community-organization.guard";
 import {
   AdminCommunitiesService,
   CaptureSnapshotDto,
@@ -22,8 +28,14 @@ import {
 } from "./admin-communities.service";
 
 @Controller("admin/communities")
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(
+  JwtAuthGuard,
+  RolesGuard,
+  OrganizationContextGuard,
+  CommunityOrganizationGuard,
+)
 @Roles(Role.ADMIN)
+@RequireOrganizationContext()
 export class AdminCommunitiesController {
   constructor(
     private readonly adminCommunitiesService: AdminCommunitiesService,
@@ -36,8 +48,13 @@ export class AdminCommunitiesController {
   async listSnapshots(
     @Param("communityId", ParseUUIDPipe) communityId: string,
     @Query("limit", new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @OrganizationId() organizationId: string,
   ) {
-    return this.adminCommunitiesService.listSnapshots(communityId, limit);
+    return this.adminCommunitiesService.listSnapshots(
+      communityId,
+      limit,
+      organizationId,
+    );
   }
 
   /**
@@ -48,11 +65,13 @@ export class AdminCommunitiesController {
     @Param("communityId", ParseUUIDPipe) communityId: string,
     @Body() body: CaptureSnapshotDto,
     @Request() req: any,
+    @OrganizationId() organizationId: string,
   ) {
     const snapshot = await this.adminCommunitiesService.captureSnapshot(
       communityId,
       req.user.id,
       body,
+      organizationId,
     );
     return {
       success: true,
@@ -67,8 +86,13 @@ export class AdminCommunitiesController {
   async restoreSnapshot(
     @Param("snapshotId", ParseUUIDPipe) snapshotId: string,
     @Request() req: any,
+    @OrganizationId() organizationId: string,
   ) {
-    await this.adminCommunitiesService.restoreSnapshot(snapshotId, req.user.id);
+    await this.adminCommunitiesService.restoreSnapshot(
+      snapshotId,
+      req.user.id,
+      organizationId,
+    );
     return {
       success: true,
       message: "커뮤니티가 스냅샷을 기준으로 복구되었습니다.",
@@ -83,11 +107,13 @@ export class AdminCommunitiesController {
     @Param("communityId", ParseUUIDPipe) communityId: string,
     @Body() body: LockCommunityDto,
     @Request() req: any,
+    @OrganizationId() organizationId: string,
   ) {
     await this.adminCommunitiesService.lockCommunity(
       communityId,
       req.user.id,
       body,
+      organizationId,
     );
     return {
       success: true,
@@ -103,11 +129,13 @@ export class AdminCommunitiesController {
     @Param("communityId", ParseUUIDPipe) communityId: string,
     @Body() body: LockCommunityDto,
     @Request() req: any,
+    @OrganizationId() organizationId: string,
   ) {
     await this.adminCommunitiesService.unlockCommunity(
       communityId,
       req.user.id,
       body,
+      organizationId,
     );
     return {
       success: true,

@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { defaultApiClient as api } from '@/lib/api';
@@ -47,13 +48,13 @@ export default function ModerationModal({ isOpen, onClose, targetType, targetId 
     } finally {
       setIsLoading(false);
     }
-  }, [targetType, targetId]);
+  }, [targetId, targetType]);
 
   useEffect(() => {
     if (isOpen && targetId) {
-      fetchContext();
+      void fetchContext();
     }
-  }, [isOpen, targetId, fetchContext]);
+  }, [fetchContext, isOpen, targetId]);
 
   const handleSubmit = async () => {
     if (!reason.trim()) {

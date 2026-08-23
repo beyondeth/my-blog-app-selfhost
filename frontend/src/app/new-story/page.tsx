@@ -25,7 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Save, Plus, AlertCircle, ImageIcon, Film, FileText, X, Github } from 'lucide-react';
+import { Save, Plus, AlertCircle, ImageIcon, Film, FileText, X } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import {
   AlertDialog,
@@ -59,26 +59,10 @@ import ReactMarkdown from 'react-markdown';
 import { useUploadFile } from '@/hooks/useFiles';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { useVideoUpload } from '@/hooks/video/useVideoUpload';
-import {
-  convertMarkdownToHtml,
-  convertHtmlToMarkdown,
-  getRichEditorCompatibilityIssues,
-} from '@/utils/markdownConversion';
-import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
+import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownConversion';
 import { validateContentSecurity } from '@/utils/contentSecurity';
 import { apiClient } from '@/lib/api';
-import type { MarkdownImageInfo } from '@/types/image-metadata.types';
-import { MarkdownImageCard } from '@/components/posts/MarkdownImageCard';
-import { MarkdownYouTubeCard } from '@/components/posts/MarkdownYouTubeCard';
-import { HybridMarkdownEditor, HybridMarkdownEditorRef } from '@/components/posts/HybridMarkdownEditor';
-import {
-  appendYouTubeThumbnailMarker,
-  extractYouTubeIdsFromMarkdown,
-  extractYouTubeThumbnailMarker,
-  stripYouTubeThumbnailMarker,
-} from '@/utils/youtubeMarkdown';
-import GithubResourcePopover from '@/components/posts/GithubResourcePopover';
-import { canAccessMarketplaceSellerTools } from '@/lib/marketplace-access';
+import type { CreatePostRequest } from '@/types';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogSimpleEditor = dynamic(
@@ -95,31 +79,28 @@ const MemoizedBlogSimpleEditor = React.memo(BlogSimpleEditor);
 // Zod 스키마 정의
 const categoriesSchema = z.array(
   z.string()
-    .min(1, 'Category must be at least 1 character.')
-    .max(15, 'Category must be 15 characters or fewer.')
+    .min(1, '카테고리는 최소 1글자 이상이어야 합니다.')
+    .max(15, '카테고리는 최대 15글자까지 입력 가능합니다.')
     .refine((value) => !value.includes('/'), {
-      message: 'Category cannot include a slash (/).',
+      message: '카테고리에 슬래시(/)를 포함할 수 없습니다.',
     })
-).max(2, 'You can add up to 2 categories.');
+).max(2, '카테고리는 최대 2개까지만 입력 가능합니다.');
 
 const postSchema = z.object({
-  title: z.string().min(1, 'Enter a title.'),
+  title: z.string().min(1, '제목을 입력해주세요.'),
   categories: categoriesSchema.optional(),
-  content: z.string().min(1, 'Enter some content.'),
+  content: z.string().min(1, '내용을 입력해주세요.'),
   tags: z.array(z.string()).optional(),
-  githubUrl: z.string().optional(),
-  githubDescription: z.string().optional(),
   fileIds: z.array(z.string()).optional(),
   thumbnailIndex: z.number().optional(), // 썸네일 인덱스 (0-based, -1 = 미선택)
 });
 
 type PostFormData = z.infer<typeof postSchema>;
 type EditorMode = 'rich' | 'markdown';
-const ENABLE_LOCAL_DRAFTS = false;
 const DRAFT_VERSION = 1;
 const DRAFT_STORAGE_PREFIX = 'new-story-draft';
 const IMAGE_URL_PATTERN = /\.(png|jpe?g|gif|webp|svg)$/i;
-// MarkdownImageInfo 타입은 @/types/image-metadata.types에서 import
+type MarkdownImageInfo = { id: string; url: string; name?: string };
 interface MarkdownImageMeta {
   url: string;
   name?: string;
@@ -134,11 +115,6 @@ function isLikelyImageUrl(url: string): boolean {
     return false;
   }
   return IMAGE_URL_PATTERN.test(normalized);
-}
-
-function hasPreferredYouTubeInHtml(html: string): boolean {
-  if (!html) return false;
-  return /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(html);
 }
 
 function convertInlineLinksToImages(markdown: string): string {
@@ -163,7 +139,7 @@ export default function NewStoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { user, isLoading: isUserLoading, isAdmin } = useAuth();
+  const { user, isLoading: isUserLoading } = useAuth();
   const forcedCommunitySlug = searchParams.get('communitySlug') || '';
   const { data: blogs, isLoading: isBlogsLoading } = useMyBlogs();
   const createPostMutation = useCreatePost();
@@ -180,10 +156,10 @@ export default function NewStoryPage() {
   const videoUploadStatusText = useMemo(() => {
     for (const upload of videoUploads.values()) {
       if (upload.stage === 'uploading') {
-        return 'Uploading video. Please wait until it finishes.';
+        return '비디오를 업로드 중입니다. 완료될 때까지 기다려주세요.';
       }
       if (upload.stage === 'processing') {
-        return 'Processing video. Please wait while the thumbnail is generated.';
+        return '비디오를 처리 중입니다. 썸네일 생성까지 잠시만 기다려주세요.';
       }
     }
     return null;
@@ -197,13 +173,6 @@ export default function NewStoryPage() {
   const [selectedFlairId, setSelectedFlairId] = useState<string | null>(null);
   const [isNsfw, setIsNsfw] = useState(false);
   const [isSpoiler, setIsSpoiler] = useState(false);
-  const [postVisibility, setPostVisibility] = useState<'public' | 'private'>('public');
-
-  // 마켓플레이스 판매 상품 상태
-  const [isSellMode, setIsSellMode] = useState(false);
-  const [sellPrice, setSellPrice] = useState<number | ''>('');
-  const [sellCategory, setSellCategory] = useState('ai_prompts');
-  const canManageMarketplace = canAccessMarketplaceSellerTools(isAdmin);
 
   // 커뮤니티 포스트 생성 뮤테이션 (대상이 커뮤니티인 경우)
   const communitySlugForMutation =
@@ -229,8 +198,6 @@ export default function NewStoryPage() {
       categories: [],
       content: '',
       tags: [],
-      githubUrl: '',
-      githubDescription: '',
       fileIds: [],
       thumbnailIndex: -1, // 초기값: 미선택
     },
@@ -253,14 +220,10 @@ export default function NewStoryPage() {
 
   // 썸네일 인덱스 상태
   const [thumbnailIndex, setThumbnailIndex] = useState<number>(-1);
-  const [selectedYouTubeThumbnailId, setSelectedYouTubeThumbnailId] = useState<string | null>(null);
-  const [markdownYouTubeIds, setMarkdownYouTubeIds] = useState<string[]>([]);
   const [editorMode, setEditorMode] = useState<EditorMode>('rich');
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [pendingEditorMode, setPendingEditorMode] = useState<EditorMode | null>(null);
-  
-  // 마크다운 에디터 ref 변경
-  const markdownEditorRef = useRef<HybridMarkdownEditorRef | null>(null);
+  const markdownTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const markdownImageInputRef = useRef<HTMLInputElement | null>(null);
   const markdownVideoInputRef = useRef<HTMLInputElement | null>(null);
   const [markdownImages, setMarkdownImages] = useState<MarkdownImageInfo[]>([]);
@@ -288,10 +251,6 @@ export default function NewStoryPage() {
   });
 
   const activeDraftKey = useMemo(() => {
-    if (!ENABLE_LOCAL_DRAFTS) {
-      return null;
-    }
-
     if (forcedCommunitySlug) {
       return `${DRAFT_STORAGE_PREFIX}:community:${forcedCommunitySlug}`;
     }
@@ -362,22 +321,6 @@ export default function NewStoryPage() {
     }
   }, [publishTarget]);
 
-  useEffect(() => {
-    if (publishTarget?.type !== 'blog') {
-      return;
-    }
-
-    setPostVisibility(blog?.isPublic === false ? 'private' : 'public');
-  }, [blog?.isPublic, publishTarget?.type]);
-
-  useEffect(() => {
-    if (!canManageMarketplace && isSellMode) {
-      setIsSellMode(false);
-      setSellPrice('');
-      setSellCategory('ai_prompts');
-    }
-  }, [canManageMarketplace, isSellMode]);
-
   const availableCommunityFlairs = useMemo(() => {
     return publishTarget?.type === 'community'
       ? selectedCommunity?.flairs?.filter(
@@ -407,10 +350,6 @@ export default function NewStoryPage() {
   // 썸네일 변경 핸들러 (인덱스 기반)
   const handleThumbnailChange = useCallback((index: number) => {
     console.log('🎯 [DEBUG] Thumbnail index changed:', { index, timestamp: new Date().toISOString() });
-
-    if (index >= 0) {
-      setSelectedYouTubeThumbnailId(null);
-    }
 
     // React Hook Form의 setValue를 사용하여 form state 업데이트
     form.setValue('thumbnailIndex', index, {
@@ -467,20 +406,11 @@ export default function NewStoryPage() {
     const currentFileIds = form.getValues('fileIds') || [];
     const index = currentFileIds.indexOf(fileId);
     if (index === -1) {
-      toast.warning('Could not find that image to use as the thumbnail.');
+      toast.warning('썸네일로 지정할 이미지를 찾을 수 없습니다.');
       return;
     }
     handleThumbnailChange(index);
   }, [form, handleThumbnailChange]);
-
-  const handleYouTubeThumbnailSelect = useCallback((videoId: string) => {
-    if (!videoId) {
-      return;
-    }
-    setSelectedYouTubeThumbnailId(videoId);
-    handleThumbnailChange(-1);
-    toast.success('Selected the YouTube video as the thumbnail.');
-  }, [handleThumbnailChange]);
 
   const syncMarkdownImages = useCallback(
     (fileIdsOverride?: string[]) => {
@@ -534,19 +464,42 @@ export default function NewStoryPage() {
   );
 
   const insertMarkdownSnippet = useCallback((snippet: string) => {
-    if (markdownEditorRef.current) {
-      markdownEditorRef.current.insertText(snippet);
-      autoConversionSkipRef.current = true;
+    const textarea = markdownTextareaRef.current;
+    const fallbackValue = form.getValues('content') || '';
+    const sanitizedSnippet = snippet.endsWith('\n') ? snippet : `${snippet}\n`;
+
+    if (!textarea) {
+      const needsNewline = fallbackValue && !fallbackValue.endsWith('\n');
+      const nextValue = `${fallbackValue}${needsNewline ? '\n' : ''}${sanitizedSnippet}`;
+      form.setValue('content', nextValue, { shouldDirty: true, shouldTouch: true });
       return;
     }
 
-    const currentContent = form.getValues('content') || '';
-    const needsNewline = currentContent && !currentContent.endsWith('\n');
-    const nextValue = `${currentContent}${needsNewline ? '\n' : ''}${snippet.endsWith('\n') ? snippet : snippet + '\n'}`;
+    const { selectionStart = textarea.value.length, selectionEnd = textarea.value.length } = textarea;
+    const before = textarea.value.slice(0, selectionStart);
+    const after = textarea.value.slice(selectionEnd);
+    const needsNewlineBefore = before && !before.endsWith('\n');
+    const insertion = `${needsNewlineBefore ? '\n' : ''}${sanitizedSnippet}`;
+    const nextValue = `${before}${insertion}${after}`;
+
+    textarea.value = nextValue;
+    const cursor = before.length + insertion.length;
+    textarea.setSelectionRange(cursor, cursor);
+    textarea.focus();
     form.setValue('content', nextValue, { shouldDirty: true, shouldTouch: true });
-    autoConversionSkipRef.current = true;
   }, [form]);
 
+  const handleInsertImageFromList = useCallback(
+    (image: MarkdownImageInfo) => {
+      if (!image?.url) {
+        toast.error('이미지 정보를 불러오지 못했습니다.');
+        return;
+      }
+      insertMarkdownSnippet(`![${image.name || 'image'}](${image.url})`);
+      toast.success('이미지를 본문에 삽입했습니다.');
+    },
+    [insertMarkdownSnippet],
+  );
 
   const scheduleDraftSave = useCallback(
     (forceImmediate = false) => {
@@ -566,7 +519,6 @@ export default function NewStoryPage() {
               typeof latestDraftRef.current.thumbnailIndex === 'number'
                 ? latestDraftRef.current.thumbnailIndex
                 : thumbnailIndex,
-            youtubeThumbnailId: selectedYouTubeThumbnailId ?? undefined,
           },
         };
 
@@ -587,7 +539,7 @@ export default function NewStoryPage() {
         draftSaveTimeoutRef.current = null;
       }, 1000);
     },
-    [activeDraftKey, editorMode, markdownImages, thumbnailIndex, selectedYouTubeThumbnailId],
+    [activeDraftKey, editorMode, markdownImages, thumbnailIndex],
   );
 
   const clearDraft = useCallback(() => {
@@ -618,17 +570,12 @@ export default function NewStoryPage() {
       }
 
       const restoredFileIds = parsed.data.fileIds ?? [];
-      const rawContent = parsed.data.content ?? '';
-      const restoredMarkerId =
-        extractYouTubeThumbnailMarker(rawContent) ??
-        (typeof parsed.data.youtubeThumbnailId === 'string' ? parsed.data.youtubeThumbnailId : null);
-      const cleanedContent = stripYouTubeThumbnailMarker(rawContent);
       form.reset({
         title: parsed.data.title ?? '',
         categories: Array.isArray(parsed.data.categories)
           ? parsed.data.categories.filter((cat: unknown): cat is string => typeof cat === 'string')
           : [],
-        content: cleanedContent,
+        content: parsed.data.content ?? '',
         tags: parsed.data.tags ?? [],
         fileIds: restoredFileIds,
         thumbnailIndex: typeof parsed.data.thumbnailIndex === 'number' ? parsed.data.thumbnailIndex : -1,
@@ -645,20 +592,19 @@ export default function NewStoryPage() {
       setThumbnailIndex(
         typeof parsed.data.thumbnailIndex === 'number' ? parsed.data.thumbnailIndex : -1,
       );
-      setSelectedYouTubeThumbnailId(restoredMarkerId);
       hasRestoredDraftRef.current = true;
       
       // 빈 초안이 아닌 경우에만 토스트 표시
       const hasContent = (parsed.data.title && parsed.data.title.trim().length > 0) ||
                          (parsed.data.content && parsed.data.content.trim().length > 0);
       if (hasContent) {
-        toast.info('Restored your saved draft.');
+        toast.info('임시 저장된 초안을 불러왔습니다.');
       }
       
       latestDraftRef.current = {
         title: parsed.data.title ?? '',
         categories: parsed.data.categories ?? [],
-        content: cleanedContent,
+        content: parsed.data.content ?? '',
         tags: Array.isArray(parsed.data.tags)
           ? parsed.data.tags.filter((tag: unknown): tag is string => typeof tag === 'string')
           : [],
@@ -700,7 +646,7 @@ export default function NewStoryPage() {
 
   useEffect(() => {
     scheduleDraftSave();
-  }, [editorMode, markdownImages, scheduleDraftSave, thumbnailIndex, selectedYouTubeThumbnailId]);
+  }, [editorMode, markdownImages, scheduleDraftSave, thumbnailIndex]);
 
   useEffect(() => {
     if (editorMode !== 'markdown') {
@@ -723,20 +669,6 @@ export default function NewStoryPage() {
       form.setValue('content', converted, { shouldDirty: true, shouldTouch: true });
     }
   }, [editorMode, form, watchedContent]);
-
-  useEffect(() => {
-    if (editorMode !== 'markdown') {
-      setMarkdownYouTubeIds([]);
-      return;
-    }
-
-    const ids = extractYouTubeIdsFromMarkdown(watchedContent || '');
-    setMarkdownYouTubeIds(ids);
-
-    if (selectedYouTubeThumbnailId && !ids.includes(selectedYouTubeThumbnailId)) {
-      setSelectedYouTubeThumbnailId(null);
-    }
-  }, [editorMode, watchedContent, selectedYouTubeThumbnailId]);
 
   useEffect(() => {
     if (!Array.isArray(watchedFileIds)) {
@@ -835,14 +767,9 @@ export default function NewStoryPage() {
             ...latestDraftRef.current,
             content: markdown,
           };
-          // markdownEditorRef cleanup not needed or handled by React
+          markdownTextareaRef.current = null;
           resetMarkdownVideo();
         } else {
-          const issues = getRichEditorCompatibilityIssues(currentContent);
-          if (issues.length > 0) {
-            toast.error(`Some content cannot be safely converted to the rich editor: ${issues.join(', ')}`);
-            return;
-          }
           const html = convertMarkdownToHtml(currentContent);
           form.setValue('content', html || '<p></p>', { shouldDirty: true, shouldTouch: true });
           latestDraftRef.current = {
@@ -855,7 +782,7 @@ export default function NewStoryPage() {
         scheduleDraftSave(true);
       } catch (error) {
         console.error('Failed to switch editor mode', error);
-        toast.error('Could not switch the editor mode.');
+        toast.error('편집 모드를 전환하지 못했습니다.');
       } finally {
         setIsSwitchingEditorMode(false);
         setIsConfirmDialogOpen(false);
@@ -884,7 +811,7 @@ export default function NewStoryPage() {
   // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
   useEffect(() => {
     if (!isUserLoading && !user) {
-      toast.error('Please sign in first.');
+      toast.error('로그인이 필요합니다.');
       router.push('/login?redirect=/new-story');
     }
   }, [user, isUserLoading, router]);
@@ -893,14 +820,14 @@ export default function NewStoryPage() {
   useEffect(() => {
     if (!isBlogsLoading && user && !blog) {
       // 블로그가 없으면 홈으로 리다이렉트 (또는 블로그 생성 페이지로)
-      toast.error('Create your blog before publishing a post.');
+      toast.error('블로그를 먼저 생성해주세요.');
       router.push('/');
     }
   }, [blog, isBlogsLoading, user, router]);
 
   const handleMarkdownImageFile = useCallback(async (file: File) => {
     if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
-      toast.error('SVG files are not supported for uploads.');
+      toast.error('SVG 이미지는 업로드할 수 없습니다.');
       return;
     }
     setIsMarkdownImageUploading(true);
@@ -914,32 +841,21 @@ export default function NewStoryPage() {
       const imageUrl = normalizeImageUrl(result.accessUrl || result.fileUrl || '');
 
       if (!fileId || !imageUrl) {
-        throw new Error('The uploaded image response was invalid.');
+        throw new Error('이미지 업로드 결과가 올바르지 않습니다.');
       }
 
       fileMetadataRef.current.set(fileId, { url: imageUrl, name: file.name || 'image' });
       const { index: insertedIndex, fileIds: nextFileIds } = appendFileId(fileId);
       syncMarkdownImages(nextFileIds);
-      if (markdownEditorRef.current) {
-        markdownEditorRef.current.insertImageBlock({
-          url: imageUrl,
-          alt: file.name || 'image',
-          size: 'default',
-          caption: '',
-          fileId,
-        });
-        autoConversionSkipRef.current = true;
-      } else {
-        insertMarkdownSnippet(`![${file.name || 'image'}](${imageUrl})`);
-      }
+      insertMarkdownSnippet(`![${file.name || 'image'}](${imageUrl})`);
 
       if (thumbnailIndex === -1 && insertedIndex >= 0) {
         handleThumbnailChange(insertedIndex);
       }
 
-      toast.success('Inserted the image into the post.');
+      toast.success('이미지를 본문에 삽입했습니다.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to upload the image.';
+      const message = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다.';
       toast.error(message);
     } finally {
       setIsMarkdownImageUploading(false);
@@ -962,10 +878,10 @@ export default function NewStoryPage() {
       const result = await uploadMarkdownVideo(file);
       if (result && result.success && result.url) {
         insertMarkdownSnippet(`<video controls src="${result.url}" data-video-id="${result.videoId}"></video>`);
-        toast.success('Added the video to the post.');
+        toast.success('비디오를 본문에 추가했습니다.');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to upload the video.';
+      const message = error instanceof Error ? error.message : '비디오 업로드에 실패했습니다.';
       toast.error(message);
     } finally {
       setIsMarkdownVideoUploading(false);
@@ -974,16 +890,16 @@ export default function NewStoryPage() {
 
   const markdownVideoStatusMessage = useMemo(() => {
     if (markdownVideoState.stage === 'uploading') {
-      return `Uploading video (${Math.round(markdownVideoState.uploadProgress)}%)`;
+      return `비디오 업로드 중 (${Math.round(markdownVideoState.uploadProgress)}%)`;
     }
     if (markdownVideoState.stage === 'processing') {
-      return 'The server is processing the video...';
+      return '서버에서 비디오를 처리하고 있습니다...';
     }
     if (markdownVideoState.stage === 'complete') {
-      return 'Video upload completed.';
+      return '비디오 업로드가 완료되었습니다.';
     }
     if (markdownVideoState.stage === 'error') {
-      return markdownVideoState.error ?? 'A video upload error occurred.';
+      return markdownVideoState.error ?? '비디오 업로드 오류가 발생했습니다.';
     }
     return null;
   }, [markdownVideoState]);
@@ -992,13 +908,13 @@ export default function NewStoryPage() {
   const onSubmit = async (data: PostFormData) => {
     // 발행 대상이 없으면 제출 불가
     if (!publishTarget) {
-      toast.error('Choose where to publish this post.');
+      toast.error('발행 대상을 선택해주세요.');
       return;
     }
     
     // 제목 유효성 검사
     if (!data.title || data.title.trim().length === 0) {
-      setTitleError('Enter a title.');
+      setTitleError('제목을 입력해주세요.');
       return;
     }
     // 이전 제목 에러 초기화
@@ -1041,7 +957,7 @@ export default function NewStoryPage() {
       if (publishTarget.type === 'blog') {
         const categories = data.categories ?? [];
         if (categories.length === 0) {
-          setCategoryError('Add at least 1 category.');
+          setCategoryError('카테고리를 최소 1개 입력해주세요.');
           isSubmittingRef.current = false;
           setIsSubmitting(false);
           return;
@@ -1050,45 +966,19 @@ export default function NewStoryPage() {
         setCategoryError(null);
         const categoryString = categories.join('/');
 
-        const hasPreferredYouTube = !isMarkdownMode && hasPreferredYouTubeInHtml(data.content);
-
-        const postData: any = {
+        const postData: CreatePostRequest = {
           title: data.title,
           category: categoryString,
           tags: data.tags,
-          githubUrl: data.githubUrl?.trim() ?? '',
-          githubDescription: data.githubDescription?.trim() ?? '',
-          visibility: postVisibility,
           attachedFileIds: data.fileIds,
-          ...(thumbnailImageId && !hasPreferredYouTube && { thumbnailImageId }),
-          // 마켓플레이스 판매 상품 필드
-          ...(isSellMode && {
-            postType: 'product',
-            price: Number(sellPrice) || 0,
-            productCategory: sellCategory,
-          }),
+          ...(thumbnailImageId && { thumbnailImageId }),
         };
 
-        // [DEBUG] 상품 모드 + postType 확인
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[DEBUG] isSellMode:', isSellMode, 'postData.postType:', postData.postType, 'sellPrice:', sellPrice);
+        if (isMarkdownMode) {
+          postData.content_markdown = data.content;
+        } else {
+          postData.content = data.content;
         }
-
-        // 판매 상품 유효성 검증
-        if (isSellMode) {
-          if (!sellPrice || Number(sellPrice) < 100) {
-            toast.error('Product price must be at least KRW 100.');
-            return;
-          }
-        }
-
-        const canonicalMarkdown = appendYouTubeThumbnailMarker(
-          isMarkdownMode ? data.content : convertHtmlToMarkdown(data.content),
-          selectedYouTubeThumbnailId,
-        );
-        postData.content_markdown = canonicalMarkdown;
-        postData.content = convertMarkdownToHtml(canonicalMarkdown);
-        postData.content_type = 'markdown';
 
         // 디버깅: 썸네일 정보 로깅
         if (process.env.NODE_ENV === 'development') {
@@ -1106,34 +996,29 @@ export default function NewStoryPage() {
           queryKey: postQueryKeys.lists()
         });
 
-        // 성공 시 이동: 상품은 마켓플레이스, 일반 포스트는 블로그
+        // 성공 시 해당 블로그의 포스트로 이동
         clearDraft();
-        if (postData.postType === 'product') {
-          router.push(`/marketplace/${result.slug}`);
-        } else {
-          router.push(`/${blog!.slug}/${result.slug}`);
-        }
+        router.push(`/${blog!.slug}/${result.slug}`);
       }
       // 커뮤니티에 포스트 발행
       else {
-        const canonicalMarkdown = appendYouTubeThumbnailMarker(
-          isMarkdownMode ? data.content : convertHtmlToMarkdown(data.content),
-          selectedYouTubeThumbnailId,
-        );
-        const canonicalHtml = convertMarkdownToHtml(canonicalMarkdown);
-        const hasPreferredYouTube = !isMarkdownMode && hasPreferredYouTubeInHtml(data.content);
-
         const communityPostData: any = {
           title: data.title,
           tags: data.tags,
-          ...(thumbnailImageId && !hasPreferredYouTube && { thumbnailImageId }),
+          ...(thumbnailImageId && { thumbnailImageId }),
           isPublished: true,
           ...(selectedFlairId && { flairId: selectedFlairId }),
           isNsfw,
           isSpoiler,
         };
-        communityPostData.content = canonicalHtml;
-        communityPostData.contentMarkdown = canonicalMarkdown;
+        if (isMarkdownMode) {
+          // Markdown 모드: content와 contentMarkdown 둘 다 설정
+          // content는 필수 필드이므로 마크다운 원본을 그대로 저장
+          communityPostData.content = data.content;
+          communityPostData.contentMarkdown = data.content;
+        } else {
+          communityPostData.content = data.content;
+        }
 
         // 디버깅: 커뮤니티 포스트 정보 로깅
         if (process.env.NODE_ENV === 'development') {
@@ -1160,7 +1045,7 @@ export default function NewStoryPage() {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
       console.error('Failed to create post:', error);
-      toast.error('Failed to save the post.');
+      toast.error('포스트 저장에 실패했습니다.');
     }
     // 성공 시 페이지가 이동되므로 finally 블록 불필요
   };
@@ -1179,11 +1064,11 @@ export default function NewStoryPage() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center max-w-md mx-auto">
           <AlertCircle className="w-12 h-12 mx-auto text-red-500 mb-4" />
-          <h1 className="text-xl font-semibold mb-2">Could not load the community</h1>
+          <h1 className="text-xl font-semibold mb-2">커뮤니티를 불러올 수 없습니다</h1>
           <p className="text-gray-500 mb-4">
-            This community does not exist or you do not have access to it.
+            존재하지 않거나 접근할 수 없는 커뮤니티입니다.
           </p>
-          <Button onClick={() => router.push('/')}>Go home</Button>
+          <Button onClick={() => router.push('/')}>홈으로 이동</Button>
         </div>
       </div>
     );
@@ -1206,11 +1091,6 @@ export default function NewStoryPage() {
   const isSaving = isSubmitting || isMutationPending;
   const isSaveDisabled = isSaving || hasPendingVideoUploads;
   const isCommunityTarget = publishTarget?.type === 'community';
-  const isBlogPublic = blog?.isPublic !== false;
-  const isPublicTransitionLocked =
-    publishTarget?.type === 'blog' &&
-    blog?.isPublic === false &&
-    postVisibility === 'private';
   const lacksCommunityPermission =
     isCommunityTarget &&
     selectedCommunity &&
@@ -1222,17 +1102,17 @@ export default function NewStoryPage() {
         <div className="text-center max-w-md mx-auto px-4">
           <AlertCircle className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            You do not have permission to post here
+            게시물 작성 권한이 없습니다
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
-            Only joined members can create posts in this community.
+            이 커뮤니티에 가입한 멤버만 게시물을 작성할 수 있습니다.
           </p>
           <div className="flex gap-3 justify-center">
             <Button variant="outline" onClick={() => router.back()}>
-              Go back
+              뒤로 가기
             </Button>
             <Button onClick={() => router.push(`/c/${selectedCommunity.slug}`)}>
-              Open community
+              커뮤니티로 이동
             </Button>
           </div>
         </div>
@@ -1241,12 +1121,12 @@ export default function NewStoryPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-3 pt-20 pb-6 lg:py-6">
+    <div className="max-w-5xl mx-auto px-3 py-6">
       {/* 발행 대상 선택 */}
       {blog && publishTarget && (
         <div className="mb-3 pt-8">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-700 dark:text-gray-100">Publish to:</span>
+            <span className="text-sm text-gray-700 dark:text-gray-100">발행 위치:</span>
             <PublishTargetSelector
               value={publishTarget}
               onChange={setPublishTarget}
@@ -1269,7 +1149,7 @@ export default function NewStoryPage() {
           <Card className="border-0 shadow-none bg-transparent">
             <CardContent className={`space-y-4 ${blog && publishTarget ? '' : 'pt-12'} px-4`}>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Your draft is saved automatically while you write.
+                작성 중인 내용은 자동으로 임시 저장됩니다.
               </p>
               {/* 제목 */}
               <FormField
@@ -1281,8 +1161,8 @@ export default function NewStoryPage() {
                       <FloatingTitleField
                         field={field}
                         disabled={isMutationPending}
-                        label="Title"
-                        placeholder="Give your post a clear headline..."
+                        label="제목"
+                        placeholder="당신의 이야기를 들려주세요..."
                       />
                     </FormControl>
                     {/* 제목 에러 인라인 표시 (FormMessage 대체) */}
@@ -1299,7 +1179,7 @@ export default function NewStoryPage() {
                             setTitleError(null);
                           }}
                           className="p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                          aria-label="Close"
+                          aria-label="닫기"
                         >
                           <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                         </button>
@@ -1334,7 +1214,7 @@ export default function NewStoryPage() {
                                 setCategoryError(null);
                               }}
                               className="p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                              aria-label="Close"
+                              aria-label="닫기"
                             >
                               <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                             </button>
@@ -1350,21 +1230,21 @@ export default function NewStoryPage() {
                 <div className="space-y-4">
                   {availableCommunityFlairs.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Flair (optional)</Label>
+                      <Label className="text-sm font-medium">플레어 (선택)</Label>
                       <Select
                         value={selectedFlairId || '__none__'}
                         onValueChange={(value) => setSelectedFlairId(value === '__none__' ? null : value)}
                         disabled={isMutationPending}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Choose flair">
+                          <SelectValue placeholder="플레어 선택">
                             {selectedCommunityFlair && (
                               <FlairBadge flair={selectedCommunityFlair} size="sm" />
                             )}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__none__">No flair</SelectItem>
+                          <SelectItem value="__none__">플레어 없음</SelectItem>
                           {availableCommunityFlairs.map((flair) => (
                             <SelectItem key={flair.id} value={flair.id}>
                               <FlairBadge flair={flair} size="sm" />
@@ -1380,7 +1260,7 @@ export default function NewStoryPage() {
                       <div>
                         <Label className="text-sm font-medium">NSFW</Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Adult or sensitive content
+                          성인용 또는 민감한 콘텐츠입니다
                         </p>
                       </div>
                       <Switch
@@ -1391,9 +1271,9 @@ export default function NewStoryPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <Label className="text-sm font-medium">Spoiler</Label>
+                        <Label className="text-sm font-medium">스포일러</Label>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          This post contains spoilers
+                          스포일러가 포함된 콘텐츠입니다
                         </p>
                       </div>
                       <Switch
@@ -1413,7 +1293,7 @@ export default function NewStoryPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
-                      <TagInputField field={field} disabled={isMutationPending} label="Tags" />
+                      <TagInputField field={field} disabled={isMutationPending} label="태그" />
                     </FormControl>
                     {/* 태그 에러 인라인 표시 (FormMessage 대체) */}
                     {form.formState.errors.tags && (
@@ -1426,7 +1306,7 @@ export default function NewStoryPage() {
                           type="button"
                           onClick={() => form.clearErrors('tags')}
                           className="p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                          aria-label="Close"
+                          aria-label="닫기"
                         >
                           <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                         </button>
@@ -1435,89 +1315,6 @@ export default function NewStoryPage() {
                   </FormItem>
                 )}
               />
-              {publishTarget?.type === 'blog' && (
-                <div className="flex flex-col items-end gap-1">
-                  <div className="flex items-center justify-end gap-2">
-                    <Label className="text-xs font-medium leading-none">
-                      {isPublicTransitionLocked
-                        ? 'Private post (locked)'
-                        : postVisibility === 'public'
-                          ? 'Public post'
-                          : 'Private post'}
-                    </Label>
-                    <Switch
-                      checked={postVisibility === 'public'}
-                      onCheckedChange={(checked) => {
-                        if (checked && !isBlogPublic) {
-                          return;
-                        }
-                        setPostVisibility(checked ? 'public' : 'private');
-                      }}
-                      disabled={isMutationPending || isPublicTransitionLocked}
-                      title={isPublicTransitionLocked ? 'Locked by blog privacy setting' : undefined}
-                      className="focus-visible:ring-gray-400 data-[state=checked]:bg-gray-500 dark:data-[state=checked]:bg-gray-500 [&>span:first-child]:bg-gray-500 dark:[&>span:first-child]:bg-gray-500"
-                    />
-                  </div>
-                  {isPublicTransitionLocked && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Tip: switch the blog itself to public in Blog Settings before making this post public.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* ── 상품으로 판매 토글 ── */}
-              {publishTarget?.type === 'blog' && canManageMarketplace && (
-                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium leading-none text-gray-700 dark:text-zinc-300">
-                      Sell as a product
-                    </Label>
-                    <Switch
-                      checked={isSellMode}
-                      onCheckedChange={setIsSellMode}
-                      disabled={isMutationPending}
-                    />
-                  </div>
-
-                  {isSellMode && (
-                    <div className="mt-3 space-y-3">
-                      {/* 가격 입력 */}
-                      <div>
-                        <label className="block text-xs text-gray-500 dark:text-zinc-400 mb-1">
-                          Price (KRW)
-                        </label>
-                        <input
-                          type="number"
-                          min={100}
-                          value={sellPrice}
-                          onChange={(e) => setSellPrice(e.target.value ? Number(e.target.value) : '')}
-                          placeholder="Minimum KRW 100"
-                          className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-gray-300 dark:focus:ring-zinc-600"
-                        />
-                      </div>
-                      {/* 상품 카테고리 */}
-                      <div>
-                        <label className="block text-xs text-gray-500 dark:text-zinc-400 mb-1">
-                          Product category
-                        </label>
-                        <select
-                          value={sellCategory}
-                          onChange={(e) => setSellCategory(e.target.value)}
-                          className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none"
-                        >
-                          <option value="ai_prompts">AI prompts</option>
-                          <option value="coding_templates">Coding templates</option>
-                          <option value="tech_guides">Tech guides</option>
-                          <option value="ai_workflows">AI workflows</option>
-                          <option value="data_analytics">Data analytics</option>
-                          <option value="others">Other</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -1532,14 +1329,14 @@ export default function NewStoryPage() {
                   const previewContent =
                     field.value && field.value.trim().length > 0
                       ? field.value
-                      : 'The preview will appear here.';
+                      : '미리보기 내용이 여기에 표시됩니다.';
 
                   return (
                     <FormItem>
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="text-sm font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
                           <Plus className="h-3 w-3" />
-                          <span>Write your post</span>
+                          <span>본문 작성</span>
                         </div>
                         <div className="inline-flex rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1 text-xs font-medium">
                           {(['rich', 'markdown'] as EditorMode[]).map((mode) => (
@@ -1554,12 +1351,12 @@ export default function NewStoryPage() {
                               }`}
                               disabled={editorMode === mode || isSwitchingEditorMode}
                             >
-                              {mode === 'rich' ? 'Rich text' : 'Markdown'}
+                              {mode === 'rich' ? '리치 텍스트' : 'Markdown'}
                             </button>
                           ))}
                           {isSwitchingEditorMode && (
                             <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
-                              Switching...
+                              전환 중...
                             </span>
                           )}
                         </div>
@@ -1571,7 +1368,7 @@ export default function NewStoryPage() {
                             <input
                               ref={markdownImageInputRef}
                               type="file"
-                              accept="image/*"
+                              accept="image/jpeg,image/png,image/webp"
                               className="hidden"
                               onChange={handleMarkdownImageInputChange}
                             />
@@ -1591,7 +1388,7 @@ export default function NewStoryPage() {
                                 disabled={isMarkdownImageUploading}
                               >
                                 <ImageIcon className="h-4 w-4 mr-1.5" />
-                                Upload image
+                                이미지 업로드
                               </Button>
                               <Button
                                 type="button"
@@ -1601,27 +1398,11 @@ export default function NewStoryPage() {
                                 disabled={isMarkdownVideoUploading}
                               >
                                 <Film className="h-4 w-4 mr-1.5" />
-                                Upload video
+                                영상 업로드
                               </Button>
-                              <GithubResourcePopover
-                                githubUrl={form.watch('githubUrl') ?? ''}
-                                githubDescription={form.watch('githubDescription') ?? ''}
-                                onGithubUrlChange={(value) => form.setValue('githubUrl', value, { shouldDirty: true, shouldTouch: true })}
-                                onGithubDescriptionChange={(value) => form.setValue('githubDescription', value, { shouldDirty: true, shouldTouch: true })}
-                              >
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="px-2.5"
-                                  title="GitHub resource"
-                                >
-                                  <Github className="h-4 w-4" />
-                                </Button>
-                              </GithubResourcePopover>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  Uploading image...
+                                  이미지 업로드 중...
                                 </span>
                               )}
                               {markdownVideoStatusMessage && (
@@ -1630,94 +1411,98 @@ export default function NewStoryPage() {
                                 </span>
                               )}
                               <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                After uploading, you can choose a thumbnail from the list below.
+                                업로드 시 아래 목록에서 썸네일을 고를 수 있어요.
                               </span>
                             </div>
-                            <div className="space-y-4">
-                              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
-                                <HybridMarkdownEditor
-                                  key={`markdown-${activeDraftKey ?? 'new-story'}`}
-                                  ref={markdownEditorRef}
-                                  content={field.value}
-                                  onChange={(value) => field.onChange(value)}
-                                  placeholder="Write your post in Markdown..."
+                            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6 lg:items-start">
+                              <div className="space-y-3">
+                                <Textarea
+                                  ref={markdownTextareaRef}
+                                  value={field.value}
+                                  onChange={(event) => field.onChange(event.target.value)}
+                                  placeholder="Markdown 문법으로 본문을 작성하세요..."
                                   className="min-h-[260px] lg:min-h-[360px] resize-y"
                                 />
-                              </div>
-                              <div className="space-y-1">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  Standard Markdown syntax is supported and safely converted to HTML when you save.
+                                  기본 Markdown 문법을 지원하며, 저장 시 서버에서 안전하게 HTML로 변환됩니다.
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  Pasted image links are automatically converted to <code>![image]</code> format.
+                                  이미지 링크를 붙여넣으면 자동으로 <code>![이미지]</code> 형식으로 바뀝니다.
                                 </p>
                               </div>
-                              <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 lg:p-6 bg-white dark:bg-gray-900">
-                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between">
-                                  <span>Live preview</span>
-                                  <span className="text-[11px] text-gray-400 dark:text-gray-500">Images, tables, and code update instantly.</span>
+                              <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 lg:p-6 bg-white dark:bg-gray-900 mt-4 lg:mt-0 max-h-[520px] lg:max-h-[720px] overflow-hidden flex flex-col">
+                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between flex-shrink-0">
+                                  <span>실시간 미리보기</span>
+                                  <span className="text-[11px] text-gray-400 dark:text-gray-500">이미지, 표, 코드까지 즉시 반영돼요.</span>
                                 </p>
-                                <HtmlContentRenderer
-                                  content={convertMarkdownToHtml(previewContent)}
-                                  options={{ enableImageModal: false }}
-                                  className="markdown-content prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words"
-                                />
+                                <div className="prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words overflow-y-auto flex-1">
+                                  <ReactMarkdown skipHtml>{previewContent}</ReactMarkdown>
+                                </div>
                               </div>
                             </div>
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  Uploaded images
+                                  업로드한 이미지
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  Thumbnails can be selected from uploaded images or YouTube videos.
+                                  썸네일은 업로드한 이미지에서만 선택됩니다.
                                 </span>
                               </div>
                               {isResolvingFileMetadata && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  Loading image details...
+                                  이미지 정보를 불러오는 중입니다...
                                 </p>
                               )}
                               {markdownImages.length > 0 ? (
                                 <div className="grid gap-4 sm:grid-cols-2">
-                                  {markdownImages.map((image) => (
-                                    <MarkdownImageCard
-                                      key={image.id}
-                                      image={image}
-                                      isActiveThumbnail={!selectedYouTubeThumbnailId && currentThumbnailFileId === image.id}
-                                      onSetThumbnail={setThumbnailByFileId}
-                                    />
-                                  ))}
+                                  {markdownImages.map((image) => {
+                                    const isActive = currentThumbnailFileId === image.id;
+                                    return (
+                                      <div
+                                        key={image.id}
+                                        className="flex items-center gap-3 rounded-lg border border-gray-100 dark:border-gray-800 p-2"
+                                      >
+                                        <div className="h-16 w-16 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img
+                                            src={normalizeImageUrl(image.url)}
+                                            alt={image.name || '업로드한 이미지'}
+                                            className="h-full w-full object-cover"
+                                          />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                                            {image.name || '업로드한 이미지'}
+                                          </p>
+                                          <div className="flex flex-wrap gap-2">
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="outline"
+                                              className="gap-1.5"
+                                              onClick={() => handleInsertImageFromList(image)}
+                                            >
+                                              <FileText className="h-3.5 w-3.5" />
+                                              본문에 삽입
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant={isActive ? 'default' : 'secondary'}
+                                              onClick={() => setThumbnailByFileId(image.id)}
+                                            >
+                                              {isActive ? '썸네일 선택됨' : '썸네일로 지정'}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  No uploaded images yet. Add one above to preview it here and use it as the thumbnail.
-                                </p>
-                              )}
-                            </div>
-                            <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  YouTube in this post
-                                </p>
-                                <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  If the post contains a YouTube link, you can choose it as the thumbnail here.
-                                </span>
-                              </div>
-                              {markdownYouTubeIds.length > 0 ? (
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                  {markdownYouTubeIds.map((videoId) => (
-                                    <MarkdownYouTubeCard
-                                      key={videoId}
-                                      videoId={videoId}
-                                      isActiveThumbnail={selectedYouTubeThumbnailId === videoId}
-                                      onSetThumbnail={handleYouTubeThumbnailSelect}
-                                    />
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  Add a YouTube link to the post and it will appear here.
+                                  업로드한 이미지가 없습니다. 위의 버튼으로 이미지를 추가하면 여기에서 미리보고 썸네일을 지정할 수 있어요.
                                 </p>
                               )}
                             </div>
@@ -1748,14 +1533,10 @@ export default function NewStoryPage() {
                                 key="blog-editor-stable"
                                 content={field.value}
                                 onChange={field.onChange}
-                                placeholder="Start writing..."
+                                placeholder=" 내용을 입력하세요..."
                                 initialThumbnailIndex={thumbnailIndex}
                                 onThumbnailIndexChange={handleThumbnailChange}
                                 onFileIdsChange={handleFileIdsChange}
-                                githubUrl={form.watch('githubUrl') ?? ''}
-                                githubDescription={form.watch('githubDescription') ?? ''}
-                                onGithubUrlChange={(value) => form.setValue('githubUrl', value, { shouldDirty: true, shouldTouch: true })}
-                                onGithubDescriptionChange={(value) => form.setValue('githubDescription', value, { shouldDirty: true, shouldTouch: true })}
                               />
                             </div>
                           </div>
@@ -1772,7 +1553,7 @@ export default function NewStoryPage() {
                             type="button"
                             onClick={() => form.clearErrors('content')}
                             className="p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                            aria-label="Close"
+                            aria-label="닫기"
                           >
                             <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
                           </button>
@@ -1791,20 +1572,20 @@ export default function NewStoryPage() {
               <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                  External images are not allowed
+                  외부 이미지 사용 불가
                 </p>
                 <p className="text-sm text-red-700 dark:text-red-300 mt-1">
                   {contentSecurityError}
                 </p>
                 <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-2">
-                  Upload the image directly or use images from an allowed domain.
+                  이미지를 직접 업로드하거나, 허용된 도메인의 이미지만 사용해주세요.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setContentSecurityError(null)}
                 className="p-1 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-                aria-label="Close"
+                aria-label="닫기"
               >
                 <X className="h-4 w-4 text-red-600 dark:text-red-400" />
               </button>
@@ -1815,7 +1596,7 @@ export default function NewStoryPage() {
           {hasPendingVideoUploads && (
             <p className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 pt-2">
               <AlertCircle className="h-4 w-4" />
-              <span>{videoUploadStatusText ?? 'Please wait for video uploads and processing to finish.'}</span>
+              <span>{videoUploadStatusText ?? '비디오 업로드와 처리가 완료될 때까지 기다려주세요.'}</span>
             </p>
           )}
 
@@ -1826,7 +1607,7 @@ export default function NewStoryPage() {
               onClick={() => router.back()}
               disabled={isMutationPending}
             >
-              Cancel
+              취소
             </Button>
             <Button
               type="button"
@@ -1836,7 +1617,7 @@ export default function NewStoryPage() {
                 // 임시저장 (isPublished: false로 저장)
                 const data = form.getValues();
                 if (!data.title?.trim()) {
-                  setTitleError('Enter a title.');
+                  setTitleError('제목을 입력해주세요.');
                   return;
                 }
                 setTitleError(null);
@@ -1857,13 +1638,10 @@ export default function NewStoryPage() {
                     const categories = data.categories ?? [];
                     const categoryString = categories.join('/');
                     
-                    const postData: any = {
+                    const postData: CreatePostRequest = {
                       title: data.title,
-                      category: categoryString || 'other',
+                      category: categoryString || '기타',
                       tags: data.tags,
-                      githubUrl: data.githubUrl?.trim() ?? '',
-                      githubDescription: data.githubDescription?.trim() ?? '',
-                      visibility: postVisibility,
                       attachedFileIds: data.fileIds,
                       ...(thumbnailImageId && { thumbnailImageId }),
                       isPublished: false, // 초안으로 저장
@@ -1871,7 +1649,7 @@ export default function NewStoryPage() {
                     
                     if (isMarkdownMode) {
                       postData.content = data.content;
-                      postData.contentMarkdown = data.content;
+                      postData.content_markdown = data.content;
                     } else {
                       postData.content = data.content;
                     }
@@ -1897,11 +1675,11 @@ export default function NewStoryPage() {
                   }
                   
                   clearDraft();
-                  toast.success('Draft saved.');
+                  toast.success('초안이 저장되었습니다.');
                   router.push('/drafts');
                 } catch (error) {
                   console.error('Failed to save draft:', error);
-                  toast.error('Failed to save the draft.');
+                  toast.error('초안 저장에 실패했습니다.');
                 } finally {
                   isSubmittingRef.current = false;
                   setIsSubmitting(false);
@@ -1910,7 +1688,7 @@ export default function NewStoryPage() {
               className="flex items-center justify-center gap-1.5"
             >
               <FileText className="h-4 w-4" />
-              Save draft
+              임시저장
             </Button>
             <Button
               type="submit"
@@ -1921,19 +1699,19 @@ export default function NewStoryPage() {
                   e.preventDefault();
                   e.stopPropagation();
                   if (hasPendingVideoUploads) {
-                    toast.warning('You can save after video upload and processing finish.');
+                    toast.warning('비디오 업로드/처리가 끝난 후에 저장할 수 있습니다.');
                   }
                 }
               }}
               className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 min-w-[88px] text-[13px] font-semibold rounded-md bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-gray-100 shadow-lg"
-              aria-label={isSaving ? "Saving" : "Save"}
+              aria-label={isSaving ? "저장 중" : "저장"}
             >
               {isSaving ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Save
+                  저장
                 </>
               )}
             </Button>
@@ -1952,9 +1730,9 @@ export default function NewStoryPage() {
             executeEditorModeChange(pendingEditorMode);
           }
         }}
-        title="Change editor mode"
-        description="Switching editor mode may convert or remove some formatting. Do you want to continue?"
-        confirmText="Continue"
+        title="편집 모드 변경"
+        description="편집 모드를 변경하면 일부 서식이 변환되거나 유실될 수 있습니다. 계속하시겠습니까?"
+        confirmText="계속하기"
       />
     </div>
   );
@@ -1979,7 +1757,7 @@ function BlogCategoryField({ field, disabled = false }: BlogCategoryFieldProps) 
     const trimmed = value.trim().replace(/,/g, '');
     if (!trimmed) return;
     if (trimmed.length > 15) {
-      toast.error('Category must be 15 characters or fewer.');
+      toast.error('카테고리는 최대 15글자까지 입력 가능합니다.');
       return;
     }
     if (categories.length < 2 && !categories.includes(trimmed) && !trimmed.includes('/')) {
@@ -2020,16 +1798,16 @@ function BlogCategoryField({ field, disabled = false }: BlogCategoryFieldProps) 
       {showLabel && (
         <>
           <div className="mb-2 lg:hidden">
-            <span className="text-xs text-gray-700 dark:text-gray-100">Category</span>
-            <div className="text-[11px] text-gray-500 dark:text-gray-400">(Required)</div>
+            <span className="text-xs text-gray-700 dark:text-gray-100">카테고리</span>
+            <div className="text-[11px] text-gray-500 dark:text-gray-400">(필수)</div>
           </div>
           <div className="hidden lg:block absolute -left-24 top-3">
             <div className="flex flex-col text-gray-700 dark:text-gray-100">
               <div className="flex items-center gap-2 text-sm whitespace-nowrap">
                 <Plus className="h-3 w-3" />
-                <span>Category</span>
+                <span>카테고리</span>
               </div>
-              <div className="ml-5 text-[11px] text-gray-500 dark:text-gray-400">(Required)</div>
+              <div className="ml-5 text-[11px] text-gray-500 dark:text-gray-400">(필수)</div>
             </div>
           </div>
         </>
@@ -2049,8 +1827,8 @@ function BlogCategoryField({ field, disabled = false }: BlogCategoryFieldProps) 
               className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm"
             >
               <span>{category}</span>
-              {index === 0 && <span className="text-xs text-gray-500 dark:text-gray-400">(Primary)</span>}
-              {index === 1 && <span className="text-xs text-gray-500 dark:text-gray-400">(Secondary)</span>}
+              {index === 0 && <span className="text-xs text-gray-500 dark:text-gray-400">(메인)</span>}
+              {index === 1 && <span className="text-xs text-gray-500 dark:text-gray-400">(서브)</span>}
               <button
                 type="button"
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -2074,18 +1852,18 @@ function BlogCategoryField({ field, disabled = false }: BlogCategoryFieldProps) 
           onFocus={() => setIsFocused(true)}
           onBlur={handleBlur}
           disabled={disabled || isMaxReached}
-          placeholder={isMaxReached ? 'You can add up to 2 categories' : 'Press Enter or use commas to add categories'}
+          placeholder={isMaxReached ? '최대 2개까지 입력 가능합니다' : '입력 후 엔터 또는 콤마로 구분'}
           className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[280px] !bg-transparent !rounded-none placeholder:text-gray-500 dark:placeholder:text-gray-300 text-gray-900 dark:text-gray-50"
           style={{ width: inputValue ? `${Math.max(280, inputValue.length * 14)}px` : '280px' }}
         />
         {!inputValue && categories.length === 0 && (
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-1">
-            Up to 2 categories (primary and secondary)
+            최대 2개 입력 가능 (메인, 서브)
           </p>
         )}
         {isMaxReached && (
           <p className="text-xs text-orange-500 dark:text-orange-400 mt-1 pl-1">
-            You can add up to 2 categories
+            카테고리는 최대 2개까지만 입력 가능합니다
           </p>
         )}
       </div>

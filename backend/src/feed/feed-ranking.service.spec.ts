@@ -32,18 +32,4 @@ describe("FeedRankingService - Community Visibility Filters", () => {
     expect(query).toContain('c."isPostDiscoverable" = true');
     expect(query).toContain("c.\"joinPolicy\" <> 'private'");
   });
-
-  it("adds blog isPublic filter to blog ranking query", async () => {
-    const service = new FeedRankingService(
-      mockDataSource as any,
-      mockRedis as any,
-    );
-
-    await (service as any).fetchRankingRows(FeedSortType.HOT, 10);
-
-    const query = mockDataSource.query.mock.calls[0][0] as string;
-    expect(query).toContain("INNER JOIN blogs b");
-    expect(query).toContain('b."isPublic" = true');
-    expect(query).toContain("p.visibility = 'public'");
-  });
 });

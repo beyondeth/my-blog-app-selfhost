@@ -46,6 +46,7 @@ export class ThumbnailService {
     fileId: string,
     userId: string,
     manager?: EntityManager,
+    organizationId?: string,
   ): Promise<Post> {
     const postRepository = manager
       ? manager.getRepository(Post)
@@ -60,7 +61,10 @@ export class ThumbnailService {
 
     // 1. 포스트 조회 및 권한 확인
     const post = await postRepository.findOne({
-      where: { id: postId },
+      where: {
+        id: postId,
+        ...(organizationId ? { blog: { organizationId } } : {}),
+      },
       relations: ["blog"],
     });
 
@@ -75,7 +79,11 @@ export class ThumbnailService {
 
     // 2. 파일 조회 및 소유권 확인
     const file = await fileRepository.findOne({
-      where: { id: fileId, userId },
+      where: {
+        id: fileId,
+        userId,
+        ...(organizationId ? { organizationId } : {}),
+      },
     });
 
     if (!file) {
@@ -193,6 +201,7 @@ export class ThumbnailService {
   async getThumbnailCandidates(
     postId: string,
     userId: string,
+    organizationId?: string,
   ): Promise<File[]> {
     this.logger.debug(
       `[GET_THUMBNAIL_CANDIDATES] Getting candidates for post: ${postId}`,
@@ -200,7 +209,10 @@ export class ThumbnailService {
 
     // 포스트 조회
     const post = await this.postsRepository.findOne({
-      where: { id: postId },
+      where: {
+        id: postId,
+        ...(organizationId ? { blog: { organizationId } } : {}),
+      },
       relations: ["blog"],
     });
 
@@ -219,6 +231,10 @@ export class ThumbnailService {
       .innerJoin("file.posts", "post")
       .where("post.id = :postId", { postId })
       .andWhere("file.fileType = :fileType", { fileType: "image" })
+      .andWhere(
+        organizationId ? "file.organizationId = :organizationId" : "1=1",
+        organizationId ? { organizationId } : {},
+      )
       .orderBy("file.createdAt", "ASC")
       .getMany();
 

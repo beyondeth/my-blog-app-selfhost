@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
 import { FiEye, FiMessageSquare, FiThumbsUp } from 'react-icons/fi';
 import { CommunityPost } from '@/types/community';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface CommunityTrendingSectionProps {
   communitySlug: string;
@@ -75,7 +76,7 @@ export default function CommunityTrendingSection({
               <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl mb-4 border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
                 {post.thumbnailImage && (
                   <Image
-                    src={post.thumbnailImage.url}
+                    src={normalizeImageUrl(post.thumbnailImage.url)}
                     alt={post.title}
                     fill
                     className="object-cover transition-transform duration-500 group-hover:scale-105"

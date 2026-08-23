@@ -38,7 +38,7 @@ export default function SidebarFooter() {
       {/* 저작권 표시 */}
       <div className="mb-4">
         <p className="text-sm text-[#4B5563] dark:text-[#C7D1DD]">
-          Codebase, Inc. © 2025. All rights reserved.
+          © 2026 beyondeth. All rights reserved.
         </p>
       </div>
 

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import io, { Socket } from 'socket.io-client';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { authEvents } from '@/lib/auth/events';
+import { getCsrfHeaders } from '@/lib/api/csrf';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -30,6 +31,7 @@ async function refreshToken(): Promise<boolean> {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        ...(await getCsrfHeaders()),
       },
       signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined,
     });
@@ -50,6 +52,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const isConnecting = useRef(false);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     // 0. 인증 확인 중이면 연결 시도하지 않음
@@ -62,9 +65,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // 1. 인증되지 않으면 소켓 연결 안 함 (또는 연결 끊기)
     if (!canConnect) {
-      if (socket) {
+      if (socketRef.current) {
         if (IS_DEV) console.log('[SocketProvider] User logged out, disconnecting socket');
-        socket.disconnect();
+        socketRef.current.disconnect();
+        socketRef.current = null;
         setSocket(null);
         setIsConnected(false);
         isConnecting.current = false;
@@ -73,7 +77,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // 2. 이미 연결 중이거나 연결된 상태면 스킵 (Singleton 보장)
-    if (isConnecting.current || (socket && socket.connected)) {
+    if (isConnecting.current || socketRef.current?.connected) {
       return;
     }
 
@@ -130,6 +134,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     newSocket.on('connect_error', onConnectError);
 
     setSocket(newSocket);
+    socketRef.current = newSocket;
 
     // 5. Cleanup Function
     return () => {
@@ -149,9 +154,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // 로그아웃 이벤트 리스너 (AuthEvents)
   useEffect(() => {
     const handleLogout = () => {
-      if (socket) {
+      if (socketRef.current) {
         if (IS_DEV) console.log('[SocketProvider] Logout event, disconnecting');
-        socket.disconnect();
+        socketRef.current.disconnect();
+        socketRef.current = null;
         setSocket(null);
         setIsConnected(false);
       }
@@ -159,7 +165,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const unsubscribe = authEvents.on('logout', handleLogout);
     return () => unsubscribe();
-  }, [socket]);
+  }, []);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>

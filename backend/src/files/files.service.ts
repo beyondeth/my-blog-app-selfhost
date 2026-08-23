@@ -4,7 +4,9 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from "@nestjs/common";
+import * as crypto from "crypto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -29,11 +31,42 @@ import {
   isImageMimeType,
   validateMimeType,
   formatFileSize,
+  SAFE_IMAGE_MIME_TYPES,
+  validateImageBuffer,
 } from "../common/utils/file.utils";
+
+type UploadIntentPayload = {
+  kind: "single";
+  userId: string;
+  organizationId?: string;
+  fileKey: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  fileType: string;
+  exp: number;
+};
+
+type BatchUploadIntentPayload = {
+  kind: "batch";
+  userId: string;
+  organizationId?: string;
+  uploads: Array<
+    Pick<
+      UploadIntentPayload,
+      "fileKey" | "fileName" | "mimeType" | "fileSize" | "fileType"
+    >
+  >;
+  context?: string;
+  exp: number;
+};
 
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name);
+
+  private readonly uploadIntentTtlSeconds = 15 * 60;
+  private readonly temporaryFileTtlMs = 24 * 60 * 60 * 1000;
 
   constructor(
     @InjectRepository(File)
@@ -50,15 +83,139 @@ export class FilesService {
    * 파일 업로드 시 사용되는 임시 컨텍스트
    * 나중에 포스트 저장 시 정식 컨텍스트로 전환됨
    */
-  private async createTemporaryContext(userId: string): Promise<FileContext> {
+  private async createTemporaryContext(
+    userId: string,
+    organizationId?: string,
+  ): Promise<FileContext> {
     const context = this.contextRepository.create({
       contextType: FileContextType.SYSTEM,
       contextId: null, // UUID 타입이므로 임시 context는 null 사용
       purpose: FilePurpose.CONTENT, // 기존 enum 사용
       ownerId: userId,
+      organizationId,
       isActive: true,
     });
     return await this.contextRepository.save(context);
+  }
+
+  private getUploadIntentSecret(): string {
+    const secret =
+      this.configService.get<string>("UPLOAD_INTENT_SECRET") ||
+      this.configService.get<string>("JWT_SECRET");
+
+    if (!secret || secret.length < 32) {
+      throw new Error(
+        "UPLOAD_INTENT_SECRET or JWT_SECRET must be at least 32 characters",
+      );
+    }
+
+    return secret;
+  }
+
+  private createSignedUploadIntent(payload: Record<string, unknown>): string {
+    const encodedPayload = Buffer.from(
+      JSON.stringify({
+        ...payload,
+        exp: Math.floor(Date.now() / 1000) + this.uploadIntentTtlSeconds,
+      }),
+    ).toString("base64url");
+    const signature = crypto
+      .createHmac("sha256", this.getUploadIntentSecret())
+      .update(encodedPayload)
+      .digest("base64url");
+
+    return `${encodedPayload}.${signature}`;
+  }
+
+  private createUploadIntent(payload: {
+    userId: string;
+    organizationId?: string;
+    fileKey: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    fileType: string;
+  }): string {
+    return this.createSignedUploadIntent({ kind: "single", ...payload });
+  }
+
+  private verifySignedUploadIntent<T extends { exp: number }>(
+    token: string,
+  ): T {
+    if (typeof token !== "string" || token.length > 2048) {
+      throw new BadRequestException("Invalid upload intent");
+    }
+
+    const [encodedPayload, signature] = token.split(".");
+    if (!encodedPayload || !signature || token.split(".").length !== 2) {
+      throw new BadRequestException("Invalid upload intent");
+    }
+
+    const expectedSignature = crypto
+      .createHmac("sha256", this.getUploadIntentSecret())
+      .update(encodedPayload)
+      .digest("base64url");
+    const receivedSignature = Buffer.from(signature);
+    const expectedSignatureBuffer = Buffer.from(expectedSignature);
+
+    if (
+      receivedSignature.length !== expectedSignatureBuffer.length ||
+      !crypto.timingSafeEqual(receivedSignature, expectedSignatureBuffer)
+    ) {
+      throw new BadRequestException("Invalid upload intent");
+    }
+
+    let payload: T;
+    try {
+      payload = JSON.parse(
+        Buffer.from(encodedPayload, "base64url").toString("utf8"),
+      );
+    } catch {
+      throw new BadRequestException("Invalid upload intent");
+    }
+
+    if (
+      !payload ||
+      typeof payload.exp !== "number" ||
+      payload.exp <= Math.floor(Date.now() / 1000)
+    ) {
+      throw new BadRequestException("Upload intent has expired");
+    }
+
+    return payload;
+  }
+
+  private verifyUploadIntent(tempId: string): UploadIntentPayload {
+    const payload = this.verifySignedUploadIntent<UploadIntentPayload>(tempId);
+    if (
+      payload.kind !== "single" ||
+      !payload.userId ||
+      !payload.fileKey ||
+      !payload.fileName ||
+      !payload.mimeType ||
+      !Number.isSafeInteger(payload.fileSize) ||
+      !payload.fileType
+    ) {
+      throw new BadRequestException("Invalid upload intent");
+    }
+
+    return payload;
+  }
+
+  private verifyBatchUploadIntent(batchId: string): BatchUploadIntentPayload {
+    const payload =
+      this.verifySignedUploadIntent<BatchUploadIntentPayload>(batchId);
+    if (
+      payload.kind !== "batch" ||
+      !payload.userId ||
+      !Array.isArray(payload.uploads) ||
+      payload.uploads.length === 0 ||
+      payload.uploads.length > 5
+    ) {
+      throw new BadRequestException("Invalid batch upload intent");
+    }
+
+    return payload;
   }
 
   /**
@@ -67,17 +224,30 @@ export class FilesService {
   async createBatchUploadUrl(
     userId: string,
     createBatchUploadUrlDto: CreateBatchUploadUrlDto,
+    organizationId?: string,
   ) {
     const { files, context } = createBatchUploadUrlDto;
 
     try {
-      // 배치 ID 생성
-      const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const batchNonce = crypto.randomUUID();
 
       // 각 파일에 대해 업로드 URL 생성
       const uploads = await Promise.all(
         files.map(async (file, index) => {
           const { fileName, mimeType, fileSize, fileType = "image" } = file;
+
+          const normalizedMimeType =
+            mimeType.toLowerCase() === "image/jpg"
+              ? "image/jpeg"
+              : mimeType.toLowerCase();
+          if (
+            isImageMimeType(mimeType) &&
+            !SAFE_IMAGE_MIME_TYPES.includes(normalizedMimeType as any)
+          ) {
+            throw new BadRequestException(
+              `SVG 및 지원하지 않는 이미지 형식은 업로드할 수 없습니다: ${fileName}`,
+            );
+          }
 
           // 이미지 파일인 경우 WebP만 허용
           if (fileType === "image" && mimeType !== "image/webp") {
@@ -111,13 +281,17 @@ export class FilesService {
             fileType,
           );
 
-          // 임시 ID 생성 (배치 ID + 인덱스)
-          const tempId = `${batchId}_${index}`;
+          // 개별 업로드 UI에서 사용할 식별자. 완료 요청은 서명된 batchId를
+          // 기준으로 다시 검증하므로 이 값만으로 파일을 확정할 수 없다.
+          const tempId = `${batchNonce}_${index}`;
 
           return {
             ...presignedData,
             tempId,
             fileName,
+            mimeType,
+            fileSize,
+            fileType,
             originalFileName: fileName,
             uuidFileName,
             s3Key,
@@ -125,8 +299,22 @@ export class FilesService {
         }),
       );
 
+      const batchId = this.createSignedUploadIntent({
+        kind: "batch",
+        userId,
+        organizationId,
+        context,
+        uploads: uploads.map((upload, index) => ({
+          fileKey: upload.fileKey,
+          fileName: upload.fileName,
+          mimeType: upload.mimeType,
+          fileSize: files[index].fileSize,
+          fileType: files[index].fileType || "image",
+        })),
+      });
+
       this.logger.log(
-        `Batch upload URLs created for user ${userId}, batch: ${batchId}, files: ${files.length}`,
+        `Batch upload URLs created for user ${userId}, files: ${files.length}`,
       );
 
       return {
@@ -149,45 +337,98 @@ export class FilesService {
   async batchUploadComplete(
     userId: string,
     batchUploadCompleteDto: BatchUploadCompleteDto,
+    organizationId?: string,
   ) {
-    const { fileKeys, context } = batchUploadCompleteDto;
+    const { batchId, fileKeys, context } = batchUploadCompleteDto;
 
     try {
+      const intent = this.verifyBatchUploadIntent(batchId);
+      if (intent.userId !== userId) {
+        throw new ForbiddenException(
+          "Batch upload intent does not belong to this user",
+        );
+      }
+
+      if ((intent.organizationId || null) !== (organizationId || null)) {
+        throw new ForbiddenException(
+          "Batch upload intent does not belong to this organization",
+        );
+      }
+
+      if (context && context !== intent.context) {
+        throw new BadRequestException(
+          "Batch upload context does not match the issued intent",
+        );
+      }
+
+      if (
+        fileKeys.length !== intent.uploads.length ||
+        new Set(fileKeys).size !== fileKeys.length
+      ) {
+        throw new BadRequestException(
+          "Batch upload files do not match the issued intent",
+        );
+      }
+
+      const expectedUploads = new Map(
+        intent.uploads.map((upload) => [upload.fileKey, upload]),
+      );
+
       this.logger.log(`Batch upload complete request received:`, {
         userId,
-        fileKeys,
-        context,
         count: fileKeys.length,
       });
 
       // 배치용 임시 context 하나 생성
-      const tempContext = await this.createTemporaryContext(userId);
+      const tempContext = await this.createTemporaryContext(
+        userId,
+        organizationId,
+      );
 
       // 각 파일에 대해 업로드 완료 처리
       const completedFiles = await Promise.all(
-        fileKeys.map(async (fileKey, index) => {
-          // S3 키 검증
-          if (!fileKey || !fileKey.includes("uploads/")) {
-            throw new Error(`Invalid S3 key format: ${fileKey}`);
+        fileKeys.map(async (fileKey) => {
+          const expectedUpload = expectedUploads.get(fileKey);
+          if (!expectedUpload || !fileKey.startsWith("uploads/")) {
+            throw new BadRequestException("Invalid batch upload file");
           }
 
           // S3에서 파일 정보 가져오기 (메타데이터 포함)
           const fileMetadata = await this.s3Service.getObjectMetadata(fileKey);
           if (!fileMetadata) {
-            throw new Error(`File metadata not found: ${fileKey}`);
+            throw new BadRequestException("Uploaded object was not found");
+          }
+
+          if (
+            fileMetadata.contentLength !== expectedUpload.fileSize ||
+            fileMetadata.contentType !== expectedUpload.mimeType
+          ) {
+            throw new BadRequestException(
+              "Uploaded object metadata does not match the issued intent",
+            );
+          }
+
+          if (isImageMimeType(expectedUpload.mimeType)) {
+            await this.validateStoredImage(
+              fileKey,
+              fileMetadata.contentLength ?? expectedUpload.fileSize,
+              fileMetadata.contentType || expectedUpload.mimeType,
+            );
           }
 
           // 파일 정보 DB에 저장
           const file = this.fileRepository.create({
-            originalName: fileMetadata.originalName || fileKey.split("/").pop(),
+            originalName: expectedUpload.fileName,
             fileName: fileKey.split("/").pop(),
             fileKey,
             fileUrl: fileKey,
-            fileSize: fileMetadata.contentLength || 0,
-            mimeType: fileMetadata.contentType || "image/webp",
-            fileType: "image",
+            fileSize: fileMetadata.contentLength,
+            mimeType: fileMetadata.contentType,
+            fileType: expectedUpload.fileType,
             userId,
+            organizationId,
             contextId: tempContext.id, // 임시 context 추가
+            expiresAt: new Date(Date.now() + this.temporaryFileTtlMs),
           });
 
           const savedFile = await this.fileRepository.save(file);
@@ -213,8 +454,8 @@ export class FilesService {
 
       return {
         files: completedFiles,
-        batchId: `batch_${Date.now()}`,
-        context,
+        batchId,
+        context: intent.context,
       };
     } catch (error) {
       this.logger.error(
@@ -232,43 +473,73 @@ export class FilesService {
     postId: string,
     userId: string,
     updateImageOrderDto: UpdateImageOrderDto,
+    organizationId?: string,
   ) {
     const { imageOrder } = updateImageOrderDto;
+    const fileIds = imageOrder.map(({ fileId }) => fileId);
+    const orders = imageOrder.map(({ order }) => order);
+
+    if (
+      new Set(fileIds).size !== fileIds.length ||
+      new Set(orders).size !== orders.length
+    ) {
+      throw new BadRequestException(
+        "파일 ID와 이미지 순서는 각각 중복될 수 없습니다.",
+      );
+    }
 
     try {
       // 포스트 소유권 확인 (Post 엔티티를 직접 주입하지 않으므로 raw query 사용)
       const postOwnerCheck = await this.fileRepository.query(
-        "SELECT author_id FROM posts WHERE id = $1",
-        [postId],
+        `SELECT p."authorId" AS author_id
+         FROM posts p
+         LEFT JOIN blogs b ON b.id = p."blogId"
+         WHERE p.id = $1
+           AND p."authorId" = $2
+           AND ($3::uuid IS NULL OR b."organizationId" = $3)`,
+        [postId, userId, organizationId || null],
       );
 
-      if (!postOwnerCheck.length || postOwnerCheck[0].author_id !== userId) {
+      if (!postOwnerCheck.length) {
         throw new ForbiddenException("포스트에 대한 권한이 없습니다.");
       }
 
-      // 트랜잭션으로 순서 업데이트
+      // 연결 검증과 순서 갱신을 각각 한 번의 쿼리로 처리한다.
       await this.fileRepository.manager.transaction(async (manager) => {
-        for (const orderInfo of imageOrder) {
-          const { fileId, order } = orderInfo;
+        if (fileIds.length === 0) {
+          return;
+        }
 
-          // 파일이 해당 포스트에 연결되어 있는지 확인
-          const fileExists = await manager.query(
-            'SELECT 1 FROM post_files WHERE "postId" = $1 AND "fileId" = $2',
-            [postId, fileId],
+        const linkedFiles: Array<{ fileId: string }> = await manager.query(
+          `SELECT pf."fileId" AS "fileId"
+           FROM post_files pf
+           JOIN files f ON f.id = pf."fileId"
+           WHERE pf."postId" = $1
+             AND pf."fileId" = ANY($2::uuid[])
+             AND ($3::uuid IS NULL OR f."organizationId" = $3)`,
+          [postId, fileIds, organizationId || null],
+        );
+
+        if (linkedFiles.length !== fileIds.length) {
+          const linkedFileIds = new Set(
+            linkedFiles.map(({ fileId }) => fileId),
           );
-
-          if (!fileExists.length) {
-            throw new NotFoundException(
-              `파일 ${fileId}가 포스트 ${postId}에 연결되어 있지 않습니다.`,
-            );
-          }
-
-          // 순서 업데이트
-          await manager.query(
-            'UPDATE post_files SET image_order = $1 WHERE "postId" = $2 AND "fileId" = $3',
-            [order, postId, fileId],
+          const missingFileId = fileIds.find(
+            (fileId) => !linkedFileIds.has(fileId),
+          );
+          throw new NotFoundException(
+            `파일 ${missingFileId}가 포스트 ${postId}에 연결되어 있지 않습니다.`,
           );
         }
+
+        await manager.query(
+          `UPDATE post_files pf
+           SET image_order = ordering.image_order
+           FROM unnest($2::uuid[], $3::int[]) AS ordering(file_id, image_order)
+           WHERE pf."postId" = $1
+             AND pf."fileId" = ordering.file_id`,
+          [postId, fileIds, orders],
+        );
       });
 
       this.logger.log(
@@ -295,6 +566,7 @@ export class FilesService {
   async createUploadUrl(
     userId: string,
     createUploadUrlDto: CreateUploadUrlDto,
+    organizationId?: string,
   ): Promise<
     PresignedUrlResponse & {
       tempId: string;
@@ -305,21 +577,24 @@ export class FilesService {
     const { fileName, mimeType, fileSize, fileType } = createUploadUrlDto;
 
     try {
-      // 이미지 파일인 경우 WebP, PNG, JPEG 허용 (MCP 업로드 호환)
-      if (fileType === "image") {
-        const allowedImageTypes = [
-          "image/webp",
-          "image/png",
-          "image/jpeg",
-          "image/jpg",
-        ];
-        if (!allowedImageTypes.includes(mimeType)) {
-          throw new BadRequestException(
-            mimeType === "image/svg+xml"
-              ? "SVG 업로드는 보안 정책상 허용되지 않습니다. PNG, JPEG, WebP 이미지를 사용하세요."
-              : "지원되지 않는 이미지 형식입니다. WebP, PNG, JPEG만 허용됩니다.",
-          );
-        }
+      const normalizedMimeType =
+        mimeType.toLowerCase() === "image/jpg"
+          ? "image/jpeg"
+          : mimeType.toLowerCase();
+      if (
+        isImageMimeType(mimeType) &&
+        !SAFE_IMAGE_MIME_TYPES.includes(normalizedMimeType as any)
+      ) {
+        throw new BadRequestException(
+          normalizedMimeType === "image/svg+xml"
+            ? "SVG 업로드는 보안 정책상 허용되지 않습니다. PNG, JPEG, WebP 이미지를 사용하세요."
+            : "SVG 및 지원하지 않는 이미지 형식은 업로드할 수 없습니다.",
+        );
+      }
+
+      // 이미지 파일인 경우 WebP만 허용
+      if (fileType === "image" && mimeType !== "image/webp") {
+        throw new Error("이미지 업로드는 WebP 형식만 허용됩니다.");
       }
 
       // 문서 파일인 경우 기존 검증 로직 적용
@@ -366,8 +641,17 @@ export class FilesService {
         fileType,
       );
 
-      // 임시 ID 생성 (업로드 완료 시 연결용)
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // 업로드 완료 요청에서 key와 클라이언트 metadata를 위조하지 못하도록
+      // 사용자와 발급 당시 metadata를 HMAC으로 묶은 intent를 반환한다.
+      const tempId = this.createUploadIntent({
+        userId,
+        organizationId,
+        fileKey: s3Key,
+        fileName,
+        mimeType,
+        fileSize,
+        fileType: fileType || "general",
+      });
 
       this.logger.log(
         `Upload URL created for user ${userId}, file: ${fileName}`,
@@ -394,28 +678,76 @@ export class FilesService {
   async uploadComplete(
     userId: string,
     uploadCompleteDto: UploadCompleteDto,
+    organizationId?: string,
   ): Promise<File & { accessUrl: string }> {
-    const { fileKey, fileUrl, fileName, mimeType, fileSize, fileType } =
+    const { tempId, fileKey, fileUrl, fileName, mimeType, fileSize, fileType } =
       uploadCompleteDto;
 
     try {
-      this.logger.log(`Upload complete request received:`, {
-        userId,
-        fileKey,
-        fileUrl,
-        fileName,
-        mimeType,
-        fileSize,
-        fileType,
-      });
+      const intent = this.verifyUploadIntent(tempId);
+      if (intent.userId !== userId) {
+        throw new ForbiddenException(
+          "Upload intent does not belong to this user",
+        );
+      }
 
-      // S3 키 검증 (UUID 형식인지 확인)
-      if (!fileKey || !fileKey.includes("uploads/")) {
-        throw new Error("Invalid S3 key format");
+      if ((intent.organizationId || null) !== (organizationId || null)) {
+        throw new ForbiddenException(
+          "Upload intent does not belong to this organization",
+        );
+      }
+
+      if (
+        intent.fileKey !== fileKey ||
+        intent.fileName !== fileName ||
+        intent.mimeType !== mimeType ||
+        intent.fileSize !== fileSize ||
+        intent.fileType !== (fileType || "general") ||
+        fileUrl !== fileKey
+      ) {
+        throw new BadRequestException(
+          "Upload metadata does not match the issued intent",
+        );
+      }
+
+      if (!fileKey.startsWith("uploads/")) {
+        throw new BadRequestException("Invalid S3 key format");
+      }
+
+      const existingFile = await this.fileRepository.findOne({
+        where: { fileKey },
+      });
+      if (existingFile) {
+        throw new ConflictException("Upload has already been completed");
+      }
+
+      const fileMetadata = await this.s3Service.getObjectMetadata(fileKey);
+      if (!fileMetadata) {
+        throw new BadRequestException("Uploaded object was not found");
+      }
+
+      if (
+        fileMetadata.contentLength !== fileSize ||
+        (fileMetadata.contentType && fileMetadata.contentType !== mimeType)
+      ) {
+        throw new BadRequestException(
+          "Uploaded object metadata does not match the issued intent",
+        );
+      }
+
+      if (isImageMimeType(mimeType)) {
+        await this.validateStoredImage(
+          fileKey,
+          fileMetadata.contentLength ?? fileSize,
+          fileMetadata.contentType || mimeType,
+        );
       }
 
       // 임시 FileContext 생성
-      const tempContext = await this.createTemporaryContext(userId);
+      const tempContext = await this.createTemporaryContext(
+        userId,
+        organizationId,
+      );
 
       // 파일 정보 DB에 저장 - fileUrl에는 S3 키를 저장
       const file = this.fileRepository.create({
@@ -423,11 +755,13 @@ export class FilesService {
         fileName: fileKey.split("/").pop(), // UUID 파일명
         fileKey, // S3 키 (전체 경로)
         fileUrl: fileKey, // S3 키를 저장 (일관성 유지)
-        fileSize,
-        mimeType,
-        fileType: fileType || "general",
+        fileSize: fileMetadata.contentLength,
+        mimeType: fileMetadata.contentType || mimeType,
+        fileType: intent.fileType,
         userId,
+        organizationId,
         contextId: tempContext.id, // 임시 context 추가
+        expiresAt: new Date(Date.now() + this.temporaryFileTtlMs),
       });
 
       const savedFile = await this.fileRepository.save(file);
@@ -461,11 +795,18 @@ export class FilesService {
     fileType?: string,
     page: number = 1,
     limit: number = 20,
+    organizationId?: string,
   ) {
     const queryBuilder = this.fileRepository
       .createQueryBuilder("file")
       .where("file.userId = :userId", { userId })
       .orderBy("file.createdAt", "DESC");
+
+    if (organizationId) {
+      queryBuilder.andWhere("file.organizationId = :organizationId", {
+        organizationId,
+      });
+    }
 
     if (fileType) {
       queryBuilder.andWhere("file.fileType = :fileType", { fileType });
@@ -481,7 +822,7 @@ export class FilesService {
       files.map(async (file) => {
         try {
           const accessUrl = isImageMimeType(file.mimeType)
-            ? await this.s3Service.generatePresignedDownloadUrl(file.fileKey)
+            ? this.cdnService.generateCdnUrl(file).url
             : null;
           return { ...file, accessUrl };
         } catch (error) {
@@ -505,9 +846,16 @@ export class FilesService {
   /**
    * 파일 정보 조회
    */
-  async getFileById(fileId: string, userId?: string): Promise<File> {
+  async getFileById(
+    fileId: string,
+    userId?: string,
+    organizationId?: string,
+  ): Promise<File> {
     const file = await this.fileRepository.findOne({
-      where: { id: fileId },
+      where: {
+        id: fileId,
+        ...(organizationId ? { organizationId } : {}),
+      },
       relations: ["user"],
     });
 
@@ -526,8 +874,12 @@ export class FilesService {
   /**
    * 파일 삭제
    */
-  async deleteFile(fileId: string, userId: string): Promise<void> {
-    const file = await this.getFileById(fileId, userId);
+  async deleteFile(
+    fileId: string,
+    userId: string,
+    organizationId?: string,
+  ): Promise<void> {
+    const file = await this.getFileById(fileId, userId, organizationId);
 
     try {
       // S3에서 파일 삭제
@@ -546,13 +898,18 @@ export class FilesService {
   /**
    * 파일 다운로드 URL 생성
    */
-  async getDownloadUrl(fileId: string, userId?: string): Promise<string> {
-    const file = await this.getFileById(fileId, userId);
+  async getDownloadUrl(
+    fileId: string,
+    userId?: string,
+    organizationId?: string,
+  ): Promise<string> {
+    const file = await this.getFileById(fileId, userId, organizationId);
 
     try {
-      // 이미지 파일이면 Presigned URL 생성
+      // 이미지는 안정적인 프록시/CDN URL을 사용해 저장소 호스트와
+      // 만료되는 presigned URL을 클라이언트에 노출하지 않는다.
       if (isImageMimeType(file.mimeType)) {
-        return await this.s3Service.generatePresignedDownloadUrl(file.fileKey);
+        return this.cdnService.generateCdnUrl(file).url;
       } else {
         return await this.s3Service.generatePresignedDownloadUrl(file.fileKey);
       }
@@ -580,7 +937,7 @@ export class FilesService {
     // S3 키가 저장되어 있다면 사용
     const s3Key = file.fileKey || file.fileUrl;
 
-    if (!s3Key || !s3Key.includes("uploads/")) {
+    if (!s3Key || (!s3Key.startsWith("uploads/") && !s3Key.startsWith("v2/"))) {
       throw new BadRequestException("Invalid file reference");
     }
 
@@ -592,22 +949,37 @@ export class FilesService {
   /**
    * 파일 통계 조회
    */
-  async getFileStats(userId: string) {
-    const stats = await this.fileRepository
+  async getFileStats(userId: string, organizationId?: string) {
+    const statsQuery = this.fileRepository
       .createQueryBuilder("file")
       .select("file.fileType", "fileType")
       .addSelect("COUNT(*)", "count")
       .addSelect("SUM(file.fileSize)", "totalSize")
-      .where("file.userId = :userId", { userId })
-      .groupBy("file.fileType")
-      .getRawMany();
+      .where("file.userId = :userId", { userId });
 
-    const totalFiles = await this.fileRepository.count({ where: { userId } });
-    const totalSize = await this.fileRepository
+    if (organizationId) {
+      statsQuery.andWhere("file.organizationId = :organizationId", {
+        organizationId,
+      });
+    }
+
+    const stats = await statsQuery.groupBy("file.fileType").getRawMany();
+
+    const totalFiles = await this.fileRepository.count({
+      where: { userId, ...(organizationId ? { organizationId } : {}) },
+    });
+    const totalSizeQuery = this.fileRepository
       .createQueryBuilder("file")
       .select("SUM(file.fileSize)", "total")
-      .where("file.userId = :userId", { userId })
-      .getRawOne();
+      .where("file.userId = :userId", { userId });
+
+    if (organizationId) {
+      totalSizeQuery.andWhere("file.organizationId = :organizationId", {
+        organizationId,
+      });
+    }
+
+    const totalSize = await totalSizeQuery.getRawOne();
 
     return {
       totalFiles,
@@ -618,6 +990,22 @@ export class FilesService {
         totalSize: parseInt(stat.totalSize || "0"),
       })),
     };
+  }
+
+  private async validateStoredImage(
+    fileKey: string,
+    size: number,
+    mimeType: string,
+  ): Promise<void> {
+    const sample = await this.s3Service.getObjectSample(fileKey);
+    const validation = validateImageBuffer(
+      { size, mimetype: mimeType, buffer: sample ?? undefined },
+      this.configService.get<number>("MAX_FILE_SIZE", 10 * 1024 * 1024),
+      SAFE_IMAGE_MIME_TYPES,
+    );
+    if (!validation.valid) {
+      throw new BadRequestException(validation.error);
+    }
   }
 
   /**

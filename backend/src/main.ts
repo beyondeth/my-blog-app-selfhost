@@ -12,14 +12,43 @@ import * as session from "express-session";
 import { join } from "path";
 import * as hbs from "hbs";
 import * as morgan from "morgan";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import type { Request, Response } from "express";
+import {
+  isProductionEnvironment,
+  validateProductionEnvironment,
+} from "./config/environment.config";
+import { RequestContextService } from "./common/services/request-context.service";
+import { DataSource } from "typeorm";
+import { UnifiedRedisService } from "./redis/unified-redis.service";
+import { checkReadiness } from "./common/utils/readiness.util";
+import {
+  resolveSessionStoreMode,
+  resolveTrustedProxyAddresses,
+} from "./common/session/session-config.util";
+import { RedisSessionStore } from "./common/session/redis-session.store";
+import { getRedisConnectionToken } from "@nestjs-modules/ioredis";
+import type Redis from "ioredis";
+import { expandLoopbackOrigins } from "./common/utils/cors.util";
+
+function getConfiguredOrigin(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    return new URL(value.includes("://") ? value : `https://${value}`).origin;
+  } catch {
+    return undefined;
+  }
+}
 
 const bootstrapLogger = new Logger("Bootstrap");
 
 async function bootstrap() {
   // 서버 시작 시 타임존을 한국 시간으로 설정
   process.env.TZ = "Asia/Seoul";
+  validateProductionEnvironment();
 
   const logger = bootstrapLogger;
 
@@ -28,7 +57,8 @@ async function bootstrap() {
   //   - 운영 환경에서는 중요한 에러와 경고만 로깅
   //   - 성능 최적화 및 리소스 절약
   // 개발환경: 모든 레벨 출력
-  const isDevelopment = process.env.NODE_ENV !== "production";
+  const isProduction = isProductionEnvironment();
+  const isDevelopment = !isProduction;
   const logLevels: LogLevel[] = isDevelopment
     ? ["error", "warn", "log", "debug", "verbose"]
     : ["error", "warn"];
@@ -38,6 +68,26 @@ async function bootstrap() {
   });
 
   const configService = app.get(ConfigService);
+  const requestContextService = app.get(RequestContextService);
+  const redisService = app.get(UnifiedRedisService);
+  const redisClient = app.get<Redis>(getRedisConnectionToken());
+
+  // Correlate every request with logs, audit rows, and worker handoffs.
+  app.use((req: Request, res: Response, next) => {
+    const rawRequestId = req.headers["x-request-id"];
+    const providedRequestId = Array.isArray(rawRequestId)
+      ? rawRequestId[0]
+      : rawRequestId;
+    const requestId =
+      typeof providedRequestId === "string" &&
+      /^[A-Za-z0-9._:-]{1,128}$/.test(providedRequestId)
+        ? providedRequestId
+        : randomUUID();
+
+    (req as Request & { requestId?: string }).requestId = requestId;
+    res.setHeader("X-Request-Id", requestId);
+    requestContextService.run({ requestId }, next);
+  });
 
   // Handlebars 뷰 엔진 설정
   app.setViewEngine("hbs");
@@ -72,6 +122,25 @@ async function bootstrap() {
     return nonce ? `'nonce-${nonce}'` : "'self'";
   };
 
+  const configuredOrigins = [
+    configService.get<string>("FRONTEND_URL"),
+    configService.get<string>("PUBLIC_SITE_URL"),
+    configService.get<string>("PUBLIC_BACKEND_URL"),
+    configService.get<string>("BACKEND_PUBLIC_URL"),
+    configService.get<string>("S3_PUBLIC_ENDPOINT"),
+    configService.get<string>("R2_PUBLIC_URL"),
+    configService.get<string>("CDN_DOMAIN"),
+    configService.get<string>("CSP_ALLOWED_ORIGINS"),
+    configService.get<string>("CORS_ALLOWED_ORIGINS"),
+  ]
+    .flatMap((value) => (value || "").split(","))
+    .map((value) => getConfiguredOrigin(value.trim()))
+    .filter((value): value is string => Boolean(value));
+  const cspOrigins = [...new Set(configuredOrigins)];
+  const developmentSources = isDevelopment
+    ? ["http://localhost:*", "https:"]
+    : [];
+
   // Security middleware
   app.use(
     helmet({
@@ -79,29 +148,10 @@ async function bootstrap() {
         directives: {
           defaultSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'", nonceDirective, "https:", "http://localhost:*"],
-          imgSrc: [
-            "'self'",
-            "data:",
-            "https:",
-            "http://localhost:*",
-            "*.s3.amazonaws.com", // AWS S3
-            "*.oraclecloud.com", // Oracle OCI Object Storage
-            "*.storage.googleapis.com", // Google Cloud Storage (Gemini AI images)
-            // Cloudflare CDN (계정 생성 후 실제 도메인으로 교체 필요)
-            // 예: "cdn.yourdomain.com"
-          ],
-          connectSrc: [
-            "'self'",
-            "http://localhost:*",
-            "https:",
-            "*.s3.amazonaws.com", // AWS S3
-            "*.oraclecloud.com", // Oracle OCI Object Storage
-            "*.storage.googleapis.com", // Google Cloud Storage (Gemini AI images)
-            // Cloudflare CDN (계정 생성 후 실제 도메인으로 교체 필요)
-            // 예: "cdn.yourdomain.com"
-          ],
-          formAction: ["'self'", "http://localhost:*"], // OAuth 폼 제출을 위해 추가
+          scriptSrc: ["'self'", nonceDirective, ...developmentSources],
+          imgSrc: ["'self'", "data:", ...cspOrigins, ...developmentSources],
+          connectSrc: ["'self'", ...cspOrigins, ...developmentSources],
+          formAction: ["'self'", ...cspOrigins, ...developmentSources],
         },
       },
       crossOriginEmbedderPolicy: false,
@@ -120,17 +170,47 @@ async function bootstrap() {
   // Cookie parser middleware
   app.use(cookieParser());
 
+  const configuredSessionSecret = configService.get<string>("SESSION_SECRET");
+  const sessionSecret =
+    configuredSessionSecret ||
+    (isDevelopment ? randomBytes(32).toString("hex") : undefined);
+  if (!sessionSecret) {
+    throw new Error("SESSION_SECRET must be defined in production");
+  }
+
+  const trustedProxyAddresses = resolveTrustedProxyAddresses(process.env);
+  if (trustedProxyAddresses.length > 0) {
+    app.set("trust proxy", trustedProxyAddresses);
+    logger.log("Explicit reverse proxy trust is configured");
+  }
+
+  const sessionStoreMode = resolveSessionStoreMode(process.env);
+  let sessionStore: session.Store;
+  if (sessionStoreMode === "redis") {
+    // Redis-backed sessions are required for consistent CSRF state across
+    // PM2 workers and multiple application instances. Fail startup if the
+    // shared store is unavailable instead of silently using MemoryStore.
+    await redisClient.ping();
+    sessionStore = new RedisSessionStore(redisClient);
+  } else {
+    logger.warn(
+      "Using express-session MemoryStore by explicit development configuration",
+    );
+    sessionStore = new session.MemoryStore();
+  }
+
   // Session middleware (CSRF 토큰용)
   app.use(
     session({
-      secret: configService.get("SESSION_SECRET", "csrf-secret-key-2024"),
+      store: sessionStore,
+      secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
       cookie: {
         maxAge: 60 * 60 * 1000, // 1시간
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax", // 개발 환경에서는 lax 사용
-        secure: process.env.NODE_ENV === "production",
+        sameSite: isProduction ? "strict" : "lax", // 개발 환경에서는 lax 사용
+        secure: isProduction,
       },
       name: "session-id", // 세션 쿠키 이름
     }),
@@ -140,25 +220,29 @@ async function bootstrap() {
   app.enableCors({
     origin: (origin, callback) => {
       // 환경 변수에서 허용된 origin 목록 가져오기 (콤마로 구분)
-      const corsOrigins = configService.get(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:3000,http://localhost:3001",
-      );
-      const allowedOrigins = corsOrigins
-        .split(",")
-        .map((o: string) => o.trim());
+      const corsOrigins =
+        configService.get<string>("CORS_ALLOWED_ORIGINS") ||
+        configService.get<string>("CORS_ORIGIN") ||
+        configService.get<string>("FRONTEND_URL") ||
+        configService.get<string>("PUBLIC_SITE_URL") ||
+        (isDevelopment ? "http://localhost:3000,http://localhost:3001" : "");
+      const allowedOrigins = expandLoopbackOrigins(corsOrigins.split(","));
 
       // CORS_ORIGIN 환경 변수가 있으면 추가 (하위 호환성)
       const additionalOrigin = configService.get("CORS_ORIGIN");
-      if (additionalOrigin && !allowedOrigins.includes(additionalOrigin)) {
-        allowedOrigins.push(additionalOrigin);
+      if (additionalOrigin) {
+        for (const origin of expandLoopbackOrigins([additionalOrigin])) {
+          if (!allowedOrigins.includes(origin)) {
+            allowedOrigins.push(origin);
+          }
+        }
       }
 
-      // Allow requests with no origin (like mobile apps or curl requests)
+      // Requests without an Origin are not CORS requests (curl/mobile clients).
       if (!origin) return callback(null, true);
 
-      // OAuth 인증 페이지를 위해 null origin 허용 (file:// 프로토콜 등)
-      if (origin === "null") {
+      // Never allow credentialed requests from an opaque file:// origin in production.
+      if (origin === "null" && isDevelopment) {
         return callback(null, true);
       }
 
@@ -178,9 +262,19 @@ async function bootstrap() {
       "Origin",
       "Cache-Control",
       "Pragma",
+      "X-CSRF-Token",
+      "X-Organization-Id",
+      "X-Request-Id",
+      "X-Device-Name",
     ],
     credentials: true, // 쿠키 전송을 위해 필수
-    exposedHeaders: ["Content-Type", "Content-Length", "ETag", "Cache-Control"],
+    exposedHeaders: [
+      "Content-Type",
+      "Content-Length",
+      "ETag",
+      "Cache-Control",
+      "X-Request-Id",
+    ],
     maxAge: 86400, // 24 hours
     preflightContinue: false,
     optionsSuccessStatus: 204,
@@ -190,7 +284,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: false, // 파라미터에 대해서는 허용
+      forbidNonWhitelisted: true,
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,
@@ -207,6 +301,7 @@ async function bootstrap() {
     exclude: [
       "/",
       "/health",
+      "/ready",
       "/api-docs",
       process.env.METRICS_PATH || "/internal/health-check-2f4a8b9c",
       // MCP Discovery 엔드포인트는 루트 경로에 위치해야 함 (RFC 9728, RFC 8414)
@@ -255,6 +350,20 @@ async function bootstrap() {
     });
   });
 
+  const dataSource = app.get(DataSource);
+  app.getHttpAdapter().get("/ready", async (req: any, res: any) => {
+    const readiness = await checkReadiness([
+      { name: "database", check: () => dataSource.query("SELECT 1") },
+      { name: "redis", check: () => redisService.ping() },
+    ]);
+
+    res.status(readiness.ready ? 200 : 503).json({
+      status: readiness.ready ? "ready" : "not_ready",
+      checks: readiness.checks,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   const port = configService.get<number>("PORT", 3000);
 
   await app.listen(port, "0.0.0.0");
@@ -269,6 +378,7 @@ async function bootstrap() {
   logger.log(`🚀 Application is running on: http://localhost:${port}`);
   logger.log(`📚 API Documentation: http://localhost:${port}/api-docs`);
   logger.log(`🏥 Health Check: http://localhost:${port}/health`);
+  logger.log(`✅ Readiness Check: http://localhost:${port}/ready`);
   logger.log(`🌍 Environment: ${configService.get("NODE_ENV", "development")}`);
 
   // Graceful shutdown 신호 처리

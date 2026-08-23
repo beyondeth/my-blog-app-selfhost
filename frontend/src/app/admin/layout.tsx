@@ -10,74 +10,54 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { SocialLoginButton } from '@/components/auth/SocialLoginButton';
 import { Shield, AlertCircle } from 'lucide-react';
-import { useAuth } from '@/providers/AuthProviderV2';
-
-// Admin 재인증 세션 키 (브라우저 탭 닫으면 자동 삭제)
-const ADMIN_SESSION_KEY = 'admin_reauth_verified';
-const ADMIN_SESSION_TIMESTAMP_KEY = 'admin_session_timestamp';
-const ADMIN_SESSION_TIMEOUT = 30 * 60 * 1000; // 30분 타임아웃
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
-  const [sessionExpired, setSessionExpired] = useState(false);
   const MAX_LOGIN_ATTEMPTS = 5;
   const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
+    const checkAuth = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/me`,
+          {
+            credentials: 'include',
+          }
+        );
 
-    if (!user) {
-      setIsAuthenticated(false);
-      setIsAdmin(false);
-      setLoading(false);
-      return;
-    }
+        if (response.ok) {
+          const data = await response.json();
 
-    // Session Storage에서 재인증 플래그와 타임스탬프 확인
-    const isReauthVerified = sessionStorage.getItem(ADMIN_SESSION_KEY);
-    const sessionTimestamp = sessionStorage.getItem(ADMIN_SESSION_TIMESTAMP_KEY);
+          if (data.role === 'admin') {
+            // 서버가 현재 인증 세션의 관리자 역할을 확인하므로
+            // Google-only 계정도 별도 로컬 비밀번호 없이 접근할 수 있다.
+            setIsAuthenticated(true);
+          } else {
+            // 일반 사용자 → 조용히 홈으로 리다이렉트 (메시지 없이)
+            router.push('/');
+          }
+        } else {
+          // 로그인 안 된 경우 - 로그인 화면 표시
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    // 세션 타임아웃 검사
-    const now = Date.now();
-    const isSessionExpired =
-      !!sessionTimestamp &&
-      now - parseInt(sessionTimestamp, 10) > ADMIN_SESSION_TIMEOUT;
-
-    if (isSessionExpired) {
-      // 세션 만료 - 클린업하고 재인증 필요
-      sessionStorage.removeItem(ADMIN_SESSION_KEY);
-      sessionStorage.removeItem(ADMIN_SESSION_TIMESTAMP_KEY);
-      setSessionExpired(true);
-    } else {
-      setSessionExpired(false);
-    }
-
-    if (user.role === 'admin' && isReauthVerified && !isSessionExpired) {
-      // Admin 재인증 완료 상태 & 세션 유효 → 자동 접근 허용
-      setIsAuthenticated(true);
-      setIsAdmin(true);
-    } else if (user.role === 'admin' && (!isReauthVerified || isSessionExpired)) {
-      // Admin이지만 재인증 필요 (2중 보안) 또는 세션 만료
-      setIsAuthenticated(false);
-      setIsAdmin(false);
-    } else {
-      // 일반 사용자 → 조용히 홈으로 리다이렉트 (메시지 없이)
-      router.push('/');
-    }
-
-    setLoading(false);
-  }, [authLoading, router, user]);
+    checkAuth();
+  }, [router]);
 
   const handleLogin = async () => {
     // Check for too many failed attempts
@@ -127,17 +107,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Admin 재인증 성공 → Session Storage에 플래그와 타임스탬프 저장
-      sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
-      sessionStorage.setItem(ADMIN_SESSION_TIMESTAMP_KEY, Date.now().toString());
-
-      // Do NOT store sensitive data in localStorage
-      // Session is managed via HttpOnly cookies
-
       toast.success('관리자 로그인 성공!');
       setIsAuthenticated(true);
-      setIsAdmin(true);
-      setSessionExpired(false); // 세션 만료 상태 리셋
       
       // Clear form data after successful login
       setEmail('');
@@ -174,16 +145,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Shield className="h-5 w-5" />
               Admin Login
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              소셜 로그인 계정은 비밀번호가 없습니다. 아래 Google 버튼으로 로그인하세요.
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {sessionExpired && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
-                <div className="text-sm text-yellow-800">
-                  관리자 세션이 만료되었습니다. 다시 로그인해주세요.
-                </div>
-              </div>
-            )}
             {loginAttempts >= MAX_LOGIN_ATTEMPTS && (
               <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-red-600 mt-0.5" />
@@ -200,40 +166,51 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter email"
-              />
+            <div className="space-y-2">
+              <SocialLoginButton provider="google" className="w-full" />
+              <p className="text-center text-xs text-muted-foreground">
+                Google 로그인 후 관리자 페이지로 자동 이동합니다.
+              </p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleLogin();
-                  }
-                }}
-              />
+            <div className="border-t pt-4">
+              <p className="mb-3 text-sm font-medium text-gray-700">
+                로컬 관리자 계정
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter email"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleLogin();
+                    }
+                  }}
+                />
+              </div>
+              <Button
+                onClick={handleLogin}
+                disabled={loginLoading || !email || !password || loginAttempts >= MAX_LOGIN_ATTEMPTS}
+                className="w-full"
+              >
+                {loginLoading ? 'Logging in...' : 'Login as Admin'}
+              </Button>
             </div>
-            <Button
-              onClick={handleLogin}
-              disabled={loginLoading || !email || !password || loginAttempts >= MAX_LOGIN_ATTEMPTS}
-              className="w-full"
-            >
-              {loginLoading ? 'Logging in...' : 'Login as Admin'}
-            </Button>
             <div className="text-xs text-gray-500 text-center">
               <p>Secure login with HttpOnly cookies</p>
               <p>Session expires after 24 hours</p>

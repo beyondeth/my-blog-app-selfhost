@@ -8,11 +8,11 @@ SET thumbnail = CASE
         CASE
             -- 개발 환경
             WHEN 'development' = current_setting('app.is_development', true) THEN
-                'https://axricjc5utqz.compat.objectstorage.ap-singapore-1.oraclecloud.com/codebase-bucket-20251021/' ||
+                'https://axricjc5utqz.compat.objectstorage.ap-singapore-1.oraclecloud.com/aigory-blog-prod-media/' ||
                 (SELECT file_key FROM files WHERE id = posts.thumbnail_image_id)
             -- 프로덕션 환경 (CDN)
             ELSE
-                'https://cdn.codebase.blog/' ||
+                'https://cdn.aigory.com/' ||
                 (SELECT file_key FROM files WHERE id = posts.thumbnail_image_id)
         END ||
         -- 캐시 버스팅 타임스탬프 추가

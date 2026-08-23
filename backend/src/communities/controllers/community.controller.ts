@@ -37,21 +37,20 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { Role } from "../../common/enums/role.enum";
 import { CommunityRolesGuard } from "../guards/community-roles.guard";
 import { CommunityVisibilityGuard } from "../guards/community-visibility.guard";
+import { CommunityOrganizationGuard } from "../guards/community-organization.guard";
+import { OrganizationContextGuard } from "../../organizations/guards/organization-context.guard";
+import {
+  OrganizationId,
+  RequireOrganizationContext,
+} from "../../organizations/decorators/organization-context.decorator";
 import {
   CommunityRoles,
   ModeratorOnly,
   OwnerOnly,
 } from "../decorators/community-roles.decorator";
 import { CommunitySlug } from "../decorators/community-id.decorator";
-import { CurrentUser } from "../../common/decorators/current-user.decorator";
-import { User } from "../../users/entities/user.entity";
-import { Community } from "../entities/community.entity";
 import { CommunityRole, FlairType } from "../enums";
-import {
-  CommunityService,
-  CommunityMembershipService,
-  CommunityPostService,
-} from "../services";
+import { CommunityService, CommunityMembershipService } from "../services";
 import { ContextualFileService } from "../../files/services/contextual-file.service";
 import {
   CreateCommunityDto,
@@ -79,13 +78,14 @@ import {
  */
 @ApiTags("Community")
 @Controller("community")
+@UseGuards(OrganizationContextGuard, CommunityOrganizationGuard)
+@RequireOrganizationContext()
 export class CommunityController {
   private readonly logger = new Logger(CommunityController.name);
 
   constructor(
     private readonly communityService: CommunityService,
     private readonly membershipService: CommunityMembershipService,
-    private readonly postService: CommunityPostService,
     private readonly contextualFileService: ContextualFileService,
   ) {}
 
@@ -108,49 +108,13 @@ export class CommunityController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "커뮤니티 목록 조회 (커서 페이지네이션)" })
   @ApiResponse({ status: 200, description: "커뮤니티 목록 반환" })
-  async findAll(
-    @Query() query: GetCommunitiesQueryDto,
-    @Request() req: { user?: { id: string } },
-  ) {
+  async findAll(@Query() query: GetCommunitiesQueryDto, @Request() req: any) {
     const userId = req.user?.id;
     const result = await this.communityService.findAll(query, userId);
 
     return {
       success: true,
       data: result,
-    };
-  }
-
-  /**
-   * 커뮤니티별 최신 게시글 일괄 조회 (Batch API)
-   * GET /api/v1/community/batch/recent-posts?ids=1,2,3
-   */
-  @Get("batch/recent-posts")
-  @Public()
-  @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: "커뮤니티별 최신 게시글 일괄 조회 (Batch API)" })
-  @ApiResponse({ status: 200, description: "커뮤니티별 최신 게시글 맵 반환" })
-  async getRecentPostsBatch(@Query("ids") ids: string) {
-    if (!ids) {
-      return { success: true, data: {} };
-    }
-
-    const communityIds = ids
-      .split(",")
-      .map((id) => id.trim())
-      .filter((id) => id.length > 0);
-    const postMap =
-      await this.postService.getRecentPostsForCommunities(communityIds);
-
-    // Map -> Object 변환 (JSON 응답용)
-    const data: Record<string, any[]> = {};
-    for (const [communityId, posts] of postMap.entries()) {
-      data[communityId] = posts; // 엔티티 그대로 반환하거나 DTO 변환 필요. 여기선 엔티티 사용 (직렬화됨)
-    }
-
-    return {
-      success: true,
-      data,
     };
   }
 
@@ -196,9 +160,17 @@ export class CommunityController {
   @ApiOperation({ summary: "커뮤니티 생성" })
   @ApiResponse({ status: 201, description: "커뮤니티 생성 성공" })
   @ApiResponse({ status: 409, description: "이미 사용 중인 slug" })
-  async create(@Body() dto: CreateCommunityDto, @CurrentUser() user: User) {
-    const userId = user.id;
-    const community = await this.communityService.create(userId, dto);
+  async create(
+    @Body() dto: CreateCommunityDto,
+    @Request() req: any,
+    @OrganizationId() organizationId: string,
+  ) {
+    const userId = req.user.id;
+    const community = await this.communityService.create(
+      userId,
+      dto,
+      organizationId,
+    );
 
     return {
       success: true,
@@ -219,8 +191,8 @@ export class CommunityController {
   @ApiParam({ name: "slug", description: "커뮤니티 slug" })
   @ApiResponse({ status: 200, description: "커뮤니티 상세 정보" })
   @ApiResponse({ status: 404, description: "커뮤니티 없음" })
-  async findOne(@CommunitySlug() slug: string, @CurrentUser() user?: User) {
-    const userId = user?.id;
+  async findOne(@CommunitySlug() slug: string, @Request() req: any) {
+    const userId = req.user?.id;
     const community = await this.communityService.findBySlug(slug, userId);
 
     return {
@@ -243,7 +215,7 @@ export class CommunityController {
   async update(
     @Param("slug") slug: string,
     @Body() dto: UpdateCommunityDto,
-    @Request() req: { user: User; community: Community },
+    @Request() req: any,
   ) {
     const community = req.community;
     const userId = req.user.id;
@@ -279,10 +251,11 @@ export class CommunityController {
     status: 403,
     description: "권한 없음 (플랫폼 관리자만 삭제 가능)",
   })
-  async delete(@Param("slug") slug: string, @CurrentUser() user: User) {
+  async delete(@Param("slug") slug: string, @Request() req: any) {
     // Site Admin은 CommunityRolesGuard를 사용하지 않으므로 직접 커뮤니티 조회
-    const community = await this.communityService.findBySlug(slug);
-    const userId = user.id;
+    const community =
+      req.community ?? (await this.communityService.findBySlug(slug));
+    const userId = req.user.id;
 
     await this.communityService.delete(community.id, userId);
 
@@ -305,7 +278,9 @@ export class CommunityController {
   @UseGuards(JwtAuthGuard, CommunityRolesGuard)
   @ModeratorOnly()
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(
+    FileInterceptor("file", { limits: { fileSize: 10 * 1024 * 1024 } }),
+  )
   @ApiConsumes("multipart/form-data")
   @ApiOperation({ summary: "커뮤니티 이미지 업로드 (아이콘/배너)" })
   @ApiParam({ name: "slug", description: "커뮤니티 slug" })
@@ -343,7 +318,7 @@ export class CommunityController {
       }),
     )
     file: Express.Multer.File,
-    @Request() req: { user: User; community: Community },
+    @Request() req: any,
   ) {
     // purpose 유효성 검사
     if (purpose !== "icon" && purpose !== "banner") {
@@ -359,6 +334,7 @@ export class CommunityController {
       community.id,
       file,
       purpose as "icon" | "banner",
+      community.organizationId || undefined,
     );
 
     // Community 엔티티의 iconUrl/bannerUrl 업데이트
@@ -402,10 +378,11 @@ export class CommunityController {
   async join(
     @CommunitySlug() slug: string,
     @Body() dto: JoinApplicationDto,
-    @CurrentUser() user: User,
+    @Request() req: any,
   ) {
-    const userId = user.id;
-    const community = await this.communityService.findBySlug(slug);
+    const userId = req.user.id;
+    const community =
+      req.community ?? (await this.communityService.findBySlug(slug));
 
     // applyToJoin은 OPEN 커뮤니티는 바로 가입, RESTRICTED는 pending 상태로 생성
     const membership = await this.membershipService.applyToJoin(
@@ -438,9 +415,10 @@ export class CommunityController {
   @ApiParam({ name: "slug", description: "커뮤니티 slug" })
   @ApiResponse({ status: 200, description: "탈퇴 성공" })
   @ApiResponse({ status: 403, description: "소유자는 탈퇴 불가" })
-  async leave(@CommunitySlug() slug: string, @CurrentUser() user: User) {
-    const userId = user.id;
-    const community = await this.communityService.findBySlug(slug);
+  async leave(@CommunitySlug() slug: string, @Request() req: any) {
+    const userId = req.user.id;
+    const community =
+      req.community ?? (await this.communityService.findBySlug(slug));
 
     await this.membershipService.leave(community.id, userId);
 
@@ -469,9 +447,7 @@ export class CommunityController {
 
     return {
       success: true,
-      data: rules.map((r) =>
-        typeof r.toPublicJSON === "function" ? r.toPublicJSON() : r,
-      ),
+      data: rules.map((r) => r.toPublicJSON()),
     };
   }
 
@@ -487,7 +463,7 @@ export class CommunityController {
   async createRule(
     @Param("slug") slug: string,
     @Body() dto: CreateCommunityRuleDto,
-    @Request() req: { user: User; community: Community },
+    @Request() req: any,
   ) {
     const community = req.community;
     const userId = req.user.id;
@@ -517,7 +493,7 @@ export class CommunityController {
     @Param("slug") slug: string,
     @Param("ruleId") ruleId: string,
     @Body() dto: UpdateCommunityRuleDto,
-    @Request() req: { user: User; community: Community },
+    @Request() req: any,
   ) {
     const community = req.community;
     const userId = req.user.id;
@@ -548,7 +524,7 @@ export class CommunityController {
   async deleteRule(
     @Param("slug") slug: string,
     @Param("ruleId") ruleId: string,
-    @Request() req: { user: User; community: Community },
+    @Request() req: any,
   ) {
     const community = req.community;
     const userId = req.user.id;
@@ -580,9 +556,7 @@ export class CommunityController {
 
     return {
       success: true,
-      data: flairs.map((f) =>
-        typeof f.toPublicJSON === "function" ? f.toPublicJSON() : f,
-      ),
+      data: flairs.map((f) => f.toPublicJSON()),
     };
   }
 
@@ -598,7 +572,7 @@ export class CommunityController {
   async createFlair(
     @Param("slug") slug: string,
     @Body() dto: CreateCommunityFlairDto,
-    @Request() req: { user: User; community: Community },
+    @Request() req: any,
   ) {
     const community = req.community;
     const userId = req.user.id;
@@ -628,7 +602,7 @@ export class CommunityController {
     @Param("slug") slug: string,
     @Param("flairId") flairId: string,
     @Body() dto: UpdateCommunityFlairDto,
-    @Request() req: { user: User; community: Community },
+    @Request() req: any,
   ) {
     const community = req.community;
     const userId = req.user.id;
@@ -659,7 +633,7 @@ export class CommunityController {
   async deleteFlair(
     @Param("slug") slug: string,
     @Param("flairId") flairId: string,
-    @Request() req: { user: User; community: Community },
+    @Request() req: any,
   ) {
     const community = req.community;
     const userId = req.user.id;
@@ -774,8 +748,8 @@ export class CommunityController {
   @ApiResponse({ status: 403, description: "차단된 사용자" })
   @ApiResponse({ status: 404, description: "유효하지 않은 초대" })
   @ApiResponse({ status: 409, description: "이미 가입됨" })
-  async acceptInvite(@Param("token") token: string, @CurrentUser() user: User) {
-    const userId = user.id;
+  async acceptInvite(@Param("token") token: string, @Request() req: any) {
+    const userId = req.user.id;
 
     const membership = await this.membershipService.joinByInvite(token, userId);
 

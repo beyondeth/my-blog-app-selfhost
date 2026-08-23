@@ -3,10 +3,67 @@
  * Provides mock implementations for TypeORM repositories
  */
 
-import { SelectQueryBuilder } from "typeorm";
+import { FindOperator, SelectQueryBuilder } from "typeorm";
+
+function matchesLike(value: unknown, pattern: unknown): boolean {
+  if (typeof value !== "string" || typeof pattern !== "string") return false;
+  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(
+    `^${escaped.replace(/%/g, ".*").replace(/_/g, ".")}$`,
+  );
+  return regex.test(value);
+}
+
+function matchesValue(actual: unknown, expected: unknown): boolean {
+  if (expected instanceof FindOperator) {
+    switch (expected.type) {
+      case "isNull":
+        return actual === null || actual === undefined;
+      case "lessThan":
+        return (
+          actual !== null && actual !== undefined && actual < expected.value
+        );
+      case "moreThan":
+        return (
+          actual !== null && actual !== undefined && actual > expected.value
+        );
+      case "like":
+        return matchesLike(actual, expected.value);
+      case "not":
+        return !matchesValue(actual, expected.child || expected.value);
+      case "in":
+        return Array.isArray(expected.value) && expected.value.includes(actual);
+      default:
+        return actual === expected.value;
+    }
+  }
+
+  if (
+    expected &&
+    typeof expected === "object" &&
+    !Array.isArray(expected) &&
+    !(expected instanceof Date)
+  ) {
+    return matchesWhere(actual, expected as Record<string, unknown>);
+  }
+
+  return actual === expected;
+}
+
+function matchesWhere(item: unknown, where: Record<string, unknown>): boolean {
+  if (!item || typeof item !== "object") return false;
+  return Object.entries(where).every(([key, value]) =>
+    matchesValue((item as Record<string, unknown>)[key], value),
+  );
+}
+
+function fieldName(expression: string): string {
+  return expression.trim().split(".").pop() as string;
+}
 
 export class MockRepository<T> {
   private data: T[] = [];
+  private nextId = 1;
 
   constructor(initialData?: T[]) {
     if (initialData) {
@@ -15,31 +72,43 @@ export class MockRepository<T> {
   }
 
   find = jest.fn().mockImplementation((options?: any) => {
-    if (!options) return Promise.resolve(this.data);
+    let result = [...this.data];
 
-    // Simple where clause simulation
-    if (options.where) {
-      const filtered = this.data.filter((item) => {
-        return Object.entries(options.where).every(([key, value]) => {
-          return (item as any)[key] === value;
-        });
-      });
-      return Promise.resolve(filtered);
+    if (options?.where) {
+      result = result.filter((item) => matchesWhere(item, options.where));
     }
 
-    return Promise.resolve(this.data);
+    if (options?.order) {
+      const [key, direction] = Object.entries(options.order)[0] as [
+        string,
+        "ASC" | "DESC",
+      ];
+      result.sort((left, right) => {
+        const leftValue = (left as any)[key];
+        const rightValue = (right as any)[key];
+        const comparison =
+          leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
+        return direction === "DESC" ? -comparison : comparison;
+      });
+    }
+
+    const start = options?.skip || 0;
+    const end = options?.take ? start + options.take : undefined;
+    return Promise.resolve(result.slice(start, end));
   });
 
   findOne = jest.fn().mockImplementation((options: any) => {
     if (options.where) {
-      const found = this.data.find((item) => {
-        return Object.entries(options.where).every(([key, value]) => {
-          return (item as any)[key] === value;
-        });
-      });
+      const found = this.data.find((item) => matchesWhere(item, options.where));
       return Promise.resolve(found || null);
     }
     return Promise.resolve(this.data[0] || null);
+  });
+
+  create = jest.fn().mockImplementation((entity: Partial<T>) => {
+    const created = { ...entity } as T & { id?: string };
+    if (!created.id) created.id = `mock-${this.nextId++}`;
+    return created;
   });
 
   save = jest.fn().mockImplementation((entity: T | T[]) => {
@@ -54,9 +123,7 @@ export class MockRepository<T> {
   update = jest.fn().mockImplementation((criteria: any, updates: any) => {
     const items = this.data.filter((item) => {
       if (typeof criteria === "object") {
-        return Object.entries(criteria).every(([key, value]) => {
-          return (item as any)[key] === value;
-        });
+        return matchesWhere(item, criteria);
       }
       return (item as any).id === criteria;
     });
@@ -81,9 +148,7 @@ export class MockRepository<T> {
     const initialLength = this.data.length;
     this.data = this.data.filter((item) => {
       if (typeof criteria === "object") {
-        return !Object.entries(criteria).every(([key, value]) => {
-          return (item as any)[key] === value;
-        });
+        return !matchesWhere(item, criteria);
       }
       return (item as any).id !== criteria;
     });
@@ -96,11 +161,9 @@ export class MockRepository<T> {
       return Promise.resolve(this.data.length);
     }
 
-    const filtered = this.data.filter((item) => {
-      return Object.entries(options.where).every(([key, value]) => {
-        return (item as any)[key] === value;
-      });
-    });
+    const filtered = this.data.filter((item) =>
+      matchesWhere(item, options.where),
+    );
 
     return Promise.resolve(filtered.length);
   });
@@ -108,6 +171,8 @@ export class MockRepository<T> {
   createQueryBuilder = jest.fn().mockImplementation((alias?: string) => {
     return new MockQueryBuilder<T>(this.data, alias);
   });
+
+  query = jest.fn().mockResolvedValue([]);
 
   // Helper methods
   private addOrUpdate(entity: T) {
@@ -143,14 +208,17 @@ export class MockRepository<T> {
 
   clear() {
     this.data = [];
+    this.nextId = 1;
     this.find.mockClear();
     this.findOne.mockClear();
+    this.create.mockClear();
     this.save.mockClear();
     this.update.mockClear();
     this.remove.mockClear();
     this.delete.mockClear();
     this.count.mockClear();
     this.createQueryBuilder.mockClear();
+    this.query.mockClear();
   }
 }
 
@@ -160,10 +228,12 @@ export class MockRepository<T> {
 export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
   private data: T[];
   private whereConditions: any[] = [];
-  private selectFields: string[] = [];
+  private selectFields: Array<{ expression: string; alias?: string }> = [];
   private limitValue?: number;
   private orderByField?: string;
   private orderByDirection?: "ASC" | "DESC";
+  private groupByField?: string;
+  private havingCondition?: string;
   public alias?: string;
 
   constructor(data: T[], alias?: string) {
@@ -171,17 +241,19 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
     this.alias = alias;
   }
 
-  select = jest.fn().mockImplementation((fields: string | string[]) => {
-    if (Array.isArray(fields)) {
-      this.selectFields.push(...fields);
-    } else {
-      this.selectFields.push(fields);
-    }
-    return this;
-  });
+  select = jest
+    .fn()
+    .mockImplementation((fields: string | string[], alias?: string) => {
+      if (Array.isArray(fields)) {
+        this.selectFields.push(...fields.map((expression) => ({ expression })));
+      } else {
+        this.selectFields.push({ expression: fields, alias });
+      }
+      return this;
+    });
 
-  addSelect = jest.fn().mockImplementation((field: string) => {
-    this.selectFields.push(field);
+  addSelect = jest.fn().mockImplementation((field: string, alias?: string) => {
+    this.selectFields.push({ expression: field, alias });
     return this;
   });
 
@@ -225,27 +297,81 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
     return this;
   });
 
-  groupBy = jest.fn().mockImplementation(() => this);
-  having = jest.fn().mockImplementation(() => this);
+  groupBy = jest.fn().mockImplementation((field: string) => {
+    this.groupByField = field;
+    return this;
+  });
+  having = jest.fn().mockImplementation((condition: string) => {
+    this.havingCondition = condition;
+    return this;
+  });
 
-  getMany = jest.fn().mockImplementation(() => {
+  private getFilteredData(): T[] {
     let result = [...this.data];
 
-    // Apply simple filtering based on where conditions
-    if (this.whereConditions.length > 0) {
-      // Simplified filtering logic
-      result = result.filter((item) => {
-        // Mock implementation - in real tests, you'd implement proper filtering
-        return true;
+    for (const { condition, params } of this.whereConditions) {
+      result = result.filter((item) =>
+        this.matchesCondition(item, condition, params),
+      );
+    }
+
+    if (this.orderByField && !this.groupByField) {
+      const key = fieldName(this.orderByField);
+      result.sort((left, right) => {
+        const leftValue = (left as any)[key];
+        const rightValue = (right as any)[key];
+        const comparison =
+          leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0;
+        return this.orderByDirection === "DESC" ? -comparison : comparison;
       });
     }
 
-    // Apply limit
-    if (this.limitValue) {
-      result = result.slice(0, this.limitValue);
+    if (this.limitValue) result = result.slice(0, this.limitValue);
+    return result;
+  }
+
+  private matchesCondition(item: T, condition: string, params?: any): boolean {
+    const normalized = condition.replace(/\s+/g, " ").trim();
+    const nullMatch = normalized.match(/(?:\w+\.)?(\w+) IS (NOT )?NULL/i);
+    if (nullMatch) {
+      const value = (item as any)[nullMatch[1]];
+      return nullMatch[2]
+        ? value !== null && value !== undefined
+        : value == null;
     }
 
-    return Promise.resolve(result);
+    const booleanMatch = normalized.match(/(?:\w+\.)?(\w+) = (true|false)/i);
+    if (booleanMatch) {
+      return (item as any)[booleanMatch[1]] === (booleanMatch[2] === "true");
+    }
+
+    const comparisonMatch = normalized.match(
+      /(?:\w+\.)?(\w+)\s*(NOT LIKE|LIKE|!=|=|<|>)\s*:(\w+)/i,
+    );
+    if (!comparisonMatch) return true;
+
+    const actual = (item as any)[comparisonMatch[1]];
+    const expected = params?.[comparisonMatch[3]];
+    switch (comparisonMatch[2].toUpperCase()) {
+      case "LIKE":
+        return matchesLike(actual, expected);
+      case "NOT LIKE":
+        return !matchesLike(actual, expected);
+      case "!=":
+        return actual !== expected;
+      case "=":
+        return actual === expected;
+      case "<":
+        return actual < expected;
+      case ">":
+        return actual > expected;
+      default:
+        return true;
+    }
+  }
+
+  getMany = jest.fn().mockImplementation(() => {
+    return Promise.resolve(this.getFilteredData());
   });
 
   getOne = jest.fn().mockImplementation(() => {
@@ -257,11 +383,79 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
   });
 
   getRawMany = jest.fn().mockImplementation(() => {
-    return this.getMany();
+    const data = this.getFilteredData();
+    if (!this.groupByField) return Promise.resolve(data);
+
+    const groupKey = fieldName(this.groupByField);
+    const groups = new Map<unknown, T[]>();
+    for (const item of data) {
+      const key = (item as any)[groupKey];
+      groups.set(key, [...(groups.get(key) || []), item]);
+    }
+
+    let rows = [...groups.entries()].map(([key, items]) => {
+      const row: Record<string, unknown> = {};
+      for (const { expression, alias } of this.selectFields) {
+        const outputKey = alias || fieldName(expression);
+        if (/^COUNT\(\*\)$/i.test(expression)) row[outputKey] = items.length;
+        else if (/^SUM\(/i.test(expression)) {
+          const sumKey = fieldName(expression.replace(/[()]/g, ""));
+          row[outputKey] = items.reduce(
+            (total, item) => total + Number((item as any)[sumKey] || 0),
+            0,
+          );
+        } else if (/^GROUP_CONCAT\(/i.test(expression)) {
+          const idKey = fieldName(expression.replace(/[()]/g, ""));
+          row[outputKey] = items.map((item) => (item as any)[idKey]).join(",");
+        } else {
+          row[outputKey] = key;
+        }
+      }
+      return row;
+    });
+
+    if (this.havingCondition?.match(/COUNT\(\*\) > 1/i)) {
+      const countAlias = this.selectFields.find(({ expression }) =>
+        /^COUNT\(\*\)$/i.test(expression),
+      )?.alias;
+      if (countAlias) rows = rows.filter((row) => Number(row[countAlias]) > 1);
+    }
+
+    if (this.orderByField) {
+      const selected = this.selectFields.find(
+        ({ expression, alias }) =>
+          expression === this.orderByField || alias === this.orderByField,
+      );
+      const key = selected?.alias || fieldName(this.orderByField);
+      rows.sort((left, right) => {
+        const comparison = Number(left[key]) - Number(right[key]);
+        return this.orderByDirection === "DESC" ? -comparison : comparison;
+      });
+    }
+
+    if (this.limitValue) rows = rows.slice(0, this.limitValue);
+    return Promise.resolve(rows);
   });
 
   getRawOne = jest.fn().mockImplementation(() => {
-    return this.getOne();
+    const data = this.getFilteredData();
+    const row: Record<string, unknown> = {};
+    for (const { expression, alias } of this.selectFields) {
+      const outputKey = alias || fieldName(expression);
+      if (/^COUNT\(\*\)$/i.test(expression)) row[outputKey] = data.length;
+      else if (/^SUM\(/i.test(expression)) {
+        const sumKey = fieldName(expression.replace(/[()]/g, ""));
+        row[outputKey] = data.reduce(
+          (total, item) => total + Number((item as any)[sumKey] || 0),
+          0,
+        );
+      } else {
+        row[outputKey] = data[0]
+          ? (data[0] as any)[fieldName(expression)]
+          : null;
+      }
+    }
+    return Promise.resolve(row);
   });
 
   getManyAndCount = jest.fn().mockImplementation(() => {
@@ -276,6 +470,6 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
   }
 
   getSelectFields() {
-    return this.selectFields;
+    return this.selectFields.map(({ expression }) => expression);
   }
 }

@@ -16,7 +16,7 @@ import path from "path";
  * @returns 저장된 파일 경로 (실패 시 null)
  *
  * 동작:
- * 1. BLOG_POSTS_DIR 환경변수 확인 (없으면 ~/Documents/codebase-mcp-posts/ 사용)
+ * 1. BLOG_POSTS_DIR 환경변수 확인 (없으면 ~/Documents/aigory-mcp-posts/ 사용)
  * 2. 디렉토리 생성 (없으면)
  * 3. 파일명 생성: YYYYMMDD_safe-title.md
  * 4. Frontmatter + 본문 형식으로 저장
@@ -32,12 +32,12 @@ export async function savePostToFile(
     const os = await import('os');
     const { generateSafeFilename } = await import('./markdown.js');
 
-    // 저장 디렉토리 결정 (환경변수 우선, 기본값: ~/Documents/codebase-mcp-posts)
+    // 저장 디렉토리 결정 (환경변수 우선, 기본값: ~/Documents/aigory-mcp-posts)
     let postsDir: string;
     if (process.env['BLOG_POSTS_DIR']) {
       postsDir = process.env['BLOG_POSTS_DIR'];
     } else {
-      postsDir = path.join(os.homedir(), 'Documents', 'codebase-mcp-posts');
+      postsDir = path.join(os.homedir(), 'Documents', 'aigory-mcp-posts');
     }
 
     // 디렉토리 생성 (이미 존재하면 무시)

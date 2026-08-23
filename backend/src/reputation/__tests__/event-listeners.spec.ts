@@ -6,19 +6,18 @@ import { getRepositoryToken } from "@nestjs/typeorm";
 import { PostEventsListener } from "../listeners/post.events.listener";
 import { CommentEventsListener } from "../listeners/comment.events.listener";
 import { ReactionEventsListener } from "../listeners/reaction.events.listener";
-import { LedgerService } from "../services/ledger.service";
 import { Post } from "../../posts/entities/post.entity";
 import { ReputationAction } from "../enums/reputation-action.enum";
+import { ReputationQueueService } from "../queues/reputation-queue.service";
 
 describe("Event Listeners", () => {
   let postListener: PostEventsListener;
   let commentListener: CommentEventsListener;
   let reactionListener: ReactionEventsListener;
-  let ledgerService: jest.Mocked<LedgerService>;
   let postRepository: jest.Mocked<any>;
 
-  const mockLedgerService = {
-    record: jest.fn(),
+  const mockQueueService = {
+    addReputationEvent: jest.fn(),
   };
 
   const mockPostRepository = {
@@ -31,10 +30,7 @@ describe("Event Listeners", () => {
         PostEventsListener,
         CommentEventsListener,
         ReactionEventsListener,
-        {
-          provide: LedgerService,
-          useValue: mockLedgerService,
-        },
+        { provide: ReputationQueueService, useValue: mockQueueService },
         {
           provide: getRepositoryToken(Post),
           useValue: mockPostRepository,
@@ -47,7 +43,6 @@ describe("Event Listeners", () => {
     reactionListener = module.get<ReactionEventsListener>(
       ReactionEventsListener,
     );
-    ledgerService = module.get(LedgerService) as jest.Mocked<LedgerService>;
     postRepository = module.get(getRepositoryToken(Post));
 
     jest.clearAllMocks();
@@ -65,10 +60,10 @@ describe("Event Listeners", () => {
 
       await postListener.handlePostCreated(payload);
 
-      expect(mockLedgerService.record).toHaveBeenCalledWith(
+      expect(mockQueueService.addReputationEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: payload.userId,
-          actionType: ReputationAction.POST_PUBLISHED,
+          action: ReputationAction.POST_PUBLISHED,
           targetType: "post",
           targetId: payload.postId,
         }),
@@ -88,10 +83,10 @@ describe("Event Listeners", () => {
 
       await commentListener.handleCommentAdded(payload);
 
-      expect(mockLedgerService.record).toHaveBeenCalledWith(
+      expect(mockQueueService.addReputationEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: payload.authorId,
-          actionType: ReputationAction.COMMENT_ADDED,
+          action: ReputationAction.COMMENT_ADDED,
           targetType: "comment",
           targetId: payload.commentId,
         }),
@@ -116,11 +111,11 @@ describe("Event Listeners", () => {
 
       await reactionListener.handleLikeToggled(payload);
 
-      expect(mockLedgerService.record).toHaveBeenCalledWith(
+      expect(mockQueueService.addReputationEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: "author-789", // 포스트 작성자
-          actionType: ReputationAction.LIKE_RECEIVED,
-          actorId: payload.userId,
+          action: ReputationAction.LIKE_RECEIVED,
+          triggeredBy: payload.userId,
         }),
       );
     });
@@ -136,7 +131,7 @@ describe("Event Listeners", () => {
 
       await reactionListener.handleLikeToggled(payload);
 
-      expect(mockLedgerService.record).not.toHaveBeenCalled();
+      expect(mockQueueService.addReputationEvent).not.toHaveBeenCalled();
     });
   });
 });

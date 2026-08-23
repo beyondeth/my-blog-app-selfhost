@@ -14,7 +14,6 @@ import {
   X,
   Shield,
   Image,
-  Bug,
   Database,
   AlertTriangle,
   Key,
@@ -56,7 +55,6 @@ const navigation: NavigationItem[] = [
   { name: '유저 모더레이션', href: '/admin/moderation/logs', icon: Flag, adminOnly: true },
   { name: '고객의 소리', href: '/admin/feedback', icon: Flag },
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
-  { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
   { name: t.navigation.settings, href: '/admin/settings', icon: Settings },
 ];
 

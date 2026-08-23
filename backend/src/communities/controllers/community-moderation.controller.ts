@@ -21,6 +21,9 @@ import {
 } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { CommunityRolesGuard } from "../guards/community-roles.guard";
+import { CommunityOrganizationGuard } from "../guards/community-organization.guard";
+import { OrganizationContextGuard } from "../../organizations/guards/organization-context.guard";
+import { RequireOrganizationContext } from "../../organizations/decorators/organization-context.decorator";
 import {
   CommunityRoles,
   ModeratorOnly,
@@ -52,6 +55,8 @@ import { PaginationDto } from "../../common/dto/pagination.dto";
  */
 @ApiTags("Community Moderation")
 @Controller("community/:slug")
+@UseGuards(OrganizationContextGuard, CommunityOrganizationGuard)
+@RequireOrganizationContext()
 export class CommunityModerationController {
   constructor(private readonly membershipService: CommunityMembershipService) {}
 

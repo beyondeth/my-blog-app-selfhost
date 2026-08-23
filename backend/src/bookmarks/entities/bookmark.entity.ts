@@ -19,21 +19,21 @@ import { Post } from "../../posts/entities/post.entity";
 @Index("idx_bookmark_user_created", ["userId", "createdAt"]) // 사용자별 최신순 조회 최적화
 @Index("idx_bookmark_post", ["postId"]) // 포스트별 북마크 조회 최적화
 export class Bookmark {
-  @PrimaryColumn({ type: "uuid", name: "user_id" })
+  @PrimaryColumn({ type: "uuid", name: "userId" })
   userId: string;
 
-  @PrimaryColumn({ type: "uuid", name: "post_id" })
+  @PrimaryColumn({ type: "uuid", name: "postId" })
   postId: string;
 
-  @CreateDateColumn({ name: "created_at" })
+  @CreateDateColumn({ name: "createdAt" })
   createdAt: Date;
 
   // 관계 설정
   @ManyToOne(() => User, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "user_id" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
   @ManyToOne(() => Post, (post) => post.bookmarks, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "post_id" })
+  @JoinColumn({ name: "postId" })
   post: Post;
 }

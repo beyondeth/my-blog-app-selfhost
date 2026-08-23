@@ -431,8 +431,9 @@ class ApiClient {
 
       // 3. 업로드 완료 알림 - file 객체 정보 그대로 사용
       const completeData: UploadCompleteDto = {
+        tempId: presignedResponse.tempId,
         fileKey: presignedResponse.fileKey,
-        fileUrl: `https://myblogdata84.s3.us-east-1.amazonaws.com/${presignedResponse.fileKey}`,
+        fileUrl: presignedResponse.fileKey,
         fileName: file.name,
         mimeType: file.type,
         fileSize: file.size,
@@ -835,4 +836,4 @@ export const googleAuth = (...args: Parameters<typeof apiClient.googleAuth>) => 
 export const kakaoAuth = (...args: Parameters<typeof apiClient.kakaoAuth>) => apiClient.kakaoAuth(...args);
 
 // Export for backward compatibility
-export default apiClient; 
+export default apiClient;

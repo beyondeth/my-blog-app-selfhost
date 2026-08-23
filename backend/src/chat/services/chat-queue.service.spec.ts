@@ -122,13 +122,14 @@ describe("ChatQueueService", () => {
       expect(messages[2].id).toBe("msg3");
       expect(messages[3].id).toBe("msg4");
 
-      // 배치 크기 4를 샤드에서 모두 소진하므로 기본 큐는 조회하지 않음
+      // 샤드에서 batch가 모두 채워졌으므로 legacy 기본 큐는 조회하지 않는다.
       expect(pipelineMock.exec).toHaveBeenCalledTimes(4);
+      expect(pipelineMock.rpop).not.toHaveBeenCalledWith("chat:queue:messages");
     });
   });
 
   describe("큐 건강 상태 모니터링", () => {
-    it("큐 크기가 임계값을 초과하면 경고를 반환해야 함", async () => {
+    it("경고 임계값을 초과해도 critical 한도 이하면 healthy를 유지해야 함", async () => {
       // 각 큐의 크기 설정
       redis.llen
         .mockResolvedValueOnce(600) // shard:0 - 과다
@@ -140,11 +141,25 @@ describe("ChatQueueService", () => {
       const health = await service.getQueueHealth();
 
       // 경고가 생성되었는지 확인
-      expect(health.healthy).toBe(false);
+      expect(health.healthy).toBe(true);
       expect(health.warnings).toContain(
         "샤드 chat:queue:shard:0에 메시지 과다: 600개",
       );
       expect(health.warnings).toContain("Dead Letter Queue에 60개 실패 메시지");
+    });
+
+    it("총 큐 크기가 critical 한도에 도달하면 unhealthy를 반환해야 함", async () => {
+      redis.llen
+        .mockResolvedValueOnce(600)
+        .mockResolvedValueOnce(250)
+        .mockResolvedValueOnce(100)
+        .mockResolvedValueOnce(50)
+        .mockResolvedValueOnce(0);
+
+      const health = await service.getQueueHealth();
+
+      expect(health.totalSize).toBe(1000);
+      expect(health.healthy).toBe(false);
     });
 
     it("모든 큐가 정상 범위면 healthy를 반환해야 함", async () => {
@@ -189,9 +204,12 @@ describe("ChatQueueService", () => {
     it("파싱 실패한 메시지는 DLQ로 이동해야 함", async () => {
       const pipelineMock = {
         rpop: jest.fn().mockReturnThis(),
-        exec: jest.fn().mockResolvedValue([
-          [null, "invalid json"], // 파싱 불가능한 데이터
-        ]),
+        exec: jest
+          .fn()
+          .mockResolvedValueOnce([
+            [null, "invalid json"], // 파싱 불가능한 데이터
+          ])
+          .mockResolvedValue([[null, null]]),
       };
       redis.pipeline.mockReturnValue(pipelineMock as any);
 

@@ -1,10 +1,7 @@
 /**
  * OAuth 2.1 라우터 통합
  *
- * OAuth 2.1 공유 엔드포인트
- * - Skills (MCPorter)
- * - Claude 커스텀 커넥터
- * - 기타 OAuth 클라이언트
+ * Claude 커스텀 커넥터를 위한 OAuth 2.1 엔드포인트
  *
  * 엔드포인트:
  * - /.well-known/oauth-protected-resource (RFC 9728)
@@ -45,61 +42,19 @@ export async function oauthMiddleware(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const acceptsEventStream =
-    (req.headers.accept || '').includes('text/event-stream') ||
-    (((req.headers['user-agent'] as string) || '').toLowerCase().includes('openai-mcp') &&
-      req.method.toUpperCase() === 'GET');
-
-  const sendOAuthError = (
-    status: number,
-    message: string,
-    authenticateHeader?: string
-  ) => {
-    if (authenticateHeader) {
-      res.header('WWW-Authenticate', authenticateHeader);
-    }
-
-    if (acceptsEventStream) {
-      res.status(status);
-      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-
-      const payload = JSON.stringify({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message,
-        },
-        id: null,
-      });
-
-      res.write(`event: error\ndata: ${payload}\n\n`);
-      res.end();
-      return;
-    }
-
-    res.status(status).json({
-      jsonrpc: '2.0',
-      error: {
-        code: -32000,
-        message,
-      },
-      id: null,
-    });
-  };
-
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    sendOAuthError(
-      401,
-      'Unauthorized: Bearer token required',
-      getWWWAuthenticateHeader(req, {
-        error: 'invalid_request',
-        errorDescription: 'Bearer token required',
-      })
-    );
+    res.status(401)
+      .header('WWW-Authenticate', getWWWAuthenticateHeader())
+      .json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Unauthorized: Bearer token required',
+        },
+        id: null,
+      });
     return;
   }
 
@@ -107,68 +62,37 @@ export async function oauthMiddleware(
   const accessToken = await storage.validateAccessToken(token);
 
   if (!accessToken) {
-    sendOAuthError(
-      401,
-      'Unauthorized: Invalid or expired access token',
-      getWWWAuthenticateHeader(req, {
-        error: 'invalid_token',
-        errorDescription: 'Invalid or expired access token',
-      })
-    );
+    res.status(401)
+      .header('WWW-Authenticate', getWWWAuthenticateHeader())
+      .json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Unauthorized: Invalid or expired access token',
+        },
+        id: null,
+      });
     return;
   }
 
   // 리소스(audience) 검증 (RFC 8707)
-  // 클라이언트마다 resource를 origin으로 보내거나, 보호 경로까지 포함해 보낼 수 있어 둘 다 허용한다.
-  const normalizeUrl = (url: string): string => {
-    try {
-      const parsed = new URL(url);
-      return `${parsed.origin}${parsed.pathname}`.replace(/\/$/, '');
-    } catch {
-      return url.replace(/\/$/, '');
-    }
-  };
+  // URL 정규화 - trailing slash 제거하여 비교
+  const normalizeUrl = (url: string) => url.replace(/\/$/, '');
   const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
-  const forwardedProto = ((req.headers['x-forwarded-proto'] as string) || '')
-    .split(',')[0]
-    ?.trim();
-  const forwardedHost = ((req.headers['x-forwarded-host'] as string) || '')
-    .split(',')[0]
-    ?.trim();
-  const requestHost = forwardedHost || req.headers.host || '';
-  const requestProto = forwardedProto || req.protocol || 'http';
-  const requestOrigin = requestHost ? `${requestProto}://${requestHost}` : null;
-  const requestBaseUrl = req.baseUrl || '';
-
-  const normalizedResource = normalizeUrl(accessToken.resource);
-  const normalizedServerUrl = normalizeUrl(serverUrl);
-  const allowedResources = new Set<string>([
-    normalizedServerUrl,
-    normalizeUrl(`${serverUrl}/mcp-remote`),
-    normalizeUrl(`${serverUrl}/mcp-openai`),
-  ]);
-  if (requestOrigin) {
-    allowedResources.add(normalizeUrl(requestOrigin));
-    if (requestBaseUrl) {
-      allowedResources.add(normalizeUrl(`${requestOrigin}${requestBaseUrl}`));
-    }
-  }
-
-  if (!allowedResources.has(normalizedResource)) {
+  if (normalizeUrl(accessToken.resource) !== normalizeUrl(serverUrl)) {
     logger.warn({
       expected: serverUrl,
       actual: accessToken.resource,
-      allowedResources: Array.from(allowedResources),
     }, '⚠️ Token audience mismatch');
 
-    sendOAuthError(
-      403,
-      'Forbidden: Token not valid for this resource',
-      getWWWAuthenticateHeader(req, {
-        error: 'insufficient_scope',
-        errorDescription: 'Token not valid for this resource',
-      })
-    );
+    res.status(403).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32001,
+        message: 'Forbidden: Token not valid for this resource',
+      },
+      id: null,
+    });
     return;
   }
 
@@ -190,7 +114,7 @@ export async function oauthMiddleware(
  */
 export async function getUserInfo(userId: string): Promise<{
   user: { id: string; username: string; email: string };
-  blog: { id: string; name: string; slug: string; isPublic?: boolean };
+  blog: { id: string; name: string; slug: string };
 } | null> {
   try {
     // Backend에서 사용자 정보 조회
@@ -228,7 +152,6 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   wellKnownRouter: Router;
   oauthRouter: Router;
   mcpRemoteRouter: Router;
-  storage: OAuthStorage;
 } {
   const storage = new OAuthStorage(redis);
 
@@ -254,10 +177,12 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   // /mcp-remote 라우터 (OAuth 인증된 MCP 엔드포인트)
   const mcpRemoteRouter = Router();
 
-  const handleOAuthMcpRequest = async (
-    req: Request,
-    res: Response,
-  ): Promise<void> => {
+  /**
+   * POST /mcp-remote - OAuth 인증된 MCP 요청 처리
+   *
+   * /mcp와 동일한 MCP 처리 로직이지만 OAuth 토큰으로 인증
+   */
+  mcpRemoteRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
     // OAuth 토큰 검증 미들웨어
     await oauthMiddleware(storage, req, res, () => {});
 
@@ -269,19 +194,15 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
     const oauth = (req as any).oauth as ValidatedToken;
 
     try {
-      logger.debug(
-        {
-          method: req.method,
-          userId: oauth.userId.substring(0, 8),
-          clientId: oauth.clientId.substring(0, 12),
-        },
-        '🔐 OAuth MCP request',
-      );
+      logger.debug({
+        userId: oauth.userId.substring(0, 8),
+        clientId: oauth.clientId.substring(0, 12),
+      }, '🔐 OAuth MCP request');
 
       // 사용자 정보 조회
       const userInfo = await getUserInfo(oauth.userId);
       if (!userInfo) {
-        res.status(403).json({
+        return res.status(403).json({
           jsonrpc: '2.0',
           error: {
             code: -32002,
@@ -289,13 +210,12 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
           },
           id: null,
         });
-        return;
       }
 
       // MCP 서버 생성
       const mcpServer = new McpServer(
         {
-          name: 'codebase-blog-mcp',
+          name: 'aigory-blog-mcp',
           version: '8.0.0',
         },
         {
@@ -303,7 +223,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
             tools: {},
             prompts: {},
           },
-        },
+        }
       );
 
       // 도구 등록 (OAuth 모드 - API Key 없음)
@@ -315,16 +235,14 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
           user: userInfo.user,
           blog: userInfo.blog,
         },
-        apiKey: null,
-        oauthToken: oauth.token,
-        oauthScope: oauth.scope,
+        apiKey: null,  // OAuth 모드에서는 API Key 없음
+        oauthToken: oauth.token,  // 대신 OAuth 토큰 전달
         metricsService,
-        route: 'mcp-remote',
         config: {
           MCP_BASE_URL: config.MCP_BASE_URL,
           BACKEND_BASE_URL: config.BACKEND_BASE_URL,
           BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
-          FRONTEND_URL: config.FRONTEND_URL,
+          PUBLIC_SITE_URL: config.PUBLIC_SITE_URL,
           MCP_SHARED_SECRET: config.MCP_SHARED_SECRET,
         },
       });
@@ -334,29 +252,25 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
         sessionIdGenerator: undefined,
       });
 
+      // MCP 서버와 Transport 연결
       await mcpServer.connect(transport);
 
+      // 요청 처리
       const startTime = Date.now();
       await transport.handleRequest(req, res);
 
+      // 메트릭 기록
       const duration = Date.now() - startTime;
-      metricsService.recordRequest('success', undefined, 'mcp-remote');
-      metricsService.recordRequestDuration(duration, undefined, 'mcp-remote');
+      metricsService.recordRequest('success');
+      metricsService.recordRequestDuration(duration);
 
-      logger.debug(
-        {
-          method: req.method,
-          userId: oauth.userId.substring(0, 8),
-          duration: `${duration}ms`,
-        },
-        '✅ OAuth MCP request processed',
-      );
+      logger.debug({
+        userId: oauth.userId.substring(0, 8),
+        duration: `${duration}ms`,
+      }, '✅ OAuth MCP request processed');
     } catch (error: any) {
-      metricsService.recordRequest('error', undefined, 'mcp-remote');
-      logger.error(
-        { error: error.message, method: req.method },
-        '❌ OAuth MCP request failed',
-      );
+      metricsService.recordRequest('error');
+      logger.error({ error: error.message }, '❌ OAuth MCP request failed');
 
       if (!res.headersSent) {
         res.status(500).json({
@@ -369,42 +283,18 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
         });
       }
     }
-  };
-
-  const isTransportGetRequest = (req: Request): boolean => {
-    const acceptHeader = (req.headers.accept || '').toLowerCase();
-    return (
-      acceptHeader.includes('text/event-stream') ||
-      typeof req.headers.authorization === 'string' ||
-      typeof req.headers['mcp-session-id'] === 'string' ||
-      typeof req.headers['mcp-protocol-version'] === 'string'
-    );
-  };
-
-  /**
-   * POST /mcp-remote - OAuth 인증된 MCP 요청 처리
-   *
-   * /mcp와 동일한 MCP 처리 로직이지만 OAuth 토큰으로 인증
-   */
-  mcpRemoteRouter.post('/', async (req: Request, res: Response) => {
-    await handleOAuthMcpRequest(req, res);
   });
 
   /**
    * GET /mcp-remote - Server Discovery (OAuth 버전)
    */
-  mcpRemoteRouter.get('/', async (req, res) => {
-    if (isTransportGetRequest(req)) {
-      await handleOAuthMcpRequest(req, res);
-      return;
-    }
-
+  mcpRemoteRouter.get('/', (req, res) => {
     const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
 
     res.json({
-      name: 'codebase-blog-mcp',
+      name: 'aigory-blog-mcp',
       version: '8.0.0',
-      description: 'Codebase.blog Auto-posting MCP Server (OAuth)',
+      description: 'Aigory Auto-posting MCP Server (OAuth)',
       capabilities: {
         tools: true,
         prompts: false,
@@ -426,15 +316,15 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   /**
    * DELETE /mcp-remote - 세션 종료
    */
-  mcpRemoteRouter.delete('/', async (req, res) => {
-    await handleOAuthMcpRequest(req, res);
+  mcpRemoteRouter.delete('/', (req, res) => {
+    logger.debug('🔌 DELETE /mcp-remote');
+    res.status(204).send();
   });
 
   return {
     wellKnownRouter,
     oauthRouter,
     mcpRemoteRouter,
-    storage,
   };
 }
 

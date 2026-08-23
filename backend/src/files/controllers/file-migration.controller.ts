@@ -97,6 +97,14 @@ export class FileMigrationController {
     return this.lifecycleService.triggerManualCleanup();
   }
 
+  @Get("cleanup/preview")
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Preview expired file cleanup without deleting" })
+  @ApiResponse({ status: 200, description: "Cleanup preview completed" })
+  async previewCleanup() {
+    return this.lifecycleService.previewExpiredCleanup();
+  }
+
   /**
    * 파일 시스템 통계
    */

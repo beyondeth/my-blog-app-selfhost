@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import CommunityPostDetailClient from './client-page';
 import type { CommunityPost } from '@/types/community';
+import { serializeJsonLd } from '@/lib/security/json-ld';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -102,7 +103,7 @@ export async function generateMetadata(
     .substring(0, 160) || 'Community post';
 
   // 사이트 정보
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Codebase';
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Aigory';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
   // 게시물 전체 URL (Reddit 스타일)
@@ -194,7 +195,7 @@ function generateStructuredData(
   post: CommunityPost,
   params: { slug: string; postId: string }
 ) {
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Codebase';
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Aigory';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
   const postUrl = `${siteUrl}/c/${params.slug}/comments/${params.postId}`;
   const makeAbsolute = (url: string) => (url.startsWith('http') ? url : `${siteUrl}${url}`);
@@ -332,7 +333,7 @@ export default async function CommunityPostPage({
           key={index}
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(data),
+            __html: serializeJsonLd(data),
           }}
         />
       ))}

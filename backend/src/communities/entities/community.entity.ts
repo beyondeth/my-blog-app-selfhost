@@ -19,6 +19,7 @@ import { CommunityPost } from "./community-post.entity";
 import { CommunityRule } from "./community-rule.entity";
 import { CommunityFlair } from "./community-flair.entity";
 import { CommunitySidebarWidget } from "./community-sidebar-widget.entity";
+import { Organization } from "../../organizations/entities/organization.entity";
 
 /**
  * Community 엔티티
@@ -117,6 +118,13 @@ export class Community {
    */
   @Column({ type: "uuid", nullable: true })
   creatorId: string;
+
+  @Column({ type: "uuid", nullable: true })
+  organizationId: string | null;
+
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "organizationId" })
+  organization: Organization | null;
 
   /**
    * 공개 여부

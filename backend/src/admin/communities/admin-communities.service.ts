@@ -18,36 +18,56 @@ export class AdminCommunitiesService {
     private readonly communityService: CommunityService,
   ) {}
 
-  async listSnapshots(communityId: string, limit?: number) {
-    return this.communityRecoveryService.listSnapshots(communityId, limit);
+  async listSnapshots(
+    communityId: string,
+    limit?: number,
+    organizationId?: string,
+  ) {
+    return this.communityRecoveryService.listSnapshots(
+      communityId,
+      limit,
+      organizationId,
+    );
   }
 
   async captureSnapshot(
     communityId: string,
     operatorId: string,
     dto: CaptureSnapshotDto,
+    organizationId?: string,
   ) {
     return this.communityRecoveryService.captureSnapshot(
       communityId,
       operatorId,
       dto.reason,
       dto.metadata,
+      organizationId,
     );
   }
 
-  async restoreSnapshot(snapshotId: string, operatorId: string) {
-    await this.communityRecoveryService.restoreSnapshot(snapshotId, operatorId);
+  async restoreSnapshot(
+    snapshotId: string,
+    operatorId: string,
+    organizationId?: string,
+  ) {
+    await this.communityRecoveryService.restoreSnapshot(
+      snapshotId,
+      operatorId,
+      organizationId,
+    );
   }
 
   async lockCommunity(
     communityId: string,
     operatorId: string,
     dto: LockCommunityDto,
+    organizationId?: string,
   ) {
     await this.communityService.lockCommunity(
       communityId,
       operatorId,
       dto.reason,
+      organizationId,
     );
   }
 
@@ -55,11 +75,13 @@ export class AdminCommunitiesService {
     communityId: string,
     operatorId: string,
     dto: LockCommunityDto,
+    organizationId?: string,
   ) {
     await this.communityService.unlockCommunity(
       communityId,
       operatorId,
       dto.reason,
+      organizationId,
     );
   }
 }

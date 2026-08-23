@@ -608,6 +608,7 @@ const PostArticle = React.memo(function PostArticle({
                   isHomeFeed={isHomeFeed}
                   shouldBlur={shouldBlurMedia}
                   blurReason={blurReason}
+                  priority={priority}
                 />
               </div>
             )
@@ -758,6 +759,7 @@ const PostArticle = React.memo(function PostArticle({
                   isHomeFeed={isHomeFeed}
                   shouldBlur={shouldBlurMedia}
                   blurReason={blurReason}
+                  priority={priority}
                 />
               </div>
             )
@@ -927,6 +929,7 @@ const PostArticle = React.memo(function PostArticle({
                 isHomeFeed={isHomeFeed}
                 shouldBlur={shouldBlurMedia}
                 blurReason={blurReason}
+                priority={priority}
               />
             </div>
           )}

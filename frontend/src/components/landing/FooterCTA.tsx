@@ -72,7 +72,7 @@ export default function FooterCTA() {
 
         {/* 카피라이트 */}
         <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">© 2025 Codebase.blog. All rights reserved.</p>
+          <p className="text-sm text-gray-500">© 2026 beyondeth. All rights reserved.</p>
         </div>
       </div>
 

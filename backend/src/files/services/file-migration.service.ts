@@ -41,6 +41,7 @@ export interface MigrationOptions {
 @Injectable()
 export class FileMigrationService {
   private readonly logger = new Logger(FileMigrationService.name);
+  private activeMigration: Promise<MigrationResult> | null = null;
   private migrationProgress: MigrationProgress = {
     total: 0,
     processed: 0,
@@ -369,6 +370,25 @@ export class FileMigrationService {
    * Migrate files to v2 structure
    */
   async migrateToV2(options: MigrationOptions): Promise<MigrationResult> {
+    if (this.activeMigration) {
+      return this.activeMigration;
+    }
+
+    const migration = this.executeMigration(options);
+    this.activeMigration = migration;
+
+    try {
+      return await migration;
+    } finally {
+      if (this.activeMigration === migration) {
+        this.activeMigration = null;
+      }
+    }
+  }
+
+  private async executeMigration(
+    options: MigrationOptions,
+  ): Promise<MigrationResult> {
     const startTime = new Date();
     const errors: Array<{ fileId: string; error: string }> = [];
 
@@ -411,11 +431,13 @@ export class FileMigrationService {
         });
 
         if (batch.length === 0) break;
+        let retainedInV1 = 0;
 
         for (const file of batch) {
           if (options.dryRun) {
             this.migrationProgress.processed++;
             this.migrationProgress.skipped++;
+            retainedInV1++;
             continue;
           }
 
@@ -425,9 +447,11 @@ export class FileMigrationService {
               this.migrationProgress.successful++;
             } else {
               this.migrationProgress.skipped++;
+              retainedInV1++;
             }
           } catch (error) {
             this.migrationProgress.failed++;
+            retainedInV1++;
             errors.push({
               fileId: file.id,
               error: error.message,
@@ -436,7 +460,9 @@ export class FileMigrationService {
           this.migrationProgress.processed++;
         }
 
-        offset += options.batchSize;
+        // Successfully migrated rows no longer match the v1 query. Only rows
+        // left in place should advance the offset, otherwise valid rows are skipped.
+        offset += retainedInV1;
       }
 
       const endTime = new Date();

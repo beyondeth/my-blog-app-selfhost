@@ -34,6 +34,7 @@ export class PostCreationService {
     author: User,
     files?: File[],
     ip?: string,
+    _organizationId?: string,
   ): Promise<Post> {
     return this.postCreator.create(createPostDto, author, files, ip);
   }
@@ -53,6 +54,7 @@ export class PostCreationService {
     updatePostDto: UpdatePostDto,
     user: User,
     files?: File[],
+    _organizationId?: string,
   ): Promise<Post> {
     return this.postUpdater.update(id, updatePostDto, user, files);
   }
@@ -92,7 +94,11 @@ export class PostCreationService {
 
   // ─── 삭제/복원/발행 (PostDeleter 위임) ─────────────
 
-  async delete(id: string, user: User): Promise<void> {
+  async delete(
+    id: string,
+    user: User,
+    _organizationId?: string,
+  ): Promise<void> {
     return this.postDeleter.delete(id, user);
   }
 

@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
@@ -12,6 +17,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 @Injectable()
 export class MaterializedViewService implements OnModuleInit {
   private readonly logger = new Logger(MaterializedViewService.name);
+  private readonly allowedViewNames = new Set(["mv_popular_posts"]);
 
   constructor(@InjectDataSource() private dataSource: DataSource) {}
 
@@ -76,6 +82,7 @@ export class MaterializedViewService implements OnModuleInit {
    * 특정 Materialized View 갱신
    */
   async refreshView(viewName: string): Promise<void> {
+    this.assertAllowedViewName(viewName);
     const startTime = Date.now();
 
     try {
@@ -100,6 +107,7 @@ export class MaterializedViewService implements OnModuleInit {
    * Materialized View의 데이터 최신 상태 확인
    */
   async getViewLastRefreshTime(viewName: string): Promise<Date | null> {
+    this.assertAllowedViewName(viewName);
     try {
       // PostgreSQL 시스템 카탈로그에서 정보 조회
       const result = await this.dataSource.query(
@@ -141,6 +149,7 @@ export class MaterializedViewService implements OnModuleInit {
    * Materialized View의 통계 정보 조회
    */
   async getViewStats(viewName: string): Promise<any> {
+    this.assertAllowedViewName(viewName);
     try {
       const result = await this.dataSource.query(
         `
@@ -174,6 +183,12 @@ export class MaterializedViewService implements OnModuleInit {
     } catch (error) {
       this.logger.error(`Failed to get stats for '${viewName}':`, error);
       return null;
+    }
+  }
+
+  private assertAllowedViewName(viewName: string): void {
+    if (!this.allowedViewNames.has(viewName)) {
+      throw new BadRequestException("Unsupported materialized view");
     }
   }
 

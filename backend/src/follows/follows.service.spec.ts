@@ -6,6 +6,7 @@ import { Follow } from "./entities/follow.entity";
 import { User } from "../users/entities/user.entity";
 import { NotificationsService } from "../notifications/notifications.service";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { CdnService } from "../files/services/cdn.service";
 
 describe("FollowsService", () => {
   let service: FollowsService;
@@ -28,6 +29,7 @@ describe("FollowsService", () => {
 
   const mockUserRepository = {
     exists: jest.fn(),
+    findOne: jest.fn(),
   };
 
   const mockDataSource = {
@@ -36,6 +38,12 @@ describe("FollowsService", () => {
 
   const mockNotificationsService = {
     createWithTransaction: jest.fn(),
+  };
+
+  const mockCdnService = {
+    generateCdnUrlFromKey: jest.fn(
+      (key: string) => `https://cdn.example.test/${key}`,
+    ),
   };
 
   beforeEach(async () => {
@@ -57,6 +65,10 @@ describe("FollowsService", () => {
         {
           provide: NotificationsService,
           useValue: mockNotificationsService,
+        },
+        {
+          provide: CdnService,
+          useValue: mockCdnService,
         },
       ],
     }).compile();
@@ -88,6 +100,7 @@ describe("FollowsService", () => {
           save: jest
             .fn()
             .mockResolvedValue({ id: "follow-id", followerId, followingId }),
+          increment: jest.fn().mockResolvedValue(undefined),
         };
         return fn(mockManager);
       });
@@ -130,6 +143,7 @@ describe("FollowsService", () => {
         const mockManager = {
           findOne: jest.fn().mockResolvedValue(mockFollow),
           remove: jest.fn().mockResolvedValue(mockFollow),
+          decrement: jest.fn().mockResolvedValue(undefined),
         };
         return fn(mockManager);
       });
@@ -158,8 +172,11 @@ describe("FollowsService", () => {
     const currentUserId = "current-user-id";
 
     it("should return follow info with isFollowedByUser true when following", async () => {
-      mockFollowRepository.count.mockResolvedValueOnce(10); // followers
-      mockFollowRepository.count.mockResolvedValueOnce(5); // following
+      mockUserRepository.findOne.mockResolvedValue({
+        id: userId,
+        followerCount: 10,
+        followingCount: 5,
+      });
 
       const mockQueryBuilder = {
         where: jest.fn().mockReturnThis(),
@@ -185,8 +202,11 @@ describe("FollowsService", () => {
     });
 
     it("should return follow info with isFollowedByUser false when not following", async () => {
-      mockFollowRepository.count.mockResolvedValueOnce(10); // followers
-      mockFollowRepository.count.mockResolvedValueOnce(5); // following
+      mockUserRepository.findOne.mockResolvedValue({
+        id: userId,
+        followerCount: 10,
+        followingCount: 5,
+      });
 
       const mockQueryBuilder = {
         where: jest.fn().mockReturnThis(),
@@ -208,8 +228,11 @@ describe("FollowsService", () => {
     });
 
     it("should return isFollowedByUser false when no currentUserId", async () => {
-      mockFollowRepository.count.mockResolvedValueOnce(10); // followers
-      mockFollowRepository.count.mockResolvedValueOnce(5); // following
+      mockUserRepository.findOne.mockResolvedValue({
+        id: userId,
+        followerCount: 10,
+        followingCount: 5,
+      });
 
       const result = await service.getFollowInfo(userId);
 
@@ -221,8 +244,11 @@ describe("FollowsService", () => {
     });
 
     it("should return isFollowedByUser false when currentUserId equals userId", async () => {
-      mockFollowRepository.count.mockResolvedValueOnce(10); // followers
-      mockFollowRepository.count.mockResolvedValueOnce(5); // following
+      mockUserRepository.findOne.mockResolvedValue({
+        id: userId,
+        followerCount: 10,
+        followingCount: 5,
+      });
 
       const result = await service.getFollowInfo(userId, userId);
 

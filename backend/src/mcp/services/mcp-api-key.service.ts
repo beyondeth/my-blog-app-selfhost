@@ -72,6 +72,7 @@ export class McpApiKeyService {
     userId: string,
     blogId: string,
     name: string,
+    organizationId?: string,
   ): Promise<{ apiKey: string; keyHint: string; expiresAt: Date }> {
     const normalizedName = name.trim();
     if (!normalizedName) {
@@ -82,6 +83,7 @@ export class McpApiKeyService {
     const activeKeyCount = await this.mcpApiKeyRepository.count({
       where: {
         userId,
+        ...(organizationId ? { organizationId } : {}),
         isActive: true,
         expiresAt: MoreThan(new Date()),
       },
@@ -137,6 +139,7 @@ export class McpApiKeyService {
       name: normalizedName,
       userId,
       blogId,
+      organizationId: organizationId ?? null,
       expiresAt,
       isActive: true,
       requestCount: 0,
@@ -191,6 +194,7 @@ export class McpApiKeyService {
   async revealSecret(
     keyId: string,
     userId: string,
+    organizationId?: string,
   ): Promise<{ apiKey: string; keyHint: string; name: string }> {
     const supportsEncryptedColumn = await this.hasEncryptedApiKeyColumn();
     if (!supportsEncryptedColumn) {
@@ -209,7 +213,10 @@ export class McpApiKeyService {
       throw new NotFoundException("API key not found");
     }
 
-    if (mcpApiKey.userId !== userId) {
+    if (
+      mcpApiKey.userId !== userId ||
+      (organizationId && mcpApiKey.organizationId !== organizationId)
+    ) {
       throw new UnauthorizedException("Not authorized to access this API key");
     }
 
@@ -327,9 +334,15 @@ export class McpApiKeyService {
    * @param userId 사용자 ID
    * @returns API Key 목록 (secret 제외)
    */
-  async findByUser(userId: string): Promise<McpApiKey[]> {
+  async findByUser(
+    userId: string,
+    organizationId?: string,
+  ): Promise<McpApiKey[]> {
     return this.mcpApiKeyRepository.find({
-      where: { userId },
+      where: {
+        userId,
+        ...(organizationId ? { organizationId } : {}),
+      },
       relations: ["blog"],
       order: { createdAt: "DESC" },
     });
@@ -341,7 +354,11 @@ export class McpApiKeyService {
    * @param keyId API Key ID
    * @param userId 요청 사용자 ID (소유권 확인)
    */
-  async delete(keyId: string, userId: string): Promise<void> {
+  async delete(
+    keyId: string,
+    userId: string,
+    organizationId?: string,
+  ): Promise<void> {
     const mcpApiKey = await this.mcpApiKeyRepository.findOne({
       where: { id: keyId },
     });
@@ -351,7 +368,10 @@ export class McpApiKeyService {
     }
 
     // 소유권 확인
-    if (mcpApiKey.userId !== userId) {
+    if (
+      mcpApiKey.userId !== userId ||
+      (organizationId && mcpApiKey.organizationId !== organizationId)
+    ) {
       throw new UnauthorizedException("Not authorized to delete this API key");
     }
 
