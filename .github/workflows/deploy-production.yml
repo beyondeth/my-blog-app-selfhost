@@ -76,6 +76,10 @@ jobs:
           umask 077
           printf '%s' "$AIGORY_ENV_FILE_BASE64" | base64 --decode > aigory.env
           test -s aigory.env
+          # appleboy/scp-action runs in a container and must be able to read the
+          # temporary file; the runner workspace is ephemeral and is discarded
+          # after this job.
+          chmod 644 aigory.env
           grep -q '^NEXT_PUBLIC_SITE_URL=https://aigory.com$' aigory.env
           grep -q '^PAYMENTS_ENABLED=false$' aigory.env
           grep -q '^MOCK_PAYMENT_ENABLED=false$' aigory.env
