@@ -2,6 +2,7 @@ import { DataSource } from "typeorm";
 import * as dotenv from "dotenv";
 import * as path from "path";
 import { ORDERED_MIGRATIONS } from "./migrations/migration-manifest";
+import { isInternalDatabaseUrl } from "./config/database-url.util";
 
 // 프로덕션 환경이 아닐 때만 dotenv 로드 (프로덕션에서는 환경변수가 이미 설정됨)
 if (process.env.NODE_ENV !== "production") {
@@ -32,11 +33,7 @@ export const createDataSourceOptions = (): any => {
 
   if (dbUrl) {
     // 로컬 데이터베이스인 경우 SSL 비활성화
-    const isLocal =
-      dbUrl.includes("localhost") ||
-      dbUrl.includes("127.0.0.1") ||
-      dbUrl.includes("[::1]") ||
-      dbUrl.includes("@postgres");
+    const isLocal = isInternalDatabaseUrl(dbUrl);
     return {
       ...baseConfig,
       url: dbUrl,
@@ -55,9 +52,13 @@ export const createDataSourceOptions = (): any => {
 
   // 개별 환경 변수 사용
   const host = process.env.DB_HOST || "localhost";
-  const isLocalHost = ["localhost", "127.0.0.1", "::1", "postgres"].includes(
-    host,
-  );
+  const isLocalHost = [
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "postgres",
+    "pgbouncer",
+  ].includes(host);
   const useSsl =
     process.env.DB_SSL_ENABLED === "true" ||
     (isProduction && !isLocalHost && process.env.DOCKERIZED !== "true");

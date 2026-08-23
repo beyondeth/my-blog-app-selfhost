@@ -282,12 +282,11 @@ export function validateProductionEnvironment(
     }
 
     const dbHost = environment.DB_HOST?.trim().toLowerCase();
-    const isLocalDatabase = [
-      "localhost",
-      "127.0.0.1",
-      "::1",
-      "postgres",
-    ].includes(dbHost || "");
+    const isLocalDatabase = dbHost
+      ? ["localhost", "127.0.0.1", "::1", "postgres", "pgbouncer"].includes(
+          dbHost,
+        )
+      : false;
     if (!isLocalDatabase && environment.DB_SSL_ENABLED !== "true") {
       errors.push("DB_SSL_ENABLED=true for non-local production databases");
     }

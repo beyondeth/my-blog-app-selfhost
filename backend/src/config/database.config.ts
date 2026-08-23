@@ -1,6 +1,7 @@
 import { registerAs } from "@nestjs/config";
 import { TypeOrmModuleOptions } from "@nestjs/typeorm";
 import { ORDERED_MIGRATIONS } from "../migrations/migration-manifest";
+import { isInternalDatabaseUrl } from "./database-url.util";
 
 export default registerAs("database", (): TypeOrmModuleOptions => {
   const dbUrl = process.env.DB_URL || process.env.DATABASE_URL;
@@ -35,10 +36,7 @@ export default registerAs("database", (): TypeOrmModuleOptions => {
   // DB_URL이 있는 경우 (AWS RDS 등)
   if (dbUrl) {
     // 로컬 데이터베이스인 경우 SSL 비활성화
-    const isLocal =
-      dbUrl.includes("localhost") ||
-      dbUrl.includes("127.0.0.1") ||
-      dbUrl.includes("[::1]");
+    const isLocal = isInternalDatabaseUrl(dbUrl);
     const sslEnabled =
       process.env.DB_SSL_ENABLED === "true" ||
       (process.env.DB_SSL_ENABLED === undefined && !isLocal);
@@ -69,9 +67,13 @@ export default registerAs("database", (): TypeOrmModuleOptions => {
 
   // 개별 환경 변수 사용 (로컬 개발)
   const host = process.env.DB_HOST || "localhost";
-  const isLocalHost = ["localhost", "127.0.0.1", "::1", "postgres"].includes(
-    host,
-  );
+  const isLocalHost = [
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "postgres",
+    "pgbouncer",
+  ].includes(host);
   const ssl = getSslConfig(
     process.env.DB_SSL_ENABLED === "true" ||
       (isProduction && !isLocalHost && process.env.DOCKERIZED !== "true"),
