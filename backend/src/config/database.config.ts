@@ -55,10 +55,16 @@ export default registerAs("database", (): TypeOrmModuleOptions => {
         ), // 데이터베이스 연결 타임아웃
         idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || "30000", 10),
         allowExitOnIdle: true,
-        statement_timeout: parseInt(
-          process.env.DB_STATEMENT_TIMEOUT || "30000",
-          10,
-        ),
+        // PgBouncer rejects statement_timeout as a startup parameter. Its
+        // server-side QUERY_TIMEOUT handles the same production limit.
+        ...(!isLocal
+          ? {
+              statement_timeout: parseInt(
+                process.env.DB_STATEMENT_TIMEOUT || "30000",
+                10,
+              ),
+            }
+          : {}),
         query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || "30000", 10),
         ...(ssl ? { ssl } : {}),
       },
@@ -96,10 +102,14 @@ export default registerAs("database", (): TypeOrmModuleOptions => {
       ),
       idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || "30000", 10),
       allowExitOnIdle: true,
-      statement_timeout: parseInt(
-        process.env.DB_STATEMENT_TIMEOUT || "30000",
-        10,
-      ),
+      ...(!isLocalHost
+        ? {
+            statement_timeout: parseInt(
+              process.env.DB_STATEMENT_TIMEOUT || "30000",
+              10,
+            ),
+          }
+        : {}),
       query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || "30000", 10),
       ...(ssl ? { ssl } : {}),
     },
