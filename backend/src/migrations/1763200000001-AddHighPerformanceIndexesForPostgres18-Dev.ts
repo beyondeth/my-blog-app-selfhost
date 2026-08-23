@@ -50,7 +50,7 @@ export class AddHighPerformanceIndexesForPostgres18Dev1763200000001
     // 북마크 조회 최적화 (사용자별 포스트 북마크 상태 조회)
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "idx_bookmarks_user_post"
-      ON "bookmarks" ("user_id", "post_id");
+      ON "bookmarks" ("userId", "postId");
     `);
 
     // ===== 4. 블로그/사용자 관련 인덱스 =====

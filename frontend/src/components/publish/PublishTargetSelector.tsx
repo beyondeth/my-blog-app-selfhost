@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { ChevronDown, BookOpen, Users, Check, Search } from 'lucide-react';
 import { useMyCommunities } from '@/hooks/community';
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 import type { Community } from '@/types/community';
 import { getOutsideClickEvent } from '@/utils/interaction';
 import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
@@ -146,7 +147,7 @@ export default function PublishTargetSelector({
     if (iconUrl) {
       return (
         <Image
-          src={iconUrl}
+          src={normalizeImageUrl(iconUrl)}
           alt={name || ''}
           width={20}
           height={20}

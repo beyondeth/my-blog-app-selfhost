@@ -194,6 +194,7 @@ const UnifiedFeedItem = React.memo(function UnifiedFeedItem({
               isHomeFeed
               shouldBlur={shouldBlurNsfw}
               blurReason={blurReason}
+              priority={priority}
             />
           </div>
         )}

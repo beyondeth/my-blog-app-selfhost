@@ -202,7 +202,7 @@ export class UsersService {
     );
   }
 
-  async clearRefreshToken(id: string): Promise<void> {
+  async clearRefreshToken(id: string, _revokeAll = true): Promise<void> {
     return this.usersCommandService.clearRefreshToken(id);
   }
 

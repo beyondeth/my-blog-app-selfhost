@@ -12,12 +12,18 @@ import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { Role } from "../../common/enums/role.enum";
+import { OrganizationContextGuard } from "../../organizations/guards/organization-context.guard";
+import {
+  OrganizationId,
+  RequireOrganizationContext,
+} from "../../organizations/decorators/organization-context.decorator";
 
 @ApiTags("admin-posts")
 @ApiBearerAuth()
 @Controller("admin/posts")
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, OrganizationContextGuard)
 @Roles(Role.ADMIN)
+@RequireOrganizationContext()
 export class AdminPostsController {
   constructor(private readonly adminPostsService: AdminPostsService) {}
 
@@ -28,6 +34,7 @@ export class AdminPostsController {
     @Query("search") search?: string,
     @Query("category") category?: string,
     @Query("isPublished") isPublished?: string,
+    @OrganizationId() organizationId?: string,
   ) {
     const filters: PostFilters = {};
 
@@ -43,7 +50,14 @@ export class AdminPostsController {
       filters.isPublished = false;
     }
 
-    const result = await this.adminPostsService.findAll(filters, page, limit);
+    const result = await this.adminPostsService.findAll(
+      filters,
+      page,
+      limit,
+      "createdAt",
+      "DESC",
+      organizationId,
+    );
 
     return {
       posts: result.data,

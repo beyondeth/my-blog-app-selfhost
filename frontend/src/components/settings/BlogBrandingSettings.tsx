@@ -752,7 +752,7 @@ type BrandingUpdatePayload = {
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp"
           onChange={(e) => handleFileSelect(field, e)}
           className="hidden"
         />

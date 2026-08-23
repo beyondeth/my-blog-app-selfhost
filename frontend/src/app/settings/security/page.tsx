@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
+import { apiClient } from '@/lib/api';
+import type { RefreshSession } from '@/lib/api';
+import { getCsrfHeaders } from '@/lib/api/csrf';
 import { FiLock, FiEye, FiEyeOff, FiShield, FiCheck, FiAlertCircle } from 'react-icons/fi';
 import {
   SETTINGS_CARD_CLASS,
@@ -26,6 +29,9 @@ export default function SecuritySettingsPage() {
   });
   const [passwordStrength, setPasswordStrength] = useState<any>(null);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+  const [sessions, setSessions] = useState<RefreshSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionActionId, setSessionActionId] = useState<string | null>(null);
 
   // 비밀번호 실시간 검증
   useEffect(() => {
@@ -38,28 +44,28 @@ export default function SecuritySettingsPage() {
 
       // 기본 검증
       if (!validation.hasMinLength) {
-        errors.push('At least 8 characters');
+        errors.push('최소 8자 이상');
       }
       if (!validation.hasUpperCase) {
-        errors.push('Uppercase letter');
+        errors.push('대문자 포함');
       }
       if (!validation.hasLowerCase) {
-        errors.push('Lowercase letter');
+        errors.push('소문자 포함');
       }
       if (!validation.hasNumber) {
-        errors.push('Number');
+        errors.push('숫자 포함');
       }
       if (validation.hasForbiddenChars) {
-        errors.push('Forbidden character');
+        errors.push('사용 금지 문자 포함');
       }
 
       // 추가 보안 검증
       if (isCommonPassword(passwordForm.newPassword)) {
-        errors.push('Too common');
+        errors.push('흔한 비밀번호 사용');
       }
 
       if (containsUserInfo(passwordForm.newPassword, user?.email, user?.username)) {
-        errors.push('Contains personal info');
+        errors.push('개인정보 포함');
       }
 
       setPasswordErrors(errors);
@@ -68,6 +74,78 @@ export default function SecuritySettingsPage() {
       setPasswordErrors([]);
     }
   }, [passwordForm.newPassword, user]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setSessions([]);
+      return;
+    }
+
+    let cancelled = false;
+    setSessionsLoading(true);
+    apiClient.auth
+      .listSessions()
+      .then((result) => {
+        if (!cancelled) {
+          setSessions(result);
+        }
+      })
+      .catch(() => {
+        // Session visibility is supplemental; keep password settings usable.
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSessionsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const revokeSession = async (sessionId: string) => {
+    if (!window.confirm('이 기기의 로그인 세션을 폐기할까요?')) {
+      return;
+    }
+
+    setSessionActionId(sessionId);
+    setError('');
+    try {
+      await apiClient.auth.revokeSession(sessionId);
+      setSessions((current) =>
+        current.map((session) =>
+          session.id === sessionId
+            ? { ...session, revokedAt: new Date().toISOString() }
+            : session,
+        ),
+      );
+    } catch (err: any) {
+      setError(err.message || '세션 폐기에 실패했습니다');
+    } finally {
+      setSessionActionId(null);
+    }
+  };
+
+  const revokeAllSessions = async () => {
+    if (!window.confirm('모든 로그인 세션을 폐기할까요?')) {
+      return;
+    }
+
+    setSessionActionId('all');
+    setError('');
+    try {
+      await apiClient.auth.revokeAllSessions();
+      const revokedAt = new Date().toISOString();
+      setSessions((current) =>
+        current.map((session) => ({ ...session, revokedAt })),
+      );
+    } catch (err: any) {
+      setError(err.message || '모든 세션 폐기에 실패했습니다');
+    } finally {
+      setSessionActionId(null);
+    }
+  };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +157,7 @@ export default function SecuritySettingsPage() {
 
     // 비밀번호 일치 확인
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError('The new passwords do not match.');
+      setError('새 비밀번호가 일치하지 않습니다');
       return;
     }
 
@@ -89,26 +167,26 @@ export default function SecuritySettingsPage() {
 
       // 백엔드와 동일한 기본 요구사항 확인 (대문자, 소문자, 숫자)
       if (!validation.hasMinLength) {
-        setError('Your password must be at least 8 characters long.');
+        setError('비밀번호는 최소 8자 이상이어야 합니다');
         return;
       }
       if (!validation.hasUpperCase || !validation.hasLowerCase || !validation.hasNumber) {
-        setError('Your password must include at least one uppercase letter, one lowercase letter, and one number.');
+        setError('비밀번호는 최소 하나의 소문자, 하나의 대문자, 그리고 하나의 숫자를 포함해야 합니다');
         return;
       }
       if (validation.hasForbiddenChars) {
-        setError('Your password contains unsupported characters: " \' \\ < > ` or spaces.');
+        setError('비밀번호에 사용할 수 없는 문자가 포함되어 있습니다: " \' \\ < > ` 공백');
         return;
       }
 
       // 추가 보안 검증
       if (isCommonPassword(passwordForm.newPassword)) {
-        setError('This password is too common.');
+        setError('너무 흔한 비밀번호는 사용할 수 없습니다');
         return;
       }
 
       if (containsUserInfo(passwordForm.newPassword, user?.email, user?.username)) {
-        setError('Your password cannot include personal information.');
+        setError('비밀번호에 개인정보를 포함할 수 없습니다');
         return;
       }
     }
@@ -124,6 +202,7 @@ export default function SecuritySettingsPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(await getCsrfHeaders()),
           },
           credentials: 'include',
           body: JSON.stringify({
@@ -135,7 +214,7 @@ export default function SecuritySettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to change the password.');
+        throw new Error(error.message || '비밀번호 변경에 실패했습니다');
       }
 
       setPasswordForm({
@@ -148,7 +227,7 @@ export default function SecuritySettingsPage() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message || 'Something went wrong.');
+      setError(err.message || '오류가 발생했습니다');
     } finally {
       setLoading(false);
     }
@@ -159,7 +238,7 @@ export default function SecuritySettingsPage() {
     return (
       <div className="space-y-6">
         <div className={`${SETTINGS_CARD_CLASS} p-6 text-center text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300`}>
-          Please sign in to continue.
+          로그인이 필요합니다
         </div>
       </div>
     );
@@ -219,64 +298,138 @@ export default function SecuritySettingsPage() {
       default:
         return {
           icon: <FiLock className="h-5 w-5 text-gray-600 dark:text-gray-300" />,
-          name: 'Email and password',
+          name: '이메일/비밀번호',
           color: 'text-gray-600 dark:text-gray-300'
         };
     }
   };
 
   const authInfo = getAuthProviderInfo();
+  const activeSessionCount = sessions.filter(
+    (session) =>
+      !session.revokedAt && new Date(session.expiresAt).getTime() > Date.now(),
+  ).length;
 
   return (
     <div className="space-y-6 pt-2">
       <div className="space-y-2 pt-1">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">Security</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300">Strengthen and manage your account security.</p>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">보안 설정</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300">계정 보안을 강화하고 안전하게 관리하세요.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className={`${SETTINGS_CARD_CLASS} p-4 sm:p-6`}>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Sign-in method</h3>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">인증 정보</h3>
           <div className="flex items-start sm:items-center gap-3">
             {authInfo.icon}
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Using {authInfo.name}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{authInfo.name} 계정 사용 중</p>
               <p className="text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300">{user.email}</p>
             </div>
           </div>
         </div>
 
         <div className={`${SETTINGS_CARD_CLASS} p-4 sm:p-6 space-y-4`}>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Security status</h3>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">보안 상태</h3>
           <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
             <div className="flex items-center gap-2">
               <FiCheck className="h-4 w-4 text-emerald-500" />
-              Email verified
+              이메일 인증 완료
             </div>
             <div className="flex items-center gap-2">
               <FiShield className="h-4 w-4 text-blue-500" />
-              Active sessions: 1
+              활성 세션: {sessionsLoading ? '확인 중' : `${activeSessionCount}개`}
             </div>
             {user.authProvider && user.authProvider !== 'local' && (
               <div className="flex items-center gap-2">
                 {authInfo.icon}
-                <span>{authInfo.name} connected</span>
+                <span>{authInfo.name} 계정 연결됨</span>
               </div>
             )}
           </div>
         </div>
       </div>
 
+      <div className={`${SETTINGS_CARD_CLASS} p-4 sm:p-6 space-y-4`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              로그인 세션
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
+              사용하지 않거나 의심스러운 기기의 세션을 폐기하세요.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={revokeAllSessions}
+            disabled={sessionsLoading || sessionActionId !== null || activeSessionCount === 0}
+            className="rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/30 dark:text-red-200 dark:hover:bg-red-500/10"
+          >
+            모든 세션 폐기
+          </button>
+        </div>
+
+        {sessionsLoading ? (
+          <p className="text-sm text-gray-500 dark:text-gray-300">세션을 불러오는 중...</p>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-300">활성 세션 정보가 없습니다.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 rounded-xl border border-gray-100 dark:divide-[#2F3440] dark:border-[#2F3440]">
+            {sessions.map((session) => {
+              const isActive =
+                !session.revokedAt &&
+                new Date(session.expiresAt).getTime() > Date.now();
+              const status = session.revokedAt
+                ? '폐기됨'
+                : isActive
+                  ? '활성'
+                  : '만료됨';
+              const label = session.deviceName || session.userAgent || '알 수 없는 기기';
+
+              return (
+                <li
+                  key={session.id}
+                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {label}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-300">
+                      {status} · 생성 {new Date(session.createdAt).toLocaleString('ko-KR')}
+                      {session.lastUsedAt
+                        ? ` · 최근 사용 ${new Date(session.lastUsedAt).toLocaleString('ko-KR')}`
+                        : ''}
+                    </p>
+                  </div>
+                  {isActive && (
+                    <button
+                      type="button"
+                      onClick={() => revokeSession(session.id)}
+                      disabled={sessionActionId !== null}
+                      className="self-start rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto dark:border-[#3A404D] dark:text-gray-200 dark:hover:bg-[#1F2229]"
+                    >
+                      {sessionActionId === session.id ? '폐기 중...' : '이 세션 폐기'}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
       {(!user.authProvider || user.authProvider === 'local') ? (
         <div className={`${SETTINGS_CARD_CLASS} p-4 sm:p-6 space-y-4`}>
             <div>
-              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Change password</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-300 dark:text-gray-300 mt-1">Set a stronger password for your account.</p>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">비밀번호 변경</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-300 dark:text-gray-300 mt-1">강력한 새 비밀번호를 설정하세요.</p>
             </div>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
                 <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Current password
+                  현재 비밀번호
                 </label>
                 <div className="relative">
                   <input
@@ -291,7 +444,7 @@ export default function SecuritySettingsPage() {
                     type="button"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                     className="absolute inset-y-0 right-0 pr-2 flex items-center min-w-[44px] justify-center text-gray-400"
-                    aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showCurrentPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
                   >
                     {showCurrentPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
                   </button>
@@ -300,7 +453,7 @@ export default function SecuritySettingsPage() {
 
               <div>
                 <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  New password
+                  새 비밀번호
                 </label>
                 <div className="relative">
                   <input
@@ -315,7 +468,7 @@ export default function SecuritySettingsPage() {
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
                     className="absolute inset-y-0 right-0 pr-2 flex items-center min-w-[44px] justify-center text-gray-400"
-                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showNewPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
                   >
                     {showNewPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
                   </button>
@@ -324,7 +477,7 @@ export default function SecuritySettingsPage() {
                 {passwordStrength && (
                   <div className="mt-3">
                     <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300 mb-1">
-                      <span>Password strength</span>
+                      <span>비밀번호 강도</span>
                       <span className="text-gray-700 dark:text-gray-300">{passwordStrength.scoreLabel}</span>
                     </div>
                     <div className="h-2 bg-gray-200 dark:bg-[#2F3440] rounded-full overflow-hidden">
@@ -337,34 +490,34 @@ export default function SecuritySettingsPage() {
                 )}
 
                 <div className="mt-3 p-3 rounded-xl border border-gray-100 dark:border-[#2F3440] bg-gray-50 dark:bg-[#1F2229]">
-                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Password requirements</p>
+                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">비밀번호 요구사항</p>
                   <div className="space-y-1">
                     <div className={`flex items-center text-xs ${passwordStrength?.hasMinLength ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasMinLength ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasMinLength ? 'line-through' : ''}>At least 8 characters</span>
+                      <span className={passwordStrength?.hasMinLength ? 'line-through' : ''}>최소 8자 이상</span>
                     </div>
                     <div className={`flex items-center text-xs ${passwordStrength?.hasUpperCase ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasUpperCase ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasUpperCase ? 'line-through' : ''}>Uppercase letter (A-Z)</span>
+                      <span className={passwordStrength?.hasUpperCase ? 'line-through' : ''}>대문자 포함 (A-Z)</span>
                     </div>
                     <div className={`flex items-center text-xs ${passwordStrength?.hasLowerCase ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasLowerCase ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasLowerCase ? 'line-through' : ''}>Lowercase letter (a-z)</span>
+                      <span className={passwordStrength?.hasLowerCase ? 'line-through' : ''}>소문자 포함 (a-z)</span>
                     </div>
                     <div className={`flex items-center text-xs ${passwordStrength?.hasNumber ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasNumber ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasNumber ? 'line-through' : ''}>Number (0-9)</span>
+                      <span className={passwordStrength?.hasNumber ? 'line-through' : ''}>숫자 포함 (0-9)</span>
                     </div>
                     <div className={`flex items-center text-xs ${passwordStrength?.hasSpecialChar ? 'text-green-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-300 dark:text-gray-300'}`}>
                       <FiCheck className={`mr-1 ${passwordStrength?.hasSpecialChar ? 'block' : 'hidden'}`} />
-                      <span className={passwordStrength?.hasSpecialChar ? 'line-through' : ''}>Special character (!@#$%^&*)</span>
+                      <span className={passwordStrength?.hasSpecialChar ? 'line-through' : ''}>특수문자 포함 (!@#$%^&*)</span>
                     </div>
                   </div>
                 </div>
 
                 {passwordErrors.length > 0 && (
                   <div className={`mt-3 rounded-xl p-3 ${DESTRUCTIVE_SURFACE_CLASS}`}>
-                    <p className="text-xs font-semibold text-[#7A271A] dark:text-red-200 mb-1">Needs attention</p>
+                    <p className="text-xs font-semibold text-[#7A271A] dark:text-red-200 mb-1">해결해야 할 항목</p>
                     <ul className="text-xs text-[#7A271A] dark:text-red-200 space-y-0.5">
                       {passwordErrors.map((error, index) => (
                         <li key={index} className="flex items-start gap-1">
@@ -376,12 +529,12 @@ export default function SecuritySettingsPage() {
                   </div>
                 )}
 
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300">Use at least 8 characters with uppercase, lowercase, and numbers.</p>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300">최소 8자 이상, 영문 대소문자와 숫자를 포함하세요.</p>
               </div>
 
               <div>
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Confirm new password
+                  새 비밀번호 확인
                 </label>
                 <div className="relative">
                   <input
@@ -396,7 +549,7 @@ export default function SecuritySettingsPage() {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute inset-y-0 right-0 pr-2 flex items-center min-w-[44px] justify-center text-gray-400"
-                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showConfirmPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
                   >
                     {showConfirmPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
                   </button>
@@ -415,7 +568,7 @@ export default function SecuritySettingsPage() {
                   }}
                   className={`${SETTINGS_PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}
                 >
-                  {loading ? 'Updating...' : 'Update password'}
+                  {loading ? '변경 중...' : '비밀번호 변경'}
                 </button>
               </div>
             </form>
@@ -426,17 +579,17 @@ export default function SecuritySettingsPage() {
             <FiAlertCircle className="h-5 w-5 text-gray-500 dark:text-gray-300 dark:text-gray-300 mt-0.5" />
             <div className="space-y-2">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Social sign-in active</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">소셜 로그인 사용 중</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300 mt-1">
-                  You signed in with {authInfo.name}. Your password is managed by {authInfo.name}.
+                  {authInfo.name} 계정으로 로그인하셨습니다. 비밀번호는 {authInfo.name}에서 관리됩니다.
                 </p>
               </div>
               <div className="rounded-xl border border-gray-100 dark:border-[#2F3440] bg-gray-50 dark:bg-[#1F2229] p-3 space-y-1">
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Security tips</p>
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">보안 강화 팁</p>
                 <ul className="text-xs text-gray-600 dark:text-gray-300 dark:text-gray-300 space-y-1 list-disc list-inside">
-                  <li>Enable two-factor authentication on your {authInfo.name} account.</li>
-                  <li>Review your {authInfo.name} security settings regularly.</li>
-                  <li>Watch for suspicious sign-in activity.</li>
+                  <li>{authInfo.name} 계정에서 2단계 인증을 활성화하세요.</li>
+                  <li>정기적으로 {authInfo.name} 보안 설정을 검토하세요.</li>
+                  <li>의심스러운 로그인 활동이 없는지 확인하세요.</li>
                 </ul>
               </div>
             </div>
@@ -451,7 +604,7 @@ export default function SecuritySettingsPage() {
       )}
       {success && (
         <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
-          Security settings were updated successfully.
+          보안 설정이 성공적으로 업데이트되었습니다!
         </div>
       )}
     </div>

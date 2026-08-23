@@ -1,12 +1,15 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosResponse } from "axios";
+import * as http from "http";
+import * as https from "https";
 import { v4 as uuidv4 } from "uuid";
-import * as sharp from "sharp";
+import sharp from "sharp";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { FilesService } from "../files.service";
 import { S3Service } from "./s3.service";
+import { CdnService } from "./cdn.service";
 import { File } from "../entities/file.entity";
 import {
   FileContext,
@@ -31,6 +34,9 @@ export class ExternalImageDownloadService {
   private readonly logger = new Logger(ExternalImageDownloadService.name);
   private readonly downloadTimeout = 10000; // 10초로 단축 (Gemini URL 만료 대비)
   private readonly maxFileSize = 10 * 1024 * 1024; // 10MB
+  private readonly maxBatchBytes = 50 * 1024 * 1024;
+  private readonly maxExternalImages = 20;
+  private readonly maxRedirects = 2;
   private readonly maxRetries = 3; // 재시도 횟수
   private readonly retryDelay = 1000; // 재시도 간격 (ms)
 
@@ -38,6 +44,7 @@ export class ExternalImageDownloadService {
     private readonly configService: ConfigService,
     private readonly filesService: FilesService,
     private readonly s3Service: S3Service,
+    private readonly cdnService: CdnService,
     @InjectRepository(File)
     private readonly fileRepository: Repository<File>,
     @InjectRepository(FileContext)
@@ -55,14 +62,22 @@ export class ExternalImageDownloadService {
   async downloadExternalImages(
     imageUrls: string[],
     userId: string,
+    organizationId?: string,
   ): Promise<ImageDownloadResult[]> {
     if (!imageUrls || imageUrls.length === 0) {
       return [];
     }
 
+    const boundedImageUrls = imageUrls.slice(0, this.maxExternalImages);
+    if (imageUrls.length > boundedImageUrls.length) {
+      this.logger.warn(
+        `External image limit reached; skipping ${imageUrls.length - boundedImageUrls.length} URLs`,
+      );
+    }
+
     const startTime = Date.now();
     const downloadStats = {
-      total: imageUrls.length,
+      total: boundedImageUrls.length,
       successful: 0,
       failed: 0,
       geminiUrls: 0,
@@ -72,12 +87,12 @@ export class ExternalImageDownloadService {
     };
 
     // Gemini URL 카운트
-    downloadStats.geminiUrls = imageUrls.filter((url) =>
+    downloadStats.geminiUrls = boundedImageUrls.filter((url) =>
       this.isGeminiImageUrl(url),
     ).length;
 
     this.logger.log(
-      `Starting download of ${imageUrls.length} external images`,
+      `Starting download of ${boundedImageUrls.length} external images`,
       {
         userId,
         geminiCount: downloadStats.geminiUrls,
@@ -88,20 +103,40 @@ export class ExternalImageDownloadService {
     const results: ImageDownloadResult[] = [];
     const processedUrls = new Set<string>();
 
-    for (const imageUrl of imageUrls) {
+    for (const imageUrl of boundedImageUrls) {
+      if (downloadStats.totalBytes >= this.maxBatchBytes) {
+        results.push({
+          originalUrl: imageUrl,
+          success: false,
+          error: "External image batch byte limit exceeded",
+        });
+        downloadStats.failed++;
+        downloadStats.errors.push({
+          url: this.redactUrl(imageUrl),
+          error: "External image batch byte limit exceeded",
+        });
+        continue;
+      }
+
       // 중복 URL 건너뛰기
       if (processedUrls.has(imageUrl)) {
         downloadStats.duplicates++;
-        this.logger.debug(`Skipping duplicate URL: ${imageUrl}`);
+        this.logger.debug(
+          `Skipping duplicate URL: ${this.redactUrl(imageUrl)}`,
+        );
         continue;
       }
       processedUrls.add(imageUrl);
 
       try {
-        const file = await this.downloadAndProcessImage(imageUrl, userId);
+        const file = await this.downloadAndProcessImage(
+          imageUrl,
+          userId,
+          organizationId,
+        );
         if (file) {
           // 성공한 경우
-          const cdnUrl = `https://cdn.codebase.blog/${file.fileKey}`;
+          const cdnUrl = this.cdnService.generateCdnUrl(file).url;
           results.push({
             originalUrl: imageUrl,
             success: true,
@@ -110,12 +145,15 @@ export class ExternalImageDownloadService {
           });
           downloadStats.successful++;
           downloadStats.totalBytes += file.fileSize || 0;
-          this.logger.log(`Successfully downloaded: ${imageUrl}`, {
-            fileId: file.id,
-            size: file.fileSize,
-            cdnUrl,
-            isGemini: this.isGeminiImageUrl(imageUrl),
-          });
+          this.logger.log(
+            `Successfully downloaded: ${this.redactUrl(imageUrl)}`,
+            {
+              fileId: file.id,
+              size: file.fileSize,
+              cdnUrl,
+              isGemini: this.isGeminiImageUrl(imageUrl),
+            },
+          );
         } else {
           // 다운로드 실패 (재시도 후에도)
           results.push({
@@ -125,7 +163,7 @@ export class ExternalImageDownloadService {
           });
           downloadStats.failed++;
           downloadStats.errors.push({
-            url: imageUrl,
+            url: this.redactUrl(imageUrl),
             error: "Download failed after retries",
           });
         }
@@ -139,13 +177,16 @@ export class ExternalImageDownloadService {
         });
         downloadStats.failed++;
         downloadStats.errors.push({
-          url: imageUrl,
+          url: this.redactUrl(imageUrl),
           error: errorMessage,
         });
-        this.logger.error(`Failed to download image: ${imageUrl}`, {
-          error: errorMessage,
-          stack: error.stack,
-        });
+        this.logger.error(
+          `Failed to download image: ${this.redactUrl(imageUrl)}`,
+          {
+            error: errorMessage,
+            stack: error.stack,
+          },
+        );
         // 개별 이미지 실패는 전체 프로세스를 중단시키지 않음
       }
     }
@@ -192,25 +233,96 @@ export class ExternalImageDownloadService {
   }
 
   /**
+   * Follow a small number of redirects while re-validating and pinning the
+   * resolved address at every hop. Axios' default redirect handling would
+   * otherwise allow a public URL to redirect into a private network.
+   */
+  private async downloadSafeResponse(
+    initialUrl: string,
+    headers: Record<string, string>,
+  ): Promise<{ response: AxiosResponse; finalUrl: string }> {
+    let target =
+      await this.urlSafetyService.normalizeAndValidateWithAddress(initialUrl);
+
+    for (let redirect = 0; redirect <= this.maxRedirects; redirect++) {
+      const parsedUrl = new URL(target.url);
+      const agent = this.createPinnedAgent(parsedUrl.protocol, target.address);
+      const response = await axios.get(target.url, {
+        responseType: "arraybuffer",
+        timeout: this.downloadTimeout,
+        maxRedirects: 0,
+        maxContentLength: this.maxFileSize,
+        maxBodyLength: this.maxFileSize,
+        proxy: false,
+        validateStatus: (status) =>
+          status === 200 || (status >= 300 && status < 400),
+        headers,
+        ...(parsedUrl.protocol === "https:"
+          ? { httpsAgent: agent }
+          : { httpAgent: agent }),
+      });
+
+      if (response.status < 300 || response.status >= 400) {
+        return { response, finalUrl: target.url };
+      }
+
+      if (redirect === this.maxRedirects) {
+        throw new Error("Too many redirects while downloading image");
+      }
+
+      const location = response.headers.location;
+      if (typeof location !== "string" || location.length === 0) {
+        throw new Error("Redirect response did not include a Location header");
+      }
+
+      const nextUrl = new URL(location, target.url).toString();
+      target =
+        await this.urlSafetyService.normalizeAndValidateWithAddress(nextUrl);
+    }
+
+    throw new Error("Unable to download image safely");
+  }
+
+  private createPinnedAgent(
+    protocol: string,
+    address: string,
+  ): http.Agent | https.Agent {
+    const family = address.includes(":") ? 6 : 4;
+    const lookup = (
+      _hostname: string,
+      _options: unknown,
+      callback: (
+        error: Error | null,
+        address?: string,
+        family?: number,
+      ) => void,
+    ) => callback(null, address, family);
+
+    return protocol === "https:"
+      ? new https.Agent({ lookup: lookup as any })
+      : new http.Agent({ lookup: lookup as any });
+  }
+
+  /**
    * 단일 외부 이미지를 다운로드하고 처리 (재시도 로직 포함)
    * @param imageUrl 이미지 URL
    * @param userId 사용자 ID
    * @returns File 엔티티 또는 null (실패 시)
    */
-  /**
-   * 단일 이미지 다운로드 및 처리
-   * MCP 도구에서도 사용 (Public)
-   */
-  public async downloadAndProcessImage(
+  private async downloadAndProcessImage(
     imageUrl: string,
     userId: string,
+    organizationId?: string,
   ): Promise<File | null> {
     const normalizedUrl = await this.urlSafetyService
       .normalizeAndValidate(imageUrl)
       .catch((error) => {
-        this.logger.warn(`Blocked unsafe image URL: ${imageUrl}`, {
-          error: error.message,
-        });
+        this.logger.warn(
+          `Blocked unsafe image URL: ${this.redactUrl(imageUrl)}`,
+          {
+            error: error.message,
+          },
+        );
         return null;
       });
 
@@ -220,7 +332,9 @@ export class ExternalImageDownloadService {
 
     const isGeminiUrl = this.isGeminiImageUrl(normalizedUrl);
     if (isGeminiUrl) {
-      this.logger.log(`Detected Gemini image URL: ${normalizedUrl}`);
+      this.logger.log(
+        `Detected Gemini image URL: ${this.redactUrl(normalizedUrl)}`,
+      );
     }
 
     // 재시도 로직
@@ -228,26 +342,25 @@ export class ExternalImageDownloadService {
       try {
         // 1. 이미지 다운로드
         this.logger.debug(
-          `Downloading image (attempt ${attempt}/${this.maxRetries}): ${normalizedUrl}`,
+          `Downloading image (attempt ${attempt}/${this.maxRetries}): ${this.redactUrl(normalizedUrl)}`,
         );
-        const response = await axios.get(normalizedUrl, {
-          responseType: "arraybuffer",
-          timeout: this.downloadTimeout,
-          maxRedirects: 2, // 리다이렉트 제한 (최대 2회)
-          validateStatus: (status) => status === 200, // 200 상태만 성공으로 처리
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (compatible; CodebaseBlog/1.0; +https://codebase.blog)",
+        const { response, finalUrl } = await this.downloadSafeResponse(
+          normalizedUrl,
+          {
+            "User-Agent": `Mozilla/5.0 (compatible; Aigory/1.0; +${
+              this.configService.get("PUBLIC_SITE_URL") ||
+              this.configService.get("FRONTEND_URL") ||
+              "http://localhost:3001"
+            })`,
             Accept: "image/webp,image/avif,image/*,*/*;q=0.8",
-            // Gemini URL의 경우 추가 헤더
             ...(isGeminiUrl && {
               "Cache-Control": "no-cache",
             }),
           },
-        });
+        );
 
         // 2. 응답 검증
-        if (!this.isValidImageResponse(response)) {
+        if (!this.isValidImageResponse(response, finalUrl)) {
           throw new Error(
             `Invalid image response: ${response.status} ${response.statusText}`,
           );
@@ -282,10 +395,11 @@ export class ExternalImageDownloadService {
           webpBuffer,
           normalizedUrl,
           userId,
+          organizationId,
         );
 
         this.logger.log(
-          `Successfully processed image (attempt ${attempt}): ${normalizedUrl}`,
+          `Successfully processed image (attempt ${attempt}): ${this.redactUrl(normalizedUrl)}`,
         );
         return file;
       } catch (error) {
@@ -294,7 +408,7 @@ export class ExternalImageDownloadService {
         const statusCode = error.response?.status;
 
         this.logger.warn(
-          `Failed to download image (attempt ${attempt}/${this.maxRetries}): ${normalizedUrl}`,
+          `Failed to download image (attempt ${attempt}/${this.maxRetries}): ${this.redactUrl(normalizedUrl)}`,
           {
             error: errorMessage,
             statusCode,
@@ -310,12 +424,15 @@ export class ExternalImageDownloadService {
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
           // 모든 시도 실패
-          this.logger.error(`All attempts failed for image: ${normalizedUrl}`, {
-            error: errorMessage,
-            statusCode,
-            isGemini: isGeminiUrl,
-            attempts: attempt,
-          });
+          this.logger.error(
+            `All attempts failed for image: ${this.redactUrl(normalizedUrl)}`,
+            {
+              error: errorMessage,
+              statusCode,
+              isGemini: isGeminiUrl,
+              attempts: attempt,
+            },
+          );
           return null;
         }
       }
@@ -338,33 +455,43 @@ export class ExternalImageDownloadService {
     );
   }
 
+  redactUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return "<invalid-url>";
+    }
+  }
+
   /**
    * 이미지 응답 유효성 검증
    * @param response Axios 응답
    * @returns 유효 여부
    */
-  private isValidImageResponse(response: AxiosResponse): boolean {
+  private isValidImageResponse(
+    response: AxiosResponse,
+    finalUrl: string,
+  ): boolean {
     // 상태 코드 확인 (200만 허용)
     if (response.status !== 200) {
       this.logger.warn(
-        `Invalid status code: ${response.status} for URL: ${response.config?.url}`,
+        `Invalid status code: ${response.status} for URL: ${this.redactUrl(finalUrl)}`,
       );
       return false;
     }
 
     // 최종 URL이 에러 페이지인지 확인
-    const finalUrl =
-      response.request?.res?.responseUrl || response.config?.url || "";
     if (this.isErrorPageUrl(finalUrl)) {
-      this.logger.warn(`Detected error page URL: ${finalUrl}`);
+      this.logger.warn(`Detected error page URL: ${this.redactUrl(finalUrl)}`);
       return false;
     }
 
     // Content-Type 확인
     const contentType = response.headers["content-type"];
-    if (!contentType || !contentType.startsWith("image/")) {
+    if (typeof contentType !== "string" || !contentType.startsWith("image/")) {
       this.logger.warn(
-        `Invalid content-type: ${contentType} for URL: ${finalUrl}`,
+        `Invalid content-type: ${contentType} for URL: ${this.redactUrl(finalUrl)}`,
       );
       return false;
     }
@@ -531,7 +658,7 @@ export class ExternalImageDownloadService {
       const format = metadata.format;
       const sanitizer = sharp(buffer);
 
-      switch (format) {
+      switch (format as string) {
         case "jpeg":
         case "jpg":
           return sanitizer.jpeg({ quality: 100 }).toBuffer();
@@ -569,7 +696,7 @@ export class ExternalImageDownloadService {
     // S3에 업로드
     try {
       await this.s3Service.uploadBuffer(fileKey, buffer, "image/webp", {
-        "original-url": originalUrl,
+        "original-url": this.redactUrl(originalUrl),
         "downloaded-at": new Date().toISOString(),
         source: "external_download",
       });
@@ -595,12 +722,14 @@ export class ExternalImageDownloadService {
     buffer: Buffer,
     originalUrl: string,
     userId: string,
+    organizationId?: string,
   ): Promise<File> {
     // 임시 FileContext 생성
     const tempContext = this.fileContextRepository.create({
       contextType: FileContextType.SYSTEM,
       purpose: FilePurpose.GENERAL,
       ownerId: userId,
+      organizationId,
     });
     const savedContext = await this.fileContextRepository.save(tempContext);
 
@@ -614,9 +743,10 @@ export class ExternalImageDownloadService {
       mimeType: "image/webp",
       fileType: "image",
       userId,
+      organizationId,
       contextId: savedContext.id, // 임시 context 추가
       metadata: {
-        originalUrl,
+        originalUrl: this.redactUrl(originalUrl),
         downloadedAt: new Date().toISOString(),
         source: "external_download",
       },
@@ -625,7 +755,7 @@ export class ExternalImageDownloadService {
     const savedFile = await this.fileRepository.save(file);
 
     this.logger.debug(
-      `File entity created: ${savedFile.id}, originalUrl: ${originalUrl}`,
+      `File entity created: ${savedFile.id}, originalUrl: ${this.redactUrl(originalUrl)}`,
     );
     return savedFile;
   }
@@ -687,8 +817,14 @@ export class ExternalImageDownloadService {
       }
     }
 
-    // 중복 제거
-    return [...new Set(imageUrls)];
+    // 중복 제거 및 서버 측 리소스 상한
+    const uniqueUrls = [...new Set(imageUrls)];
+    if (uniqueUrls.length > this.maxExternalImages) {
+      this.logger.warn(
+        `External image URL limit reached; keeping first ${this.maxExternalImages} of ${uniqueUrls.length}`,
+      );
+    }
+    return uniqueUrls.slice(0, this.maxExternalImages);
   }
 
   /**
@@ -700,14 +836,14 @@ export class ExternalImageDownloadService {
     // localhost:3000/user_images는 외부 URL로 처리 (MCP 자동포스팅에서 사용)
     if (/^https?:\/\/localhost:\d+\/user_images\//.test(url)) {
       this.logger.debug(
-        `[External Image] localhost user_images URL detected as external: ${url}`,
+        `[External Image] localhost user_images URL detected as external: ${this.redactUrl(url)}`,
       );
       return true;
     }
 
     // 내부 CDN URL 패턴
     const internalPatterns = [
-      /^https:\/\/cdn\.codebase\.blog\//,
+      /^https:\/\/cdn\.aigory\.com\//,
       /^https?:\/\/localhost:\d+\//, // localhost의 다른 경로는 여전히 내부로 처리
       /^\/api\/v1\/files\//,
       /^uploads\//,
@@ -718,8 +854,8 @@ export class ExternalImageDownloadService {
     const externalPatterns = [
       /storage\.googleapis\.com/,
       /gemini-.*\.googleapis\.com/,
-      /.*\.amazonaws\.com\/.*\/(?!.*\.codebase\.blog)/,
-      /.*\.oraclecloud\.com\/.*\/(?!.*\.codebase\.blog)/,
+      /.*\.amazonaws\.com\/.*\/(?!.*\.aigory\.com)/,
+      /.*\.oraclecloud\.com\/.*\/(?!.*\.aigory\.com)/,
     ];
 
     // 내부 URL이면 false
@@ -730,7 +866,7 @@ export class ExternalImageDownloadService {
     // 외부 스토리지이거나 일반 외부 URL이면 true
     return (
       externalPatterns.some((pattern) => pattern.test(url)) ||
-      (url.startsWith("https://") && !url.includes("codebase.blog")) ||
+      (url.startsWith("https://") && !url.includes("aigory.com")) ||
       (url.startsWith("http://") && !url.includes("localhost"))
     ); // http 외부 URL도 처리
   }
@@ -823,7 +959,7 @@ export class ExternalImageDownloadService {
       this.logger.log(
         `Removed ${failedUrls.length} failed image(s) from content`,
         {
-          failedUrls,
+          failedUrls: failedUrls.map((url) => this.redactUrl(url)),
         },
       );
     }

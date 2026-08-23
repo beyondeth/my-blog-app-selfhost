@@ -6,6 +6,7 @@ export interface JwtPayload {
   role: Role;
   lastLoginProvider?: string; // 현재 세션의 로그인 방법 (local, google, kakao, github) - UX 개선용
   tokenType?: "access" | "refresh" | "session"; // 토큰 타입 구분 (session 추가)
+  jti?: string; // refresh-session identifier shared by the access/refresh pair
   iat?: number; // issued at
   exp?: number; // expires at
   iss?: string;

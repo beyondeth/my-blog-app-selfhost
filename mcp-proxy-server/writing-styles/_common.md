@@ -2,231 +2,166 @@
 
 ## MCP Server Base Requirements
 
-- Always authenticate before creating or publishing content.
-- Use preset `style` when the user selected a built-in writing mode.
-- Use `customMarkdown` when the caller provides a local or user-authored style guide.
-- Use `styleAlias` when custom markdown came from a named local preset so the route can preserve traceability.
+**Authentication**: Always call `check_auth()` before creating any content and
+confirm that its reported authentication mode matches the selected route.
 
 ## Workflow
 
-When the user requests auto-posting with style flags:
+The `--flag` values below are prompt conventions for the AI client, not
+MCPorter command-line options. When a user requests auto-posting with one flag
+(for example, "create post --default"):
 
-1. Resolve the style source.
-   - Built-in preset flag: `--default`, `--pm`, `--designer`, etc.
-   - Custom local style flag: route-specific resolver loads markdown, then passes it as `customMarkdown`.
-2. Call `get_writing_style_guide(...)`.
-3. Write the post using the returned guide only.
-4. Call `create_post(...)`.
+1. Call get_writing_style_guide(style) with appropriate style parameter:
+   - --novel → 'novel'
+   - --tutorial → 'tutorial'
+   - --comedy → 'comedy'
+   - --podcast → 'podcast'
+   - --vibe → 'vibe'
+   - --research → 'research'
+   - --human → 'human'
+   - --default or no flag → 'default'
+2. Write content following the retrieved style guide
+3. Call create_post() to publish
 
-## Available Preset Styles
+## Available Styles
 
-- `default`: professional technical explanation
-- `novel`: narrative storytelling
-- `podcast`: conversational dialogue format
-- `vibe`: developer growth and learning guide
-- `research`: evidence-first analysis
-- `pm`: product narrative and decision rationale
-- `designer`: design case study and UX reasoning
-- `marketer`: growth and performance storytelling
-- `sell`: marketplace product listing (requires price and productCategory)
+**Priority:** Preset styles (default if no flag) → Custom markdown (if user provides)
 
-## Marketplace Product Posting (`--sell`)
+- **default**: Professional technical blog (formal, detailed analysis) - used when no flag specified
+- **novel**: Narrative storytelling (vivid descriptions, emotional journey)
+- **tutorial**: Step-by-step guide (beginner-friendly, verification checkpoints)
+- **comedy**: Humorous tone (self-deprecating, relatable developer experiences)
+- **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
+- **vibe**: Developer learning guide (friendly, conversational, concept-focused)
+- **research**: Academic paper analysis (claims, evidence, and practical insights)
+- **human**: Human-like writing (experience-driven, scene-first, reflective)
+- **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
 
-**IMPORTANT:** Only activate sell mode when the user **explicitly** includes `--sell` in their request.
-Do NOT treat natural language like "sell", "product", or "list this" as sell triggers unless the explicit `--sell` flag is present.
-
-**Trigger:** `--sell` flag only. Examples:
-- "Auto-post this --sell" ✅
-- "Publish this as a product --sell" ✅
-- "Write a post about sales strategy" ❌ (normal blog post about sales strategy)
-- "Write a product review" ❌ (normal product review blog post)
-
-When `--sell` is explicitly present:
-
-1. Call `get_writing_style_guide(style='sell')`.
-2. If price is not provided, ask the user for price (KRW, minimum 100).
-3. If category is not provided, ask the user to choose from: `ai_prompts`, `coding_templates`, `tech_guides`, `ai_workflows`, `data_analytics`, `others`.
-4. Write content using the sell style guide. Include `<!-- preview-end -->` comment to separate free preview from paid content.
-5. Call `create_post(sell=true, price=<price>, productCategory=<category>, ...)`.
-
-**Important:** The `sell`, `price`, and `productCategory` parameters are passed to `create_post()`, NOT to `get_writing_style_guide()`.
-
-## AI Identification Tag
+**AI Identification Tag** (REQUIRED for transparency):
 
 Include one of these tags in every post:
 
-- Claude → `ai:claude`
-- ChatGPT → `ai:chatgpt`
-- Gemini → `ai:gemini`
-- Qwen → `ai:qwen`
-- Other AI → `ai:other`
+- Claude → "ai:claude"
+- ChatGPT → "ai:chatgpt"
+- Gemini → "ai:gemini"
+- Qwen → "ai:qwen"
+- Other AI → "ai:other"
 
-## Parameter Structure
+Example: `tags: ["javascript", "ai:claude", "tutorial"]`
 
-Pass title, tags, and content as separate parameters to `create_post()`.
+**Default Language**: Korean unless English is explicitly requested by user.
 
-- `title`: final headline
-- `tags`: max 10
-- `content_markdown`: body only
+---
 
-Do not include front matter inside `content_markdown`.
+## Parameter Structure (CRITICAL)
 
-## Markdown Structure Rules
+Pass title, tags, and content as **SEPARATE parameters** to `create_post()`:
 
-- Start content with `##` sections, never `#`
-- Use H2 for major sections and H3/H4 for detail
-- Keep code blocks language-tagged
-- Use tables only when comparison speed matters
-- Use bold sparingly for real emphasis, not decoration
-
-## Diagram Authoring Rules
-
-- If the user asks for a structure diagram, flow, workflow, architecture map, or even explicitly says `mermaid`, write it as a `diagram` fenced block.
-- Never emit raw `mermaid` fenced blocks in new auto-posted posts.
-- Treat `mermaid` in the user request as diagram intent, not as a syntax requirement.
-- Existing Mermaid posts are legacy-readable, but new authoring must target the D2-backed `diagram` path.
-
-```diagram
-type: flow
-style: clean
-direction: horizontal
-title: Example flow
-nodes:
-  - id: start
-    label: Start
-  - id: end
-    label: Done
-edges:
-  - from: start
-    to: end
+```typescript
+// Correct approach
+create_post({
+  title: "Your Title", // ✓ Separate parameter
+  tags: ["tag1", "ai:claude", "tag2"], // ✓ Separate parameter
+  content_markdown: "## First Section...", // ✓ Body only, NO front matter
+});
 ```
+
+**Do NOT include front matter in content_markdown**:
+
+```markdown
+## ❌ Wrong:
+
+title: "Your Title" // Don't include in content_markdown
+tags: ["tag1"] // Don't include in content_markdown
+
+---
+
+## Content starts here
+
+✓ Correct:
+
+## First Section // Start directly with H2
+
+Content begins here...
+```
+
+**Important**: Start `content_markdown` with `##` (H2) sections. Do NOT use `#` (H1) or front matter delimiters (`---`).
+
+---
+
+## Markdown Structure Guidelines
+
+### Heading Hierarchy
+
+- H2 (`##`) for major sections
+- H3 (`###`) for subsections
+- H4 (`####`) for detailed points
+- Never use H1 (`#`) in content_markdown
+
+### Code Blocks
+
+- Always specify language: ` ```javascript `, ` ```python `, ` ```typescript `
+- Add comments for complex logic
+- Keep code focused and executable where possible
+
+### Formatting
+
+- **Bold** for key terms (3-5 per post)
+- `inline code` for function names, variables, commands
+- Horizontal rules (`---`) between major sections
+- Tables for comparisons and quick reference
+
+---
 
 ## Content Quality Principles
 
-### 1. Strong Point of View
+### 1. Clarity Over Cleverness
 
-Every post must make a real claim, not just summarize a topic.
+Write to be understood, not to impress. Technical accuracy with accessible explanation.
 
-### 2. Evidence Before Abstraction
+### 2. Progressive Depth
 
-When numbers, experiments, user feedback, examples, screenshots, or outcomes exist, use them. Do not replace evidence with vague language.
+Start with core concept, then layer complexity. Readers should be able to stop at any point with value gained.
 
-### 3. Outcome-Oriented Structure
+### 3. Context Before Code
 
-Readers should quickly understand:
+Explain WHY before WHAT. Code should support narrative, not replace it.
 
-- who this is for
-- what changed
-- why it matters
-- what to do next
+### 4. Actionable Takeaways
 
-### 4. Scan-Friendly Layout
+Every post should give readers something they can apply immediately.
 
-Keep sections explicit and front-load the most important point of each section.
+---
 
-### 5. Reusable Takeaways
+## Korean Writing Guidelines (한국어 작성 시)
 
-Close every post with lessons, heuristics, or a checklist that the reader can reuse.
+**Tone**: Use formal but friendly Korean (존댓말)
 
-## English Writing Rules
+- Preferred: "~합니다", "~할 수 있습니다", "~하시면 됩니다"
+- Avoid: "~한다" (딱딱), "~해" (반말), "~하라" (명령)
 
-- Use natural, native English with a clear professional rhythm.
-- Avoid empty hype, filler, and generic openings
-- Prefer concrete verbs over ornamental adjectives
-- Keep terminology consistent through the whole post
+**Sentence Connection**: Use natural connectors
+
+- "또한", "더 중요한 것은", "이는", "예를 들어", "따라서"
+
+**Rhythm**: Mix short, medium, and long sentences for natural flow.
+
+---
 
 ## Common Patterns to Avoid
 
-- Generic openings such as `Today we'll look at...`
-- Empty intensifiers such as `really`, `very`, `completely`
-- Paragraphs that explain a concept without an example
-- Long sections with no reader payoff
-- AI-sounding summaries with no concrete stance
+**Don't**:
 
-# === QUALITY ENHANCEMENT GUIDE ===
+- Use "Untitled" or generic titles → Create meaningful, specific titles
+- Overly formal/academic language → Keep professional but accessible
+- Code dumps without explanation → Always provide context
+- Mixing formal/informal tone → Maintain consistency
+- Front matter in content_markdown → Use separate parameters
 
-## Editorial Pass Order
+**Do**:
 
-### Pass 1: Hook
-
-The first 2-3 lines should make one of these immediately clear:
-
-- a painful problem
-- a surprising result
-- a sharp opinion
-- a concrete situation with stakes
-
-### Pass 2: Proof
-
-For every major claim, check whether it has at least one of:
-
-- number
-- example
-- comparison
-- quote
-- scenario
-
-### Pass 3: Reader Relevance
-
-Add a sentence that answers `What does the reader gain from this?` in each major section.
-
-### Pass 4: Compression
-
-Delete sentences that only restate the previous sentence.
-
-### Pass 5: Finish Strong
-
-The ending should not simply “wrap up.” It should leave the reader with:
-
-- a decision rule
-- a checklist
-- a next action
-- a memorable line grounded in the post
-
-# === ENHANCEMENT TECHNIQUES ===
-
-## Claim -> Evidence -> Implication
-
-Use this pattern repeatedly:
-
-```markdown
-Claim: What changed?
-Evidence: What data, example, or observation supports it?
-Implication: What should the team or reader do differently?
-```
-
-## Before -> After -> Why
-
-This is the default pattern for examples:
-
-```markdown
-Before
-After
-Why it is better
-```
-
-## Make the Scannable Version Visible
-
-For long posts, include at least one of:
-
-- short bullet recap
-- table
-- checklist
-- comparison block
-
-## Prefer Specific Nouns
-
-Replace vague nouns with concrete nouns.
-
-- `There was a problem` → `The detail API latency climbed to 1.8 seconds.`
-- `The result was good` → `Conversion rose from 2.1% to 3.4%.`
-
-# === QUALITY CHECKLIST ===
-
-- The title promises a real outcome or insight
-- The opening contains a concrete hook
-- The post has a visible target reader and goal
-- Each major section contains proof, not only explanation
-- The structure is skimmable without reading every sentence
-- The ending contains reusable takeaways
-- The tone sounds authored, not auto-filled
+- Craft descriptive titles that preview content value
+- Explain technical concepts with appropriate context
+- Balance code examples with narrative explanation
+- Maintain consistent professional tone throughout
+- Follow parameter structure exactly as specified

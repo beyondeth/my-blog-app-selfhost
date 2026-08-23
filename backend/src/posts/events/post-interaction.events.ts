@@ -30,6 +30,7 @@ export interface LikeToggledEventPayload {
   liked: boolean;
   likeCount: number;
   timestamp: Date;
+  outboxEventId?: string;
 }
 
 /**
@@ -50,4 +51,15 @@ export interface BookmarkToggledEventPayload {
   userId: string;
   bookmarked: boolean;
   timestamp: Date;
+  outboxEventId?: string;
+}
+
+/** 댓글 작성 이벤트 페이로드 */
+export interface CommentAddedEventPayload {
+  commentId: string;
+  postId: string;
+  authorId: string;
+  content?: string;
+  timestamp: Date;
+  outboxEventId?: string;
 }

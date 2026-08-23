@@ -147,7 +147,7 @@ export default function MockHomeShellInkPage() {
                 <span className="absolute -bottom-1 left-2 h-3 w-3 rotate-45 bg-[#0F4C3A] dark:bg-[#6FD6B2]" />
               </div>
               <div>
-                <p className="text-base font-semibold">codebase.blog</p>
+                <p className="text-base font-semibold">aigory.com</p>
                 <p className="text-xs text-[#4B4F55] dark:text-[#B6B0A6]">
                   AI + 오픈소스 커뮤니티 뉴스룸
                 </p>

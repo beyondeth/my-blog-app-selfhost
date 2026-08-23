@@ -1,5 +1,5 @@
-import { Injectable, Logger } from "@nestjs/common";
-import DOMPurify from "isomorphic-dompurify";
+import { Injectable } from "@nestjs/common";
+import * as DOMPurify from "isomorphic-dompurify";
 import * as sanitizeHtml from "sanitize-html";
 
 /**
@@ -10,8 +10,6 @@ import * as sanitizeHtml from "sanitize-html";
  */
 @Injectable()
 export class HtmlSanitizerService {
-  private readonly logger = new Logger(HtmlSanitizerService.name);
-
   /**
    * DOMPurify 설정 옵션
    *
@@ -60,8 +58,6 @@ export class HtmlSanitizerService {
       "var",
       // 컨테이너
       "div",
-      // iframe (YouTube 전용, allowIframes 옵션으로 제어)
-      "iframe",
       // 구분선
       "hr",
       // 테이블
@@ -96,11 +92,6 @@ export class HtmlSanitizerService {
       // 이미지 최적화
       "loading",
       "decoding",
-      // iframe 관련 속성 (YouTube 전용)
-      "allow",
-      "allowfullscreen",
-      "frameborder",
-      "referrerpolicy",
     ],
     ALLOW_DATA_ATTR: true,
     KEEP_CONTENT: true,
@@ -146,8 +137,6 @@ export class HtmlSanitizerService {
       "samp",
       "var",
       "div",
-      // iframe (YouTube 전용, allowIframes 옵션으로 제어)
-      "iframe",
       "hr",
       "table",
       "thead",
@@ -166,60 +155,13 @@ export class HtmlSanitizerService {
       a: ["href", "target", "rel", "title"],
       img: ["src", "alt", "title", "width", "height", "loading", "decoding"],
       button: ["data-code"],
-      iframe: [
-        "src",
-        "width",
-        "height",
-        "allow",
-        "allowfullscreen",
-        "frameborder",
-        "title",
-        "loading",
-        "referrerpolicy",
-      ],
     },
     allowedSchemes: ["http", "https"],
     allowedSchemesByTag: {
       img: ["http", "https", "data"],
     },
-    allowedIframeHostnames: [
-      "youtube.com",
-      "www.youtube.com",
-      "m.youtube.com",
-      "youtube-nocookie.com",
-      "www.youtube-nocookie.com",
-    ],
     allowCommentTag: true,
   };
-
-  private isDomPurifyReady(): boolean {
-    return !!DOMPurify && typeof DOMPurify.sanitize === "function";
-  }
-
-  private canUseDomPurifyHooks(): boolean {
-    return (
-      this.isDomPurifyReady() &&
-      typeof DOMPurify.addHook === "function" &&
-      typeof DOMPurify.removeAllHooks === "function"
-    );
-  }
-
-  private sanitizeWithDomPurify(
-    html: string,
-    config: Record<string, unknown>,
-    fallback: () => string,
-  ): string {
-    if (!this.isDomPurifyReady()) {
-      return fallback();
-    }
-
-    try {
-      return DOMPurify.sanitize(html, config);
-    } catch (error) {
-      this.logger.error("DOMPurify sanitize call failed:", error);
-      return fallback();
-    }
-  }
 
   /**
    * HTML 콘텐츠를 살균합니다.
@@ -245,104 +187,55 @@ export class HtmlSanitizerService {
     } = options || {};
 
     try {
-      // Mermaid / diagram 코드 블록 보존
+      // Mermaid 코드 블록 보존
       let processedHtml = html;
-      const preservedBlocks: Array<{
-        placeholder: string;
-        content: string;
-        language: "mermaid" | "diagram";
-      }> = [];
+      const mermaidBlocks: { placeholder: string; content: string }[] = [];
 
       if (preserveMermaid) {
-        const preserveCodeBlock = (
-          language: "mermaid" | "diagram",
-          pattern: RegExp,
-        ) => {
-          processedHtml = processedHtml.replace(pattern, (match, content) => {
-            const placeholder = `<!--${language.toUpperCase()}_BLOCK_${preservedBlocks.length}-->`;
-            preservedBlocks.push({ placeholder, content, language });
-            return placeholder;
-          });
-        };
-
-        preserveCodeBlock(
-          "mermaid",
+        // Mermaid 코드 블록을 임시 플레이스홀더로 교체
+        // data-language 속성이 있는 경우도 지원 (code-highlight.service.ts와 호환)
+        processedHtml = processedHtml.replace(
           /<pre[^>]*><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
-        );
-        preserveCodeBlock(
-          "diagram",
-          /<pre[^>]*><code[^>]*class="[^"]*language-diagram[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+          (match, content) => {
+            const placeholder = `<!--MERMAID_BLOCK_${mermaidBlocks.length}-->`;
+            mermaidBlocks.push({ placeholder, content });
+            return placeholder;
+          },
         );
       }
 
       // DOMPurify로 살균 (안전성 체크 추가)
-      const config = {
-        ...this.domPurifyConfig,
-        ALLOWED_TAGS: [...this.domPurifyConfig.ALLOWED_TAGS],
-        ALLOWED_ATTR: [...this.domPurifyConfig.ALLOWED_ATTR],
-      };
+      const config = { ...this.domPurifyConfig };
 
       if (!allowComments) {
         config.ALLOW_COMMENTS = false;
       }
 
-      if (!allowIframes) {
-        config.ALLOWED_TAGS = config.ALLOWED_TAGS.filter(
-          (tag) => tag !== "iframe",
-        );
-      }
-
-      const canUseHooks = this.canUseDomPurifyHooks();
-
-      if (!this.isDomPurifyReady()) {
-        this.logger.error(
+      // DOMPurify가 정상적으로 초기화되었는지 확인
+      if (!DOMPurify || typeof DOMPurify.sanitize !== "function") {
+        console.error(
           "DOMPurify is not properly initialized, falling back to sanitize-html",
         );
         return this.fallbackSanitize(html, options);
       }
 
-      if (allowIframes && canUseHooks) {
-        // YouTube iframe만 허용
-        const allowYouTubeIframes = (node: Element) => {
-          if (node.tagName !== "IFRAME") return;
-
-          const src = node.getAttribute("src") || "";
-          if (!this.isYouTubeIframeSrc(src)) {
-            node.parentNode?.removeChild(node);
-            return;
-          }
-
-          // 안전한 기본 속성 보강
-          node.setAttribute("loading", "lazy");
-          if (!node.getAttribute("referrerpolicy")) {
-            node.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
-          }
-        };
-
-        DOMPurify.addHook("uponSanitizeElement", allowYouTubeIframes);
-      }
-
       let sanitized = DOMPurify.sanitize(processedHtml, config);
 
-      // 등록한 hook 정리 (전역 오염 방지)
-      if (allowIframes && canUseHooks) {
-        DOMPurify.removeAllHooks();
-      }
-
-      // Mermaid / diagram 블록 복원
+      // Mermaid 블록 복원
       if (preserveMermaid) {
-        preservedBlocks.forEach(({ placeholder, content, language }) => {
+        mermaidBlocks.forEach(({ placeholder, content }) => {
+          // Mermaid 콘텐츠 전처리 및 살균
           const sanitizedContent = this.sanitizeMermaidContent(content);
           sanitized = sanitized.replace(
             placeholder,
-            `<pre><code class="language-${language}">${sanitizedContent}</code></pre>`,
+            `<pre><code class="language-mermaid">${sanitizedContent}</code></pre>`,
           );
         });
       }
 
       return sanitized;
     } catch (error) {
-      this.logger.error(
+      console.error(
         "DOMPurify sanitization failed, falling back to sanitize-html:",
         error,
       );
@@ -373,11 +266,6 @@ export class HtmlSanitizerService {
       config.allowCommentTag = false;
     }
 
-    if (!allowIframes) {
-      config.allowedTags = config.allowedTags.filter((tag) => tag !== "iframe");
-      config.allowedIframeHostnames = [];
-    }
-
     return sanitizeHtml(html, config);
   }
 
@@ -395,14 +283,7 @@ export class HtmlSanitizerService {
       ALLOWED_URI_REGEXP: /^https?:\/\//i,
     };
 
-    return this.sanitizeWithDomPurify(html, strictConfig, () =>
-      sanitizeHtml(html, {
-        allowedTags: ["p", "br", "strong", "em", "a", "code"],
-        allowedAttributes: {
-          a: ["href", "target", "rel"],
-        },
-      }),
-    );
+    return DOMPurify.sanitize(html, strictConfig);
   }
 
   /**
@@ -413,15 +294,11 @@ export class HtmlSanitizerService {
   extractText(html: string): string {
     if (!html) return "";
 
-    return this.sanitizeWithDomPurify(
-      html,
-      {
-        ALLOWED_TAGS: [],
-        ALLOWED_ATTR: [],
-        KEEP_CONTENT: true,
-      },
-      () => sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
-    );
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: [],
+      ALLOWED_ATTR: [],
+      KEEP_CONTENT: true,
+    });
   }
 
   /**
@@ -447,29 +324,21 @@ export class HtmlSanitizerService {
       processed = processed.replace(/<br\s*\/?>/gi, "<br/>");
 
       // 3. 위험한 태그만 제거 (스크립트, 이벤트 핸들러 등)
-      processed = this.sanitizeWithDomPurify(
-        processed,
-        {
-          ALLOWED_TAGS: ["br"], // br 태그만 허용
-          ALLOWED_ATTR: [],
-          KEEP_CONTENT: true,
-        },
-        () => sanitizeHtml(processed, { allowedTags: ["br"] }),
-      );
+      processed = DOMPurify.sanitize(processed, {
+        ALLOWED_TAGS: ["br"], // br 태그만 허용
+        ALLOWED_ATTR: [],
+        KEEP_CONTENT: true,
+      });
 
       return processed.trim();
     } catch (error) {
-      this.logger.error("Mermaid content sanitization failed:", error);
+      console.error("Mermaid content sanitization failed:", error);
       // Fallback: 기본 살균
-      return this.sanitizeWithDomPurify(
-        content,
-        {
-          ALLOWED_TAGS: [],
-          ALLOWED_ATTR: [],
-          KEEP_CONTENT: true,
-        },
-        () => sanitizeHtml(content, { allowedTags: [], allowedAttributes: {} }),
-      );
+      return DOMPurify.sanitize(content, {
+        ALLOWED_TAGS: [],
+        ALLOWED_ATTR: [],
+        KEEP_CONTENT: true,
+      });
     }
   }
 
@@ -493,29 +362,5 @@ export class HtmlSanitizerService {
     };
 
     return text.replace(/&[#\w]+;/g, (entity) => entities[entity] || entity);
-  }
-
-  /**
-   * YouTube iframe URL 여부 확인
-   *
-   * @param src iframe src
-   * @returns YouTube iframe 여부
-   */
-  private isYouTubeIframeSrc(src: string): boolean {
-    if (!src) return false;
-    try {
-      const url = new URL(src);
-      const host = url.hostname.toLowerCase();
-      const isYouTubeHost =
-        host === "youtube.com" ||
-        host === "www.youtube.com" ||
-        host === "m.youtube.com" ||
-        host === "youtube-nocookie.com" ||
-        host === "www.youtube-nocookie.com";
-
-      return isYouTubeHost && url.pathname.startsWith("/embed/");
-    } catch {
-      return false;
-    }
   }
 }

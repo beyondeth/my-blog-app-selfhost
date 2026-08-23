@@ -3,7 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { File } from "../entities/file.entity";
 import { S3Service } from "./s3.service";
-import * as sharp from "sharp";
+import sharp from "sharp";
 import { Readable } from "stream";
 
 export interface OptimizationOptions {
@@ -237,7 +237,7 @@ export class ImageOptimizationService {
   private async downloadFromS3(key: string): Promise<Buffer> {
     // TODO: S3Service에 download 메서드 추가 필요
     // 임시로 fetch 사용
-    const url = await this.s3Service.generatePresignedDownloadUrl(key);
+    const url = await this.s3Service.generateInternalPresignedDownloadUrl(key);
     const response = await fetch(url);
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
@@ -252,16 +252,17 @@ export class ImageOptimizationService {
     mimeType: string,
   ): Promise<void> {
     // TODO: S3Service에 direct upload 메서드 추가 필요
-    const presignedUrl = await this.s3Service.generatePresignedUploadUrl(
-      key,
-      mimeType,
-      buffer.length,
-      "image",
-    );
+    const presignedUrl =
+      await this.s3Service.generateInternalPresignedUploadUrl(
+        key,
+        mimeType,
+        buffer.length,
+        "image",
+      );
 
     await fetch(presignedUrl.uploadUrl, {
       method: "PUT",
-      body: buffer,
+      body: new Uint8Array(buffer),
       headers: {
         "Content-Type": mimeType,
       },

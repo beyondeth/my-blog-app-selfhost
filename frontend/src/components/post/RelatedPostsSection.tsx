@@ -1,15 +1,13 @@
 'use client';
 
-import { Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getRelatedPosts } from '@/services/api/posts.service';
-import { getPostKnowledgeContext } from '@/services/api/knowledge.service';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { FiBookOpen, FiEye, FiThumbsUp } from 'react-icons/fi';
-import { buildNodeHref } from '@/lib/knowledge-ui';
+import { FiEye, FiThumbsUp } from 'react-icons/fi';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface RelatedPostsSectionProps {
   postId: string;
@@ -26,11 +24,6 @@ export default function RelatedPostsSection({
     queryKey: ['relatedPosts', postId],
     queryFn: () => getRelatedPosts(postId, 6),
     staleTime: 1000 * 60 * 5, // 5분 캐시
-  });
-  const { data: knowledgeContext } = useQuery({
-    queryKey: ['postKnowledgeContext', postId],
-    queryFn: () => getPostKnowledgeContext(postId),
-    staleTime: 1000 * 60 * 5,
   });
 
   if (isLoading) {
@@ -57,48 +50,9 @@ export default function RelatedPostsSection({
     <section className="border-t border-gray-100 dark:border-gray-800">
       <div className="max-w-5xl mx-auto px-6 py-16">
         <div className="flex items-center justify-between mb-8">
-          <div className="space-y-3">
-            {knowledgeContext && knowledgeContext.primaryNodes.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                  <FiBookOpen className="h-3.5 w-3.5" />
-                  <span>이 글이 속한 위키 경로</span>
-                </div>
-                {knowledgeContext.breadcrumb.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                    {knowledgeContext.breadcrumb.map((item, index) => (
-                      <Fragment key={item.slug}>
-                        <Link
-                          href={buildNodeHref(blogSlug, item.slug)}
-                          className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-                        >
-                          {item.title}
-                        </Link>
-                        {index < knowledgeContext.breadcrumb.length - 1 && <span>›</span>}
-                      </Fragment>
-                    ))}
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  {[...knowledgeContext.primaryNodes, ...knowledgeContext.secondaryNodes]
-                    .slice(0, 5)
-                    .map((node) => (
-                      <Link
-                        key={node.slug}
-                        href={buildNodeHref(blogSlug, node.slug)}
-                        className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
-                      >
-                        {node.title}
-                      </Link>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-              {authorName}의 다른 글
-            </h2>
-          </div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            {authorName}의 다른 글
+          </h2>
           <Link
             href={`/${blogSlug}`}
             className="inline-flex px-4 py-1.5 rounded-full text-sm font-medium bg-[#264653] text-white hover:bg-[#1e3a45] dark:bg-[#6CC3B2] dark:text-[#0E141B] dark:hover:bg-[#5aa89a] transition-all transform hover:-translate-y-0.5 shadow-sm"
@@ -118,7 +72,7 @@ export default function RelatedPostsSection({
               <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl mb-4 border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
                 {post.thumbnail ? (
                   <Image
-                    src={post.thumbnail}
+                    src={normalizeImageUrl(post.thumbnail)}
                     alt={post.title}
                     fill
                     className="object-cover transition-transform duration-500 group-hover:scale-105"

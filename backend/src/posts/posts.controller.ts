@@ -42,7 +42,6 @@ import { UpdatePostDto } from "./dto/update-post.dto";
 import { SetThumbnailDto } from "./dto/set-thumbnail.dto";
 import { GetPostsCursorDto } from "./dto/get-posts-cursor.dto";
 import { UpdateEditorPicksOrderDto } from "./dto/update-editor-picks-order.dto";
-import { UpdatePostVisibilityDto } from "./dto/update-post-visibility.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { OptionalJwtAuthGuard } from "../common/guards/optional-jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
@@ -67,11 +66,12 @@ import { MonitoringService } from "../monitoring/monitoring.service";
 import { InjectRedis } from "@nestjs-modules/ioredis";
 import Redis from "ioredis";
 import { BlogResolverService } from "../common/services/blog-resolver.service";
-import { ViewerIdUtil } from "../common/utils/viewer-id.util";
-import { PopularPostsReadService } from "../popular-posts/services/popular-posts-read.service";
-import { KnowledgePublicReadService } from "../knowledge/services/knowledge-public-read.service";
-import { SubmitKnowledgeDraftDto } from "../knowledge/dto/knowledge-draft.dto";
-import { KnowledgeCandidateGraphService } from "../knowledge/services/knowledge-candidate-graph.service";
+import { IdempotencyService } from "../common/services/idempotency.service";
+import {
+  OrganizationId,
+  RequireOrganizationContext,
+} from "../organizations/decorators/organization-context.decorator";
+import { OrganizationContextGuard } from "../organizations/guards/organization-context.guard";
 
 @ApiTags("posts")
 @Controller("posts")
@@ -92,9 +92,7 @@ export class PostsController {
     private readonly monitoringService: MonitoringService,
     private readonly likeService: LikeService,
     private readonly voteService: VoteService,
-    private readonly popularPostsReadService: PopularPostsReadService,
-    private readonly knowledgePublicReadService: KnowledgePublicReadService,
-    private readonly knowledgeCandidateGraphService: KnowledgeCandidateGraphService,
+    private readonly idempotencyService: IdempotencyService,
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
@@ -131,7 +129,8 @@ export class PostsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, PostsThrottlerGuard)
+  @UseGuards(JwtAuthGuard, PostsThrottlerGuard, OrganizationContextGuard)
+  @RequireOrganizationContext()
   @Throttle({ default: { limit: 15, ttl: 3600000 } }) // 시간당 15개 제한
   @ApiOperation({ summary: "게시글 작성 (시간당 15개 제한)" })
   @ApiBearerAuth()
@@ -139,13 +138,30 @@ export class PostsController {
     @Body() createPostDto: CreatePostDto,
     @CurrentUser() user: User,
     @Ip() ip: string,
+    @OrganizationId() organizationId: string,
+    @Headers("Idempotency-Key") idempotencyKey?: string,
   ) {
-    const newPost = await this.postsService.create(
-      createPostDto,
-      user,
-      undefined,
-      ip,
-    );
+    const newPost = idempotencyKey
+      ? await this.idempotencyService.execute({
+          scope: `posts:create:${organizationId}:${user.id}`,
+          key: idempotencyKey,
+          request: createPostDto,
+          operation: () =>
+            this.postsService.create(
+              createPostDto,
+              user,
+              undefined,
+              ip,
+              organizationId,
+            ),
+        })
+      : await this.postsService.create(
+          createPostDto,
+          user,
+          undefined,
+          ip,
+          organizationId,
+        );
     // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return newPost;
   }
@@ -155,83 +171,26 @@ export class PostsController {
    * - 본인의 draft 상태 게시물만 조회
    */
   @Get("drafts")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OrganizationContextGuard)
+  @RequireOrganizationContext()
   @ApiOperation({ summary: "내 초안 목록 조회" })
   @ApiBearerAuth()
-  async findDrafts(@CurrentUser() user: User) {
-    return this.postsService.findDrafts(user.id);
-  }
-
-  @Get("mine")
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "내 포스트 목록 조회 (상태/공개범위 필터)" })
-  @ApiBearerAuth()
-  async findMine(
+  async findDrafts(
     @CurrentUser() user: User,
-    @Query("status") status?: "draft" | "published",
-    @Query("visibility") visibility?: "public" | "private",
+    @OrganizationId() organizationId: string,
   ) {
-    const normalizedStatus =
-      status === "draft" || status === "published" ? status : undefined;
-    const normalizedVisibility =
-      visibility === "public" || visibility === "private"
-        ? visibility
-        : undefined;
-
-    return this.postsService.findMine(user.id, {
-      status: normalizedStatus,
-      visibility: normalizedVisibility,
-    });
+    return this.postsService.findDrafts(user.id, organizationId);
   }
 
   @Get(":id/related")
   @Public()
-  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "연관 포스트 조회" })
   @ApiResponse({ status: 200, description: "연관 포스트 목록 반환" })
   async getRelatedPosts(
     @Param("id", ParseUUIDPipe) id: string,
     @Query("limit", new DefaultValuePipe(6), ParseIntPipe) limit: number,
-    @CurrentUser() user?: User,
   ) {
-    return this.postsService.getRelatedPosts(id, limit, user);
-  }
-
-  @Get(":id/knowledge-context")
-  @Public()
-  @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: "포스트 공개 Knowledge 컨텍스트 조회" })
-  async getKnowledgeContext(
-    @Param("id", ParseUUIDPipe) id: string,
-    @CurrentUser() user?: User,
-  ) {
-    return this.knowledgePublicReadService.getPostKnowledgeContext(id, user);
-  }
-
-  @Post(":id/knowledge-draft")
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "포스트 KB draft 제출" })
-  @ApiBearerAuth()
-  async submitKnowledgeDraft(
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body() body: SubmitKnowledgeDraftDto,
-    @CurrentUser() user: User,
-  ) {
-    const artifact = await this.knowledgeCandidateGraphService.submitDraft({
-      userId: user.id,
-      postId: id,
-      draft: body,
-    });
-
-    if (!artifact) {
-      throw new NotFoundException("포스트를 찾을 수 없거나 draft를 제출할 권한이 없습니다.");
-    }
-
-    return {
-      success: true,
-      postId: id,
-      artifactId: artifact.id,
-    };
+    return this.postsService.getRelatedPosts(id, limit);
   }
 
   @Get()
@@ -359,12 +318,12 @@ export class PostsController {
       if (cached) {
         // 캐시 히트 로깅 (성능 모니터링용)
         const cacheType = actualBlogId ? "MY_BLOG" : "HOME_FEED";
-        this.logger.debug(`✅ [Cache HIT] ${cacheType} for ${cacheKey}`);
+        console.log(`✅ [Cache HIT] ${cacheType} for ${cacheKey}`);
         this.logger.log(`[Cache HIT] ${cacheType} - ${cacheKey}`);
         return cached;
       }
     } catch (error) {
-      this.logger.error("Cache get error:", error);
+      console.error("Cache get error:", error);
       this.logger.error(`Cache get error for ${cacheKey}:`, error);
     }
 
@@ -389,25 +348,23 @@ export class PostsController {
       ttl = CacheTTL.MY_BLOG; // 10초
     } else {
       // 홈 피드: 긴 TTL
-      ttl = pageNumber === 1 ? CacheTTL.SHORT : CacheTTL.SHORT * 2;
+      ttl = pageNumber === 1 ? CacheTTL.HOME_FEED : CacheTTL.HOME_FEED * 2;
     }
 
     // 캐시 미스 로깅
     const cacheType = actualBlogId ? "MY_BLOG" : "HOME_FEED";
-    this.logger.debug(
-      `❌ [Cache MISS] ${cacheType} for ${cacheKey} - Querying DB`,
-    );
+    console.log(`❌ [Cache MISS] ${cacheType} for ${cacheKey} - Querying DB`);
     this.logger.log(`[Cache MISS] ${cacheType} - ${cacheKey}, TTL: ${ttl}s`);
 
     // 캐싱
     try {
       await this.cacheService.set(cacheKey, result, ttl);
-      this.logger.debug(
+      console.log(
         `📦 [Cache SET] ${cacheType} for ${cacheKey} with TTL ${ttl}s`,
       );
       this.logger.log(`[Cache SET] ${cacheType} - ${cacheKey}, TTL: ${ttl}s`);
     } catch (error) {
-      this.logger.error("Cache set error:", error);
+      console.error("Cache set error:", error);
       this.logger.error(`Cache set error for ${cacheKey}:`, error);
     }
 
@@ -427,9 +384,47 @@ export class PostsController {
     @Param("period") period: string,
     @Query("limit") limit?: string,
   ) {
-    // 인기글은 전용 read path(redis -> snapshot fallback)로 조회한다.
-    // 요청 시점의 집계 계산/대형 정렬 쿼리는 수행하지 않는다.
-    return this.popularPostsReadService.getBlogPopularPosts(period, limit);
+    // period 파라미터 안전하게 검증
+    const validPeriods = ["daily", "weekly", "monthly"];
+    const sanitizedPeriod = validPeriods.includes(period)
+      ? (period as "daily" | "weekly" | "monthly")
+      : "weekly"; // 기본값: 주간
+    const limitNumber = PaginationHelper.getSafeLimit(limit, 10); // 인기 게시글은 최대 10개
+
+    // 캐시 키 생성
+    const cacheKey = CacheKeys.FEED_POPULAR(sanitizedPeriod, limitNumber);
+
+    // 캐시 확인
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit: ${cacheKey}`);
+      return cached;
+    }
+
+    // 캐시 미스 - DB 조회
+    this.logger.debug(`Cache miss: ${cacheKey}`);
+    const posts = await this.postsService.findPopularPosts(
+      sanitizedPeriod,
+      limitNumber,
+    );
+
+    // 응답 포맷팅 (프론트엔드에서 기대하는 형식: { posts: [...], total: number })
+    const result = {
+      posts: posts,
+      total: posts.length,
+    };
+
+    // 기간별 캐시 TTL 설정 후 캐싱
+    const ttl =
+      sanitizedPeriod === "daily"
+        ? 3600
+        : sanitizedPeriod === "weekly"
+          ? 10800
+          : 21600;
+    await this.cacheService.set(cacheKey, result, ttl);
+    this.logger.debug(`Cached: ${cacheKey} (TTL: ${ttl}s)`);
+
+    return result;
   }
 
   @Get("categories/public")
@@ -466,7 +461,8 @@ export class PostsController {
   }
 
   @Post(":id/thumbnail")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OrganizationContextGuard)
+  @RequireOrganizationContext()
   @ApiOperation({ summary: "게시글 썸네일 설정/제거" })
   @ApiBearerAuth()
   @ApiResponse({ status: 200, description: "썸네일 설정/제거 성공" })
@@ -475,12 +471,19 @@ export class PostsController {
     @Param("id", ParseUUIDPipe) postId: string,
     @CurrentUser() user: User,
     @Body() setThumbnailDto: SetThumbnailDto,
+    @OrganizationId() organizationId: string,
   ) {
-    return this.postsService.setThumbnail(postId, user.id, setThumbnailDto);
+    return this.postsService.setThumbnail(
+      postId,
+      user.id,
+      setThumbnailDto,
+      organizationId,
+    );
   }
 
   @Get(":id/thumbnail/candidates")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OrganizationContextGuard)
+  @RequireOrganizationContext()
   @ApiOperation({ summary: "게시글 썸네일 후보 이미지 조회" })
   @ApiBearerAuth()
   @ApiResponse({ status: 200, description: "썸네일 후보 목록 반환" })
@@ -488,8 +491,13 @@ export class PostsController {
   async getThumbnailCandidates(
     @Param("id", ParseUUIDPipe) postId: string,
     @CurrentUser() user: User,
+    @OrganizationId() organizationId: string,
   ) {
-    return this.postsService.getThumbnailCandidates(postId, user.id);
+    return this.postsService.getThumbnailCandidates(
+      postId,
+      user.id,
+      organizationId,
+    );
   }
 
   @Get("read")
@@ -566,21 +574,14 @@ export class PostsController {
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "Slug로 게시글 조회" })
-  findBySlug(
-    @Param("slug") slug: string,
-    @Request() req: any,
-    @Query("fresh") fresh?: string,
-  ) {
+  findBySlug(@Param("slug") slug: string, @Request() req: any) {
     // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
-    const shouldBypassCache = fresh === "1" || fresh === "true";
 
     // URL 파라미터 안전하게 디코딩 및 정제
     const sanitizedSlug = UrlSanitizerUtil.sanitizeSlug(slug);
 
-    return this.postsService.findBySlug(sanitizedSlug, user, {
-      bypassCache: shouldBypassCache,
-    });
+    return this.postsService.findBySlug(sanitizedSlug, user);
   }
 
   @Get("editor-picks/admin")
@@ -617,6 +618,27 @@ export class PostsController {
   ) {
     await this.postsService.updateEditorPicksOrder(dto.orderedIds, user);
     return { success: true };
+  }
+
+  @Get(":blogId/:slug")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({
+    summary: "블로그 ID와 슬러그로 게시글 조회 (프론트엔드 호환성)",
+  })
+  findByBlogIdAndSlug(
+    @Param("blogId", ParseUUIDPipe) blogId: string,
+    @Param("slug") slug: string,
+    @Request() req: any,
+  ) {
+    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
+    const user = req.user || null;
+
+    // URL 파라미터 안전하게 디코딩 및 정제
+    const sanitizedSlug = UrlSanitizerUtil.sanitizeSlug(slug);
+
+    // blogId는 validation 용도로만 사용하고, 실제로는 slug로 조회
+    return this.postsService.findBySlug(sanitizedSlug, user);
   }
 
   @Get("view-stats")
@@ -717,7 +739,8 @@ export class PostsController {
   }
 
   @Patch(":id")
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, OrganizationContextGuard)
+  @RequireOrganizationContext()
   @Roles(Role.ADMIN, Role.USER)
   @ApiOperation({ summary: "게시글 수정" })
   @ApiBearerAuth()
@@ -725,6 +748,7 @@ export class PostsController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() updatePostDto: UpdatePostDto,
     @CurrentUser() user: User,
+    @OrganizationId() organizationId: string,
   ) {
     // 🎯 [THUMBNAIL_TRACK] STEP_4_BACKEND_RECEIVE
     if ("thumbnailImageId" in updatePostDto || "thumbnail" in updatePostDto) {
@@ -742,7 +766,13 @@ export class PostsController {
       this.logger.debug(`  - Timestamp: ${new Date().toISOString()}`);
     }
 
-    const updated = await this.postsService.update(id, updatePostDto, user);
+    const updated = await this.postsService.update(
+      id,
+      updatePostDto,
+      user,
+      undefined,
+      organizationId,
+    );
     // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
 
     // 🎯 [THUMBNAIL_TRACK] STEP_4_BACKEND_SUCCESS
@@ -755,36 +785,18 @@ export class PostsController {
     return updated;
   }
 
-  @Patch(":id/visibility")
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.USER)
-  @ApiOperation({ summary: "게시글 공개 범위 변경" })
-  @ApiBearerAuth()
-  async updateVisibility(
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body() dto: UpdatePostVisibilityDto,
-    @CurrentUser() user: User,
-  ) {
-    return this.postsService.update(
-      id,
-      {
-        visibility: dto.visibility,
-        ...(typeof dto.version === "number" ? { version: dto.version } : {}),
-      },
-      user,
-    );
-  }
-
   @Delete(":id")
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, OrganizationContextGuard)
+  @RequireOrganizationContext()
   @Roles(Role.ADMIN, Role.USER)
   @ApiOperation({ summary: "게시글 삭제" })
   @ApiBearerAuth()
   async remove(
     @Param("id", ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
+    @OrganizationId() organizationId: string,
   ) {
-    const result = await this.postsService.remove(id, user);
+    const result = await this.postsService.remove(id, user, organizationId);
     // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return result;
   }
@@ -870,34 +882,14 @@ export class PostsController {
     return { message: "Files relinked successfully" };
   }
 
-  @Post("reconcile-managed-images")
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: "managed image 관계 점검/복구 (관리자만)" })
-  @ApiBearerAuth()
-  @ApiQuery({
-    name: "dryRun",
-    required: false,
-    description: "true면 점검만 수행, false면 post_files 복구까지 수행",
-  })
-  async reconcileManagedImages(@Query("dryRun") dryRun?: string) {
-    const resolvedDryRun =
-      dryRun === undefined ? true : !["false", "0"].includes(dryRun);
-
-    return this.postsService.reconcileManagedImages(resolvedDryRun);
-  }
-
   @Post(":id/view")
   @Public()
-  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "게시글 조회수 증가 (배치 처리)" })
   @ApiResponse({ status: 200, description: "조회수 증가 성공 (배치 대기중)" })
   @ApiResponse({ status: 404, description: "게시글을 찾을 수 없음" })
-  async incrementViewCount(@Param("id") id: string, @Request() req: any) {
-    const userId = req.user?.id;
-    const viewerId = ViewerIdUtil.resolve(req);
-
-    await this.viewCountService.incrementViewCount(id, userId, viewerId);
+  async incrementViewCount(@Param("id") id: string) {
+    // 배치 서비스로 조회수 증가 (메모리에 임시 저장)
+    await this.viewCountService.incrementViewCount(id);
     return { message: "View count queued for batch update" };
   }
 
@@ -945,7 +937,8 @@ export class PostsController {
    * @returns 카테고리 목록 (문자열 배열)
    */
   @Get("categories")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OrganizationContextGuard)
+  @RequireOrganizationContext()
   @ApiBearerAuth()
   @ApiOperation({ summary: "사용자의 카테고리 목록 조회 (자동완성용)" })
   @ApiResponse({
@@ -957,8 +950,11 @@ export class PostsController {
       example: ["JavaScript", "TypeScript", "React", "Node.js"],
     },
   })
-  async getUserCategories(@CurrentUser() user: User): Promise<string[]> {
-    return this.postsService.getUserCategories(user.id);
+  async getUserCategories(
+    @CurrentUser() user: User,
+    @OrganizationId() organizationId: string,
+  ): Promise<string[]> {
+    return this.postsService.getUserCategories(user.id, organizationId);
   }
 
   /**
@@ -1116,31 +1112,6 @@ export class PostsController {
     Array<{ slug: string; blogSlug: string; updatedAt: Date }>
   > {
     return this.postsService.getAllPublishedPostsForSitemap();
-  }
-
-  @Get(":blogId/:slug")
-  @Public()
-  @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({
-    summary: "블로그 ID와 슬러그로 게시글 조회 (프론트엔드 호환성)",
-  })
-  findByBlogIdAndSlug(
-    @Param("blogId", ParseUUIDPipe) blogId: string,
-    @Param("slug") slug: string,
-    @Request() req: any,
-    @Query("fresh") fresh?: string,
-  ) {
-    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
-    const user = req.user || null;
-    const shouldBypassCache = fresh === "1" || fresh === "true";
-
-    // URL 파라미터 안전하게 디코딩 및 정제
-    const sanitizedSlug = UrlSanitizerUtil.sanitizeSlug(slug);
-
-    // blogId는 validation 용도로만 사용하고, 실제로는 slug로 조회
-    return this.postsService.findBySlug(sanitizedSlug, user, {
-      bypassCache: shouldBypassCache,
-    });
   }
 
   // ⚠️ 주의: 이 라우트는 반드시 모든 정적 라우트 아래에 위치해야 합니다.

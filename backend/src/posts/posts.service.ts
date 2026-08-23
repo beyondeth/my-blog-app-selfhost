@@ -133,6 +133,7 @@ export class PostsService {
     user: User,
     files?: File[],
     ip?: string,
+    organizationId?: string,
   ): Promise<PostResponseDto> {
     this.logger.log(`Creating post for user: ${user.id}`);
 
@@ -141,6 +142,7 @@ export class PostsService {
       user,
       files,
       ip,
+      organizationId,
     );
 
     // 생성된 포스트를 DTO로 변환
@@ -156,11 +158,18 @@ export class PostsService {
   async createFast(
     createPostDto: CreatePostDto,
     user: User,
+    organizationId?: string,
   ): Promise<PostResponseDto> {
     this.logger.log(`Fast creating post for user: ${user.id}`);
 
     // 기본적으로 create와 동일하지만, 최적화된 경로 사용
-    return await this.create(createPostDto, user);
+    return await this.create(
+      createPostDto,
+      user,
+      undefined,
+      undefined,
+      organizationId,
+    );
   }
 
   /**
@@ -171,6 +180,7 @@ export class PostsService {
     updatePostDto: UpdatePostDto,
     user: User,
     files?: File[],
+    organizationId?: string,
   ): Promise<PostResponseDto> {
     this.logger.log(`[POSTS_SERVICE] Updating post: ${id} by user: ${user.id}`);
 
@@ -179,6 +189,7 @@ export class PostsService {
       updatePostDto,
       user,
       files,
+      organizationId,
     );
 
     this.logger.log(
@@ -201,9 +212,9 @@ export class PostsService {
   /**
    * 포스트 삭제 (소프트 삭제)
    */
-  async delete(id: string, user: User): Promise<void> {
+  async delete(id: string, user: User, organizationId?: string): Promise<void> {
     this.logger.log(`Deleting post: ${id} by user: ${user.id}`);
-    return await this.postCreationService.delete(id, user);
+    return await this.postCreationService.delete(id, user, organizationId);
   }
 
   /**
@@ -271,15 +282,25 @@ export class PostsService {
   /**
    * 사용자의 초안 목록 조회
    */
-  async findDrafts(userId: string): Promise<PostResponseDto[]> {
+  async findDrafts(
+    userId: string,
+    organizationId?: string,
+  ): Promise<PostResponseDto[]> {
     this.logger.log(`Finding drafts for user: ${userId}`);
 
     const drafts = await this.postsRepository.find({
-      where: {
-        authorId: userId,
-        status: "draft",
-        isDeleted: false,
-      },
+      where: organizationId
+        ? {
+            authorId: userId,
+            status: "draft",
+            isDeleted: false,
+            blog: { organizationId },
+          }
+        : {
+            authorId: userId,
+            status: "draft",
+            isDeleted: false,
+          },
       relations: ["blog", "author", "stats"],
       order: { updatedAt: "DESC" },
     });
@@ -628,6 +649,7 @@ export class PostsService {
     postId: string,
     userIdOrThumbnail: string | User,
     thumbnailFileId?: string | SetThumbnailDto,
+    organizationId?: string,
   ): Promise<{ success: boolean; thumbnailUrl?: string }> {
     this.logger.debug(`Setting thumbnail for post: ${postId}`);
 
@@ -640,13 +662,21 @@ export class PostsService {
         postId,
         fileId,
         userIdOrThumbnail,
+        undefined,
+        organizationId,
       );
     } else {
       // 새 방식: setThumbnail(postId, user, setThumbnailDto)
       const user = userIdOrThumbnail as User;
       const dto = thumbnailFileId as SetThumbnailDto;
       fileId = dto.thumbnailFileId;
-      await this.thumbnailService.setThumbnail(postId, fileId, user.id);
+      await this.thumbnailService.setThumbnail(
+        postId,
+        fileId,
+        user.id,
+        undefined,
+        organizationId,
+      );
     }
 
     // File 엔티티에서 직접 URL 조회
@@ -680,8 +710,13 @@ export class PostsService {
   async getThumbnailCandidates(
     postId: string,
     userId: string,
+    organizationId?: string,
   ): Promise<File[]> {
-    return await this.thumbnailService.getThumbnailCandidates(postId, userId);
+    return await this.thumbnailService.getThumbnailCandidates(
+      postId,
+      userId,
+      organizationId,
+    );
   }
 
   async removeThumbnailOld(
@@ -826,8 +861,8 @@ export class PostsService {
   /**
    * 포스트 삭제 (remove 메서드 별칭)
    */
-  async remove(id: string, user: User): Promise<void> {
-    return await this.delete(id, user);
+  async remove(id: string, user: User, organizationId?: string): Promise<void> {
+    return await this.delete(id, user, organizationId);
   }
 
   /**
@@ -919,11 +954,19 @@ export class PostsService {
   /**
    * 사용자 카테고리 조회
    */
-  async getUserCategories(userId: string): Promise<string[]> {
+  async getUserCategories(
+    userId: string,
+    organizationId?: string,
+  ): Promise<string[]> {
     this.logger.debug(`Getting categories for user: ${userId}`);
 
     // 사용자의 블로그 ID 조회
-    const blog = await this.blogsRepository.findOne({ where: { userId } });
+    const blog = await this.blogsRepository.findOne({
+      where: {
+        userId,
+        ...(organizationId ? { organizationId } : {}),
+      },
+    });
     if (!blog) {
       return [];
     }

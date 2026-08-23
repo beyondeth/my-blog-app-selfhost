@@ -10,6 +10,8 @@ import {
   Logger,
   Req,
   Query,
+  Param,
+  ParseUUIDPipe,
 } from "@nestjs/common";
 import { Request as ExpressRequest, Response } from "express";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
@@ -33,26 +35,57 @@ import { RegisterDto } from "./dto/register.dto";
 import { DeleteAccountDto } from "./dto/delete-account.dto";
 import { ConsentDto } from "./dto/consent.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
-import { CookieConsentDto } from "./dto/cookie-consent.dto";
 import { UnifiedRedisService } from "../redis/unified-redis.service";
-import { AuthProvider, User } from "../users/entities/user.entity";
-import {
-  MobileOAuthCodeService,
-  SocialProvider,
-} from "./services/mobile-oauth-code.service";
-import {
-  appendQueryParams,
-  decodeMobileOAuthState,
-  parseAllowedMobileSchemes,
-  sanitizeMobileRedirectUri,
-} from "./utils/oauth-mobile-redirect.util";
+import { User } from "../users/entities/user.entity";
+import { CsrfGuard } from "../common/guards/csrf.guard";
+import * as crypto from "crypto";
+
+interface McpOAuthGrantClaims {
+  iss: string;
+  aud: string;
+  sub: string;
+  state: string;
+  callback: string;
+  jti: string;
+  iat: number;
+  exp: number;
+}
+
+export function createMcpOAuthGrant(
+  claims: Omit<McpOAuthGrantClaims, "jti" | "iat" | "exp">,
+  secret: string,
+  now = Math.floor(Date.now() / 1000),
+  jti = crypto.randomUUID(),
+): string {
+  if (!secret || secret.length < 16) {
+    throw new Error("MCP_SHARED_SECRET must be configured for MCP OAuth");
+  }
+
+  const header = Buffer.from(
+    JSON.stringify({ alg: "HS256", typ: "JWT" }),
+    "utf8",
+  ).toString("base64url");
+  const payload = Buffer.from(
+    JSON.stringify({
+      ...claims,
+      jti,
+      iat: now,
+      exp: now + 60,
+    } satisfies McpOAuthGrantClaims),
+    "utf8",
+  ).toString("base64url");
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(`${header}.${payload}`)
+    .digest("base64url");
+
+  return `${header}.${payload}.${signature}`;
+}
 
 @ApiTags("auth")
 @Controller(["auth", "mobile/auth"])
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
-  private readonly allowedMobileRedirectSchemes: Set<string>;
-  private readonly oauthStateSecret: string;
 
   constructor(
     private readonly authService: AuthService,
@@ -61,12 +94,116 @@ export class AuthController {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly redisService: UnifiedRedisService,
-    private readonly mobileOAuthCodeService: MobileOAuthCodeService,
-  ) {
-    this.allowedMobileRedirectSchemes = parseAllowedMobileSchemes(
-      this.configService.get<string>("MOBILE_AUTH_REDIRECT_SCHEMES"),
+  ) {}
+
+  private getRefreshCookieMaxAge(): number {
+    const expiresIn = this.configService.get<string>(
+      "JWT_REFRESH_EXPIRES_IN",
+      "7d",
     );
-    this.oauthStateSecret = this.configService.get<string>("JWT_SECRET") ?? "";
+    const match = /^([0-9]+)\s*(s|m|h|d)$/.exec(expiresIn.trim());
+    if (!match) {
+      return 7 * 24 * 60 * 60 * 1000;
+    }
+
+    const amount = Number(match[1]);
+    const multiplier = {
+      s: 1000,
+      m: 60 * 1000,
+      h: 60 * 60 * 1000,
+      d: 24 * 60 * 60 * 1000,
+    }[match[2]];
+
+    return amount * multiplier;
+  }
+
+  private getRefreshSessionContext(req: ExpressRequest) {
+    const deviceName = req.headers["x-device-name"];
+    const normalizedDeviceName = Array.isArray(deviceName)
+      ? deviceName[0]
+      : deviceName;
+
+    return {
+      ipAddress: req.ip || req.socket?.remoteAddress,
+      userAgent: req.headers["user-agent"],
+      deviceName:
+        typeof normalizedDeviceName === "string"
+          ? normalizedDeviceName.trim().slice(0, 100)
+          : undefined,
+    };
+  }
+
+  private normalizeConfiguredPublicUrl(value: string, name: string): string {
+    if (!value) {
+      throw new Error(`${name} must be configured for MCP OAuth`);
+    }
+
+    const url = new URL(value);
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      url.username ||
+      url.password
+    ) {
+      throw new Error(`${name} must be a public http(s) URL`);
+    }
+
+    url.search = "";
+    url.hash = "";
+    url.pathname = url.pathname.replace(/\/$/, "");
+    return url.toString().replace(/\/$/, "");
+  }
+
+  private getMcpOAuthAudience(): string {
+    return this.normalizeConfiguredPublicUrl(
+      this.configService.get<string>("MCP_BASE_URL"),
+      "MCP_BASE_URL",
+    );
+  }
+
+  private getMcpOAuthCallbackUrl(): string {
+    return `${this.getMcpOAuthAudience()}/oauth/callback`;
+  }
+
+  private getMcpOAuthIssuer(): string {
+    const backendPublicUrl =
+      this.configService.get<string>("PUBLIC_BACKEND_URL") ||
+      this.configService.get<string>("BACKEND_PUBLIC_URL");
+    return `${this.normalizeConfiguredPublicUrl(backendPublicUrl, "PUBLIC_BACKEND_URL")}/api/v1/auth/oauth/mcp`;
+  }
+
+  private issueMcpOAuthGrant(userId: string, state: string): string {
+    const audience = this.getMcpOAuthAudience();
+    return createMcpOAuthGrant(
+      {
+        iss: this.getMcpOAuthIssuer(),
+        aud: audience,
+        sub: userId,
+        state,
+        callback: `${audience}/oauth/callback`,
+      },
+      this.configService.get<string>("MCP_SHARED_SECRET"),
+    );
+  }
+
+  /**
+   * Issue a CSRF token for browser clients using the HttpOnly auth cookies.
+   * The token is also returned in the response so clients do not need to read
+   * a cross-origin cookie.
+   */
+  @Get("csrf-token")
+  @Public()
+  @ApiOperation({ summary: "브라우저용 CSRF 토큰 발급" })
+  async getCsrfToken(@Req() req: ExpressRequest, @Res() res: Response) {
+    const csrfToken = CsrfGuard.generateToken(req);
+
+    res.cookie("csrf_token", csrfToken, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      path: "/",
+    });
+
+    return res.json({ csrfToken });
   }
 
   /**
@@ -74,15 +211,15 @@ export class AuthController {
    * 웹에서 로그인하면 MCP 세션도 활성화 상태로 만들어 통일성 유지
    */
   private async createWebSessionInRedis(
-    accountId: number | string,
+    userId: number | string,
   ): Promise<void> {
     try {
       // userId는 UUID이므로 문자열로 유지
-      const accountIdString = String(accountId);
+      const userIdString = String(userId);
 
       // 웹 세션을 Redis에 저장 (MCP 세션 검증에 사용)
       const sessionData = {
-        userId: accountIdString,
+        userId: userIdString,
         isActive: true,
         loginAt: Date.now(),
         lastAccessAt: Date.now(),
@@ -91,162 +228,15 @@ export class AuthController {
       // 24시간 TTL로 세션 저장
       await this.redisService.setCache(
         "sessions",
-        `user:${accountIdString}`,
+        `user:${userIdString}`,
         sessionData,
         24 * 60 * 60, // 24시간
       );
 
-      this.logger.debug(`웹 세션 생성: accountId=${accountIdString}`);
+      this.logger.debug(`웹 세션 생성: userId=${userIdString}`);
     } catch (error) {
       this.logger.error(`웹 세션 생성 실패: ${error.message}`);
       // 세션 생성 실패해도 로그인은 진행
-    }
-  }
-
-  private frontendBaseURL(): string {
-    return (
-      this.configService.get<string>("FRONTEND_URL") || "http://localhost:3001"
-    );
-  }
-
-  /**
-   * MCP Proxy의 OAuth 토큰(Access/Refresh)을 사용자 단위로 무효화.
-   * 웹 로그아웃 시 GPT/Claude 커넥터 세션도 함께 끊기게 하기 위한 내부 연동이다.
-   */
-  private async revokeMcpOAuthTokens(accountId: string): Promise<void> {
-    const mcpProxyUrl =
-      this.configService.get<string>("MCP_PROXY_INTERNAL_URL") ||
-      this.configService.get<string>("MCP_BASE_URL") ||
-      "http://localhost:3002";
-    const sharedSecret = this.configService.get<string>("MCP_SHARED_SECRET");
-
-    if (!sharedSecret) {
-      this.logger.warn(
-        "[Logout] MCP_SHARED_SECRET is missing; skip MCP OAuth revoke",
-      );
-      return;
-    }
-
-    const endpoint = `${mcpProxyUrl.replace(/\/+$/, "")}/internal/oauth/revoke-user`;
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Internal-Secret": sharedSecret,
-      },
-      body: JSON.stringify({ userId: accountId }),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`MCP revoke failed (${response.status}): ${body}`);
-    }
-  }
-
-  private resolveMobileRedirectUri(req: ExpressRequest): string | null {
-    const statePayload = decodeMobileOAuthState(
-      req.query?.state,
-      this.oauthStateSecret,
-    );
-    return sanitizeMobileRedirectUri(
-      statePayload?.mobileRedirectUri,
-      this.allowedMobileRedirectSchemes,
-    );
-  }
-
-  private tryRedirectToMobileCallback(
-    req: ExpressRequest,
-    res: Response,
-    params: Record<string, string | undefined>,
-  ): boolean {
-    const mobileRedirectUri = this.resolveMobileRedirectUri(req);
-    if (!mobileRedirectUri) {
-      return false;
-    }
-    res.redirect(appendQueryParams(mobileRedirectUri, params));
-    return true;
-  }
-
-  private mobileOAuthCallbackMode(): "dual" | "code" {
-    const rawMode = (
-      this.configService.get<string>("MOBILE_OAUTH_CALLBACK_MODE") || "dual"
-    )
-      .trim()
-      .toLowerCase();
-
-    if (rawMode === "code") {
-      return "code";
-    }
-    return "dual";
-  }
-
-  private async tryRedirectToMobileOAuthSuccess(
-    req: ExpressRequest,
-    res: Response,
-    payload: {
-      accessToken: string;
-      refreshToken: string;
-      userId: string;
-      provider: SocialProvider;
-      needsConsent: boolean;
-    },
-  ): Promise<boolean> {
-    const mobileRedirectUri = this.resolveMobileRedirectUri(req);
-    if (!mobileRedirectUri) {
-      return false;
-    }
-
-    const mode = this.mobileOAuthCallbackMode();
-
-    try {
-      const issueResult = await this.mobileOAuthCodeService.issueCode({
-        accessToken: payload.accessToken,
-        refreshToken: payload.refreshToken,
-        userId: payload.userId,
-        provider: payload.provider,
-        redirectUri: mobileRedirectUri,
-        needsConsent: payload.needsConsent,
-      });
-
-      const params: Record<string, string | undefined> = {
-        code: issueResult.code,
-        provider: payload.provider,
-        needs_consent: payload.needsConsent ? "1" : "0",
-        expires_in: String(issueResult.expiresInSeconds),
-      };
-
-      if (mode === "dual") {
-        params.access_token = payload.accessToken;
-        params.refresh_token = payload.refreshToken;
-      }
-
-      res.redirect(appendQueryParams(mobileRedirectUri, params));
-      return true;
-    } catch (error) {
-      this.logger.error(
-        `[Mobile OAuth] Failed to issue one-time code: ${error?.message || error}`,
-      );
-
-      if (mode === "dual") {
-        res.redirect(
-          appendQueryParams(mobileRedirectUri, {
-            access_token: payload.accessToken,
-            refresh_token: payload.refreshToken,
-            provider: payload.provider,
-            needs_consent: payload.needsConsent ? "1" : "0",
-            exchange_error: "1",
-          }),
-        );
-        return true;
-      }
-
-      res.redirect(
-        appendQueryParams(mobileRedirectUri, {
-          error: "oauth_exchange_unavailable",
-          message: "We could not complete the social sign-in exchange. Please try again.",
-        }),
-      );
-      return true;
     }
   }
 
@@ -262,14 +252,17 @@ export class AuthController {
     @Req() req: ExpressRequest,
     @Res() res: Response,
   ) {
-    const authResponse = await this.authService.login(loginDto);
+    const authResponse = await this.authService.login(
+      loginDto,
+      this.getRefreshSessionContext(req),
+    );
 
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie("access_token", authResponse.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // 프로덕션에서만 HTTPS 사용
       sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax", // 개발 환경에서는 lax 사용
-      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
+      maxAge: authResponse.expires_in * 1000,
       path: "/",
     });
 
@@ -277,7 +270,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+      maxAge: this.getRefreshCookieMaxAge(),
       path: "/",
     });
 
@@ -294,7 +287,7 @@ export class AuthController {
     // 항상 JSON 응답 반환 (프론트엔드에서 리다이렉트 처리)
     return res.json({
       user: authResponse.user,
-      message: "Signed in successfully.",
+      message: "로그인 성공",
       ...(includeTokens && {
         access_token: authResponse.access_token,
         refresh_token: authResponse.refresh_token,
@@ -309,15 +302,22 @@ export class AuthController {
   @ApiOperation({ summary: "회원가입" })
   @ApiResponse({ status: 201, description: "회원가입 성공" })
   @ApiResponse({ status: 400, description: "잘못된 요청" })
-  async register(@Body() registerDto: RegisterDto, @Res() res: Response) {
-    const authResponse = await this.authService.register(registerDto);
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Req() req: ExpressRequest,
+    @Res() res: Response,
+  ) {
+    const authResponse = await this.authService.register(
+      registerDto,
+      this.getRefreshSessionContext(req),
+    );
 
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie("access_token", authResponse.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // 프로덕션에서만 HTTPS 사용
       sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax", // 개발 환경에서는 lax 사용
-      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
+      maxAge: authResponse.expires_in * 1000,
       path: "/",
     });
 
@@ -325,7 +325,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+      maxAge: this.getRefreshCookieMaxAge(),
       path: "/",
     });
 
@@ -335,7 +335,7 @@ export class AuthController {
     // 토큰 제외하고 사용자 정보만 반환 (개발 환경에서는 토큰도 포함)
     return res.json({
       user: authResponse.user,
-      message: "Your account has been created.",
+      message: "회원가입 성공",
       ...(process.env.NODE_ENV !== "production" && {
         access_token: authResponse.access_token,
         refresh_token: authResponse.refresh_token,
@@ -355,24 +355,13 @@ export class AuthController {
   @Get("google/callback")
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: "구글 로그인 콜백" })
-  async googleAuthRedirect(
-    @Request() req: ExpressRequest & { user?: any },
-    @Res() res: Response,
-  ) {
+  async googleAuthRedirect(@Request() req, @Res() res) {
     try {
       // OAuth Guard가 이미 사용자를 찾았는지 확인
       if (!req.user || !req.user.user) {
         this.logger.error(`[Google OAuth Callback] No user found in request`);
-        if (
-          this.tryRedirectToMobileCallback(req, res, {
-            error: "auth_failed",
-            message: "Sign-in failed. Please try again.",
-          })
-        ) {
-          return;
-        }
         return res.redirect(
-          `${this.frontendBaseURL()}/login?error=auth_failed`,
+          `${process.env.FRONTEND_URL}/login?error=auth_failed`,
         );
       }
 
@@ -386,7 +375,7 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
+        maxAge: req.user.expires_in * 1000,
         path: "/",
       });
 
@@ -394,7 +383,7 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+        maxAge: this.getRefreshCookieMaxAge(),
         path: "/",
       });
 
@@ -416,18 +405,7 @@ export class AuthController {
 
       // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
       const redirectPath = needsConsent ? "/consent" : "/";
-      if (
-        await this.tryRedirectToMobileOAuthSuccess(req, res, {
-          accessToken: req.user.access_token,
-          refreshToken: req.user.refresh_token,
-          userId: String(req.user.user.id),
-          provider: "google",
-          needsConsent,
-        })
-      ) {
-        return;
-      }
-      res.redirect(`${this.frontendBaseURL()}${redirectPath}`);
+      res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
     } catch (error) {
       this.logger.error(`[Google OAuth Callback] Error:`, error);
 
@@ -444,70 +422,34 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_DELETED" ||
-          errorMessage.includes("This account has been deleted")
+          errorMessage.includes("계정이 삭제되었습니다")
         ) {
-          if (
-            this.tryRedirectToMobileCallback(req, res, {
-              error: "account_deleted",
-              message: errorMessage,
-            })
-          ) {
-            return;
-          }
           return res.redirect(
-            `${this.frontendBaseURL()}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
+            `${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
           );
         }
 
         if (
           code === "ACCOUNT_SUSPENDED" ||
-          errorMessage.includes("Your account is suspended")
+          errorMessage.includes("계정이 정지되었습니다")
         ) {
-          if (
-            this.tryRedirectToMobileCallback(req, res, {
-              error: "account_suspended",
-              message: errorMessage,
-              reason: error.response?.reason || error.reason || "",
-              until:
-                error.response?.suspensionUntil || error.suspensionUntil || "",
-            })
-          ) {
-            return;
-          }
           return res.redirect(
-            `${this.frontendBaseURL()}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
+            `${process.env.FRONTEND_URL}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
           );
         }
 
         if (
           code === "ACCOUNT_BANNED" ||
-          errorMessage.includes("permanently banned")
+          errorMessage.includes("계정이 영구 차단되었습니다")
         ) {
-          if (
-            this.tryRedirectToMobileCallback(req, res, {
-              error: "account_banned",
-              message: errorMessage,
-              reason: error.response?.reason || error.reason || "",
-            })
-          ) {
-            return;
-          }
           return res.redirect(
-            `${this.frontendBaseURL()}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
+            `${process.env.FRONTEND_URL}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
           );
         }
 
         // 기본 에러 처리
-        if (
-          this.tryRedirectToMobileCallback(req, res, {
-            error: "oauth_failed",
-            message: "Sign-in failed. Please try again.",
-          })
-        ) {
-          return;
-        }
         return res.redirect(
-          `${this.frontendBaseURL()}/login?error=oauth_failed&message=${encodeURIComponent("Sign-in failed. Please try again.")}`,
+          `${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent("로그인에 실패했습니다. 다시 시도해주세요.")}`,
         );
       }
     }
@@ -525,32 +467,14 @@ export class AuthController {
   @Get("kakao/callback")
   @UseGuards(KakaoAuthGuard)
   @ApiOperation({ summary: "카카오 로그인 콜백" })
-  async kakaoAuthRedirect(
-    @Request() req: ExpressRequest & { user?: any },
-    @Res() res: Response,
-  ) {
+  async kakaoAuthRedirect(@Request() req, @Res() res) {
     try {
-      if (!req.user || !req.user.user) {
-        this.logger.error(`[Kakao OAuth Callback] No user found in request`);
-        if (
-          this.tryRedirectToMobileCallback(req, res, {
-            error: "auth_failed",
-            message: "Sign-in failed. Please try again.",
-          })
-        ) {
-          return;
-        }
-        return res.redirect(
-          `${this.frontendBaseURL()}/login?error=auth_failed`,
-        );
-      }
-
       // HttpOnly 쿠키로 토큰들 설정
       res.cookie("access_token", req.user.access_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
+        maxAge: req.user.expires_in * 1000,
         path: "/",
       });
 
@@ -558,7 +482,7 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+        maxAge: this.getRefreshCookieMaxAge(),
         path: "/",
       });
 
@@ -574,94 +498,47 @@ export class AuthController {
 
       // 헤더가 이미 전송되었는지 확인
       if (!res.headersSent) {
-        if (
-          await this.tryRedirectToMobileOAuthSuccess(req, res, {
-            accessToken: req.user.access_token,
-            refreshToken: req.user.refresh_token,
-            userId: String(req.user.user.id),
-            provider: "kakao",
-            needsConsent,
-          })
-        ) {
-          return;
-        }
-        res.redirect(`${this.frontendBaseURL()}${redirectPath}`);
+        res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
       }
     } catch (error) {
-      this.logger.error("Error while handling Kakao login callback:", error);
+      this.logger.error("카카오 로그인 콜백 처리 중 오류 발생:", error);
 
       // 헤더가 이미 전송되었는지 확인
       if (!res.headersSent) {
         const errorMessage =
-          error.message || "Kakao sign-in failed.";
+          error.message || "카카오 로그인 처리 중 오류가 발생했습니다.";
         const code = error.response?.code || error.code;
 
         // Handle specific error codes
         if (
           code === "ACCOUNT_DELETED" ||
-          errorMessage.includes("This account has been deleted")
+          errorMessage.includes("계정이 삭제되었습니다")
         ) {
-          if (
-            this.tryRedirectToMobileCallback(req, res, {
-              error: "account_deleted",
-              message: errorMessage,
-            })
-          ) {
-            return;
-          }
           return res.redirect(
-            `${this.frontendBaseURL()}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
+            `${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
           );
         }
 
         if (
           code === "ACCOUNT_SUSPENDED" ||
-          errorMessage.includes("Your account is suspended")
+          errorMessage.includes("계정이 정지되었습니다")
         ) {
-          if (
-            this.tryRedirectToMobileCallback(req, res, {
-              error: "account_suspended",
-              message: errorMessage,
-              reason: error.response?.reason || error.reason || "",
-              until:
-                error.response?.suspensionUntil || error.suspensionUntil || "",
-            })
-          ) {
-            return;
-          }
           return res.redirect(
-            `${this.frontendBaseURL()}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
+            `${process.env.FRONTEND_URL}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
           );
         }
 
         if (
           code === "ACCOUNT_BANNED" ||
-          errorMessage.includes("permanently banned")
+          errorMessage.includes("계정이 영구 차단되었습니다")
         ) {
-          if (
-            this.tryRedirectToMobileCallback(req, res, {
-              error: "account_banned",
-              message: errorMessage,
-              reason: error.response?.reason || error.reason || "",
-            })
-          ) {
-            return;
-          }
           return res.redirect(
-            `${this.frontendBaseURL()}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
+            `${process.env.FRONTEND_URL}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
           );
         }
 
-        if (
-          this.tryRedirectToMobileCallback(req, res, {
-            error: "kakao_auth_failed",
-            message: errorMessage,
-          })
-        ) {
-          return;
-        }
         res.redirect(
-          `${this.frontendBaseURL()}/login?error=kakao_auth_failed&message=${encodeURIComponent(errorMessage)}`,
+          `${process.env.FRONTEND_URL}/login?error=kakao_auth_failed&message=${encodeURIComponent(errorMessage)}`,
         );
       }
     }
@@ -679,24 +556,13 @@ export class AuthController {
   @Get("github/callback")
   @UseGuards(GitHubAuthGuard)
   @ApiOperation({ summary: "GitHub 로그인 콜백" })
-  async githubAuthRedirect(
-    @Request() req: ExpressRequest & { user?: any },
-    @Res() res: Response,
-  ) {
+  async githubAuthRedirect(@Request() req, @Res() res) {
     try {
       // OAuth Guard가 이미 사용자를 찾았는지 확인
       if (!req.user || !req.user.user) {
         this.logger.error(`[GitHub OAuth Callback] No user found in request`);
-        if (
-          this.tryRedirectToMobileCallback(req, res, {
-            error: "auth_failed",
-            message: "Sign-in failed. Please try again.",
-          })
-        ) {
-          return;
-        }
         return res.redirect(
-          `${this.frontendBaseURL()}/login?error=auth_failed`,
+          `${process.env.FRONTEND_URL}/login?error=auth_failed`,
         );
       }
 
@@ -705,7 +571,7 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
+        maxAge: req.user.expires_in * 1000,
         path: "/",
       });
 
@@ -713,7 +579,7 @@ export class AuthController {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+        maxAge: this.getRefreshCookieMaxAge(),
         path: "/",
       });
 
@@ -726,18 +592,7 @@ export class AuthController {
 
       // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
       const redirectPath = needsConsent ? "/consent" : "/";
-      if (
-        await this.tryRedirectToMobileOAuthSuccess(req, res, {
-          accessToken: req.user.access_token,
-          refreshToken: req.user.refresh_token,
-          userId: String(req.user.user.id),
-          provider: "github",
-          needsConsent,
-        })
-      ) {
-        return;
-      }
-      res.redirect(`${this.frontendBaseURL()}${redirectPath}`);
+      res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
     } catch (error) {
       this.logger.error(`[GitHub OAuth Callback] Error:`, error);
 
@@ -754,70 +609,34 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_DELETED" ||
-          errorMessage.includes("This account has been deleted")
+          errorMessage.includes("계정이 삭제되었습니다")
         ) {
-          if (
-            this.tryRedirectToMobileCallback(req, res, {
-              error: "account_deleted",
-              message: errorMessage,
-            })
-          ) {
-            return;
-          }
           return res.redirect(
-            `${this.frontendBaseURL()}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
+            `${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
           );
         }
 
         if (
           code === "ACCOUNT_SUSPENDED" ||
-          errorMessage.includes("Your account is suspended")
+          errorMessage.includes("계정이 정지되었습니다")
         ) {
-          if (
-            this.tryRedirectToMobileCallback(req, res, {
-              error: "account_suspended",
-              message: errorMessage,
-              reason: error.response?.reason || error.reason || "",
-              until:
-                error.response?.suspensionUntil || error.suspensionUntil || "",
-            })
-          ) {
-            return;
-          }
           return res.redirect(
-            `${this.frontendBaseURL()}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
+            `${process.env.FRONTEND_URL}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
           );
         }
 
         if (
           code === "ACCOUNT_BANNED" ||
-          errorMessage.includes("permanently banned")
+          errorMessage.includes("계정이 영구 차단되었습니다")
         ) {
-          if (
-            this.tryRedirectToMobileCallback(req, res, {
-              error: "account_banned",
-              message: errorMessage,
-              reason: error.response?.reason || error.reason || "",
-            })
-          ) {
-            return;
-          }
           return res.redirect(
-            `${this.frontendBaseURL()}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
+            `${process.env.FRONTEND_URL}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
           );
         }
 
         // 기본 에러 처리
-        if (
-          this.tryRedirectToMobileCallback(req, res, {
-            error: "oauth_failed",
-            message: "Sign-in failed. Please try again.",
-          })
-        ) {
-          return;
-        }
         return res.redirect(
-          `${this.frontendBaseURL()}/login?error=oauth_failed&message=${encodeURIComponent("Sign-in failed. Please try again.")}`,
+          `${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent("로그인에 실패했습니다. 다시 시도해주세요.")}`,
         );
       }
     }
@@ -834,7 +653,7 @@ export class AuthController {
       await this.emailService.sendVerificationCode(dto.email);
       return res.json({
         success: true,
-        message: "A verification code has been sent. Please check your email.",
+        message: "인증 코드가 발송되었습니다. 이메일을 확인해주세요.",
       });
     } catch (error) {
       if (error.status === 409) {
@@ -853,7 +672,7 @@ export class AuthController {
       }
       return res.status(500).json({
         success: false,
-        message: "Failed to send the verification code.",
+        message: "인증 코드 발송에 실패했습니다.",
       });
     }
   }
@@ -870,7 +689,7 @@ export class AuthController {
         success: true,
         verified: result.verified,
         sessionToken: result.sessionToken,
-        message: "Your email has been verified.",
+        message: "이메일 인증이 완료되었습니다.",
       });
     } catch (error) {
       if (error.status === 401 || error.status === 400) {
@@ -881,7 +700,7 @@ export class AuthController {
       }
       return res.status(500).json({
         success: false,
-        message: "Failed to verify the code.",
+        message: "인증 코드 검증에 실패했습니다.",
       });
     }
   }
@@ -896,7 +715,7 @@ export class AuthController {
       await this.emailService.resendVerificationCode(dto.email);
       return res.json({
         success: true,
-        message: "A new verification code has been sent. Please check your email.",
+        message: "인증 코드가 재발송되었습니다. 이메일을 확인해주세요.",
       });
     } catch (error) {
       if (error.status === 400) {
@@ -907,13 +726,14 @@ export class AuthController {
       }
       return res.status(500).json({
         success: false,
-        message: "Failed to resend the verification code.",
+        message: "인증 코드 재발송에 실패했습니다.",
       });
     }
   }
 
   @Post("refresh")
   @Public()
+  @UseGuards(CsrfGuard)
   @ApiOperation({ summary: "토큰 갱신" })
   @ApiResponse({ status: 200, description: "토큰 갱신 성공" })
   @ApiResponse({ status: 401, description: "유효하지 않은 토큰" })
@@ -926,17 +746,20 @@ export class AuthController {
       req.cookies?.refresh_token || body?.refreshToken || body?.refresh_token;
 
     if (!refreshToken) {
-      return res.status(401).json({ message: "Refresh token not found." });
+      return res.status(401).json({ message: "Refresh token not found" });
     }
 
-    const authResponse = await this.authService.refreshTokens(refreshToken);
+    const authResponse = await this.authService.refreshTokens(
+      refreshToken,
+      this.getRefreshSessionContext(req),
+    );
 
     // 새로운 토큰들을 쿠키에 설정
     res.cookie("access_token", authResponse.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
+      maxAge: authResponse.expires_in * 1000,
       path: "/",
     });
 
@@ -944,7 +767,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+      maxAge: this.getRefreshCookieMaxAge(),
       path: "/",
     });
 
@@ -956,7 +779,7 @@ export class AuthController {
 
     return res.json({
       user: authResponse.user,
-      message: "Session refreshed successfully.",
+      message: "토큰이 갱신되었습니다.",
       ...(includeTokens && {
         access_token: authResponse.access_token,
         refresh_token: authResponse.refresh_token,
@@ -971,34 +794,30 @@ export class AuthController {
   @ApiOperation({ summary: "현재 사용자 정보 조회" })
   @ApiResponse({ status: 200, description: "사용자 정보 조회 성공" })
   async getCurrentUser(@CurrentUser() user: any) {
-    // 핵심 변경점:
-    // 과거에는 여기서 response 객체를 직접 조립했지만,
-    // 현재는 UsersService.getAuthContextRaw()가 동일한 응답 스키마를 조립한다.
-    const fullUser = await this.usersService.getAuthContextRaw(user.id);
+    // UsersService를 통해 CDN URL이 적용된 사용자 정보 가져오기
+    const fullUser = await this.usersService.findOne(user.id);
 
     if (!fullUser) {
-      // 예외 대비 fallback:
-      // DB 조회 결과가 비어도 프론트 auth 흐름이 깨지지 않도록 JWT payload 기반 최소 응답을 유지한다.
       const fallbackResponse = {
         id: user.id,
-        email: user.email ?? null,
-        username: user.username ?? null,
-        role: user.role ?? null,
-        profileImage: user.profileImage ?? null,
-        isEmailVerified: user.isEmailVerified ?? false,
-        authProvider: user.authProvider ?? AuthProvider.LOCAL, // 최초 가입 방법 (계정 관리용)
-        lastLoginProvider: user.lastLoginProvider ?? null, // 현재 로그인 방법 (계정 삭제 UX용)
-        subscriptionTier: user.subscriptionTier ?? null,
-        subscriptionStatus: user.subscriptionStatus ?? null,
-        bio: user.bio ?? null,
-        blogSlug: user.blogSlug || user.blog?.slug || null,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        profileImage: user.profileImage,
+        isEmailVerified: user.isEmailVerified,
+        authProvider: user.authProvider, // 최초 가입 방법 (계정 관리용)
+        lastLoginProvider: user.lastLoginProvider, // 현재 로그인 방법 (계정 삭제 UX용)
+        subscriptionTier: user.subscriptionTier,
+        subscriptionStatus: user.subscriptionStatus,
+        bio: user.bio,
+        blogSlug: user.blog?.slug || null,
         jobTitle: user.jobTitle || null,
-        termsAcceptedAt: user.termsAcceptedAt ?? null,
-        privacyAcceptedAt: user.privacyAcceptedAt ?? null,
-        marketingOptIn: user.marketingOptIn ?? false,
-        newsletterOptIn: user.newsletterOptIn ?? false,
+        termsAcceptedAt: user.termsAcceptedAt,
+        privacyAcceptedAt: user.privacyAcceptedAt,
+        marketingOptIn: user.marketingOptIn,
+        newsletterOptIn: user.newsletterOptIn,
         socialLinks: user.socialLinks ?? [],
-        createdAt: user.createdAt ?? null,
+        createdAt: user.createdAt,
       };
 
       this.logger.debug(
@@ -1007,58 +826,92 @@ export class AuthController {
       return fallbackResponse;
     }
 
+    // 보안을 위해 공개 정보만 반환 (CDN URL 적용됨)
+    const response = {
+      id: fullUser.id,
+      email: fullUser.email,
+      username: fullUser.username,
+      role: fullUser.role,
+      profileImage: fullUser.profileImage, // ✅ CDN URL로 변환됨
+      isEmailVerified: fullUser.isEmailVerified,
+      authProvider: fullUser.authProvider, // 최초 가입 방법 (계정 관리용)
+      lastLoginProvider: fullUser.lastLoginProvider, // 현재 로그인 방법 (계정 삭제 UX용)
+      subscriptionTier: fullUser.subscriptionTier,
+      subscriptionStatus: fullUser.subscriptionStatus,
+      bio: fullUser.bio,
+      jobTitle: fullUser.jobTitle,
+      socialLinks: fullUser.socialLinks ?? [],
+      blogSlug: fullUser.blog?.slug || null,
+      termsAcceptedAt: fullUser.termsAcceptedAt, // 약관 동의 시각
+      privacyAcceptedAt: fullUser.privacyAcceptedAt, // 개인정보 동의 시각
+      marketingOptIn: fullUser.marketingOptIn, // 마케팅 정보 수신 동의
+      newsletterOptIn: fullUser.newsletterOptIn, // 뉴스레터 수신 동의
+      createdAt: fullUser.createdAt,
+    };
+
     this.logger.debug(
-      `[/auth/me] Response for ${fullUser.email} - authProvider: ${fullUser.authProvider}, lastLoginProvider: ${fullUser.lastLoginProvider}`,
+      `[/auth/me] Response for ${fullUser.email} - authProvider: ${response.authProvider}, lastLoginProvider: ${response.lastLoginProvider}`,
     );
-    // getAuthContextRaw()에서 이미 profileImage CDN 변환/소셜링크 정규화까지 완료된 상태다.
-    return fullUser;
+    return response;
+  }
+
+  @Get("sessions")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "현재 사용자의 Refresh Session 목록" })
+  async listSessions(@CurrentUser() user: User) {
+    return this.authService.listRefreshSessions(user.id);
+  }
+
+  @Delete("sessions/:id")
+  @UseGuards(JwtAuthGuard, CsrfGuard)
+  @ApiOperation({ summary: "특정 Refresh Session 폐기" })
+  async revokeSession(
+    @CurrentUser() user: User,
+    @Param("id", new ParseUUIDPipe()) sessionId: string,
+  ) {
+    await this.authService.revokeRefreshSession(user.id, sessionId);
+    return { message: "세션이 폐기되었습니다." };
+  }
+
+  @Post("sessions/revoke-all")
+  @UseGuards(JwtAuthGuard, CsrfGuard)
+  @ApiOperation({ summary: "모든 Refresh Session 폐기" })
+  async revokeAllSessions(@CurrentUser() user: User) {
+    await this.authService.revokeAllRefreshSessions(user.id);
+    return { message: "모든 세션이 폐기되었습니다." };
   }
 
   @Post("logout")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CsrfGuard)
   @ApiOperation({ summary: "로그아웃" })
   @ApiResponse({ status: 200, description: "로그아웃 성공" })
-  async logout(@CurrentUser() user: any, @Res() res: Response) {
-    const accountId = user.id;
+  async logout(
+    @CurrentUser() user: any,
+    @Req() req: ExpressRequest,
+    @Res() res: Response,
+  ) {
     this.logger.log(
-      `[Logout] 로그아웃 시작 - accountId: ${accountId}, email: ${user.email}`,
+      `[Logout] 로그아웃 시작 - userId: ${user.id}, email: ${user.email}`,
     );
 
-    await this.authService.logout(accountId);
-
-    // GPT App/Claude 커넥터 등 OAuth 기반 MCP 세션도 동시에 끊는다.
-    // (웹 로그아웃 후에도 커넥터가 같은 계정으로 남아있는 문제 방지)
-    try {
-      await this.revokeMcpOAuthTokens(accountId);
-      this.logger.log(
-        `[Logout] MCP OAuth tokens revoked - accountId: ${accountId}`,
-      );
-    } catch (error: any) {
-      this.logger.warn(
-        `[Logout] MCP OAuth revoke skipped/failed - accountId: ${accountId}, reason: ${error?.message || "unknown"}`,
-      );
-    }
+    await this.authService.logout(user.id, req.cookies?.refresh_token);
 
     // 웹 세션 삭제 (MCP 세션도 무효화되도록)
     try {
       // 웹 세션 삭제
-      await this.redisService.deleteCache("sessions", `user:${accountId}`);
+      await this.redisService.deleteCache("sessions", `user:${user.id}`);
 
-      // JWT validation 캐시 삭제 (JwtStrategy 키 규칙과 일치)
-      await this.redisService.invalidatePattern(
-        `sessions:user_validate_${accountId}_*`,
-      );
-      // 레거시 키도 함께 정리 (하위 호환)
+      // JWT validation 캐시 삭제 (JwtStrategy가 사용)
       await this.redisService.deleteCache(
         "sessions",
-        `user_validate_${accountId}`,
+        `user_validate_${user.id}`,
       );
 
       // 해당 사용자의 모든 MCP 세션 찾아서 삭제
       // MCP 세션은 mcp:sessions:* 패턴으로 저장되어 있고, 세션 데이터에 userId가 포함됨
       // 여기서는 간단히 웹 세션만 삭제하고, MCP 세션은 검증 시 자동으로 무효화됨
       this.logger.debug(
-        `웹 세션 및 JWT validation 캐시 삭제: accountId=${accountId}`,
+        `웹 세션 및 JWT validation 캐시 삭제: userId=${user.id}`,
       );
     } catch (error) {
       this.logger.error(`세션 삭제 실패: ${error.message}`);
@@ -1082,9 +935,9 @@ export class AuthController {
       path: "/",
     });
 
-    this.logger.log(`[Logout] 로그아웃 완료 - accountId: ${accountId}`);
+    this.logger.log(`[Logout] 로그아웃 완료 - userId: ${user.id}`);
 
-    return res.json({ message: "Signed out successfully." });
+    return res.json({ message: "로그아웃되었습니다." });
   }
 
   @Post("check-email")
@@ -1107,7 +960,7 @@ export class AuthController {
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "Failed to check the email address.",
+        message: "이메일 확인 중 오류가 발생했습니다.",
       });
     }
   }
@@ -1131,10 +984,10 @@ export class AuthController {
       // 보안: 계정 존재 여부와 관계없이 동일한 응답
       return res.json({
         success: true,
-        message: "If that email is registered, a password reset link will be sent.",
+        message: "이메일이 등록되어 있다면 비밀번호 재설정 링크가 발송됩니다.",
       });
     } catch (error) {
-      if (error.message?.includes("Social sign-in")) {
+      if (error.message?.includes("소셜 로그인")) {
         return res.status(400).json({
           success: false,
           message: error.message,
@@ -1144,7 +997,7 @@ export class AuthController {
       // 다른 에러도 보안상 동일한 메시지
       return res.json({
         success: true,
-        message: "If that email is registered, a password reset link will be sent.",
+        message: "이메일이 등록되어 있다면 비밀번호 재설정 링크가 발송됩니다.",
       });
     }
   }
@@ -1187,12 +1040,12 @@ export class AuthController {
 
       return res.json({
         success: true,
-        message: "Your password has been updated.",
+        message: "비밀번호가 성공적으로 변경되었습니다.",
       });
     } catch (error) {
       return res.status(400).json({
         success: false,
-        message: error.message || "Failed to reset the password.",
+        message: error.message || "비밀번호 재설정에 실패했습니다.",
       });
     }
   }
@@ -1207,7 +1060,7 @@ export class AuthController {
    * - 소셜 로그인 계정은 불가
    */
   @Post("change-password")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CsrfGuard)
   @ApiOperation({ summary: "비밀번호 변경 (로그인한 사용자)" })
   @ApiResponse({ status: 200, description: "비밀번호 변경 성공" })
   @ApiResponse({ status: 400, description: "잘못된 요청" })
@@ -1229,7 +1082,7 @@ export class AuthController {
 
       return res.json({
         success: true,
-        message: "Your password has been updated.",
+        message: "비밀번호가 성공적으로 변경되었습니다.",
       });
     } catch (error) {
       // 상태 코드 결정
@@ -1237,13 +1090,13 @@ export class AuthController {
 
       return res.status(statusCode).json({
         success: false,
-        message: error.message || "Failed to change the password.",
+        message: error.message || "비밀번호 변경에 실패했습니다.",
       });
     }
   }
 
   @Delete("account")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CsrfGuard)
   @ApiOperation({ summary: "계정 탈퇴" })
   @ApiResponse({ status: 200, description: "계정 삭제 성공" })
   @ApiResponse({ status: 400, description: "잘못된 요청" })
@@ -1253,7 +1106,6 @@ export class AuthController {
     @Body() dto: DeleteAccountDto,
     @Res() res: Response,
   ) {
-    const accountId = user.id;
     /**
      * UX 개선: 현재 세션의 로그인 방법 기준으로 비밀번호 확인
      *
@@ -1273,7 +1125,7 @@ export class AuthController {
       if (!dto.password) {
         return res.status(400).json({
           success: false,
-          message: "Enter your password to confirm account deletion.",
+          message: "비밀번호를 입력해주세요.",
         });
       }
 
@@ -1285,7 +1137,7 @@ export class AuthController {
       if (!validUser) {
         return res.status(401).json({
           success: false,
-          message: "The password you entered is incorrect.",
+          message: "비밀번호가 일치하지 않습니다.",
         });
       }
     }
@@ -1293,26 +1145,19 @@ export class AuthController {
 
     try {
       // 1. 즉시 소프트 삭제 실행 (개인정보 마스킹 + 로그인 차단)
-      await this.usersService.softDelete(accountId);
-      this.logger.log(`User ${accountId} soft deleted, personal data masked`);
+      await this.usersService.softDelete(user.id);
+      this.logger.log(`User ${user.id} soft deleted, personal data masked`);
 
       // 2. 180일 후 자동 완전 삭제 (DataRetentionService가 매일 자정 처리)
       // scheduledDeletionAt이 account_settings 테이블에 저장됨
       this.logger.log(
-        `User ${accountId} scheduled for permanent deletion in 180 days`,
+        `User ${user.id} scheduled for permanent deletion in 180 days`,
       );
 
       // 3. 웹 세션 삭제 (MCP 세션도 무효화되도록)
       try {
-        await this.redisService.deleteCache("sessions", `user:${accountId}`);
-        await this.redisService.invalidatePattern(
-          `sessions:user_validate_${accountId}_*`,
-        );
-        await this.redisService.deleteCache(
-          "sessions",
-          `user_validate_${accountId}`,
-        );
-        this.logger.debug(`Session deleted for user ${accountId}`);
+        await this.redisService.deleteCache("sessions", `user:${user.id}`);
+        this.logger.debug(`Session deleted for user ${user.id}`);
       } catch (error) {
         this.logger.error(`Failed to delete session: ${error.message}`);
       }
@@ -1336,22 +1181,19 @@ export class AuthController {
       return res.json({
         success: true,
         message:
-          "Your account deletion request has been accepted. Personal data has been masked immediately, and retained records will be removed after the applicable retention periods.",
+          "계정 삭제가 요청되었습니다. 개인정보는 즉시 마스킹되었으며, 관련 데이터는 법적 보관 기간 후 자동으로 삭제됩니다.",
         deletedAt: new Date().toISOString(),
         info: {
           personalDataMasked: true,
           backgroundDeletionQueued: true,
-          legalRetentionPeriod: "Payment records: 5 years, dispute records: 3 years, messages: 30 days",
+          legalRetentionPeriod: "결제 기록: 5년, 분쟁 기록: 3년, 메시지: 30일",
         },
       });
     } catch (error) {
-      this.logger.error(
-        `Account deletion failed for user ${accountId}:`,
-        error,
-      );
+      this.logger.error(`Account deletion failed for user ${user.id}:`, error);
       return res.status(400).json({
         success: false,
-        message: error.message || "Failed to delete the account.",
+        message: error.message || "계정 삭제 중 오류가 발생했습니다.",
       });
     }
   }
@@ -1362,14 +1204,14 @@ export class AuthController {
    * MCP OAuth 로그인 페이지
    *
    * MCP Proxy Server에서 OAuth 인증 시작 시 사용자를 이 URL로 리다이렉트
-   * 이미 로그인된 사용자는 Frontend 승인 화면으로 전달
+   * 이미 로그인된 사용자는 바로 MCP Proxy callback으로 전달
    * 로그인되지 않은 사용자는 로그인 페이지로 리다이렉트
    *
    * 쿼리 파라미터:
    * - state: MCP OAuth 세션 상태
    * - client_name: 연결하려는 클라이언트 이름 (예: "Claude")
    * - scope: 요청 스코프
-   * - callback_url: MCP Proxy의 콜백 URL
+   * 콜백 URL은 서버의 MCP_BASE_URL 설정에서만 파생됩니다.
    */
   @Get("oauth/mcp/login")
   @Public()
@@ -1378,62 +1220,59 @@ export class AuthController {
     @Query("state") state: string,
     @Query("client_name") clientName: string,
     @Query("scope") scope: string,
-    @Query("callback_url") callbackUrl: string,
-    @Query("force_login") forceLoginParam: string,
     @Request() req,
     @Res() res: Response,
   ) {
-    const forceLogin = forceLoginParam === "true" || forceLoginParam === "1";
-
     this.logger.debug(
       {
         state: state?.substring(0, 8),
         clientName,
         scope,
-        forceLogin,
       },
       "🔐 MCP OAuth login request",
     );
 
     // 필수 파라미터 검증
-    if (!state || !callbackUrl) {
+    if (!state) {
       return res.status(400).json({
         error: "invalid_request",
-        error_description: "Missing required parameters: state, callback_url",
+        error_description: "Missing required parameter: state",
       });
     }
 
-    // force_login=true가 아닌 경우에만 기존 브라우저 세션(access_token 쿠키)을 재사용.
-    // - 기본 동작: 이미 로그인된 유저는 승인 화면으로 바로 진행
-    // - force_login=true: 계정 전환/재인증을 위해 로그인 화면으로 강제 이동
+    let callbackUrl: string;
+    try {
+      callbackUrl = this.getMcpOAuthCallbackUrl();
+    } catch (error) {
+      this.logger.error(`MCP OAuth configuration error: ${error.message}`);
+      return res.status(503).json({
+        error: "temporarily_unavailable",
+        error_description: "MCP OAuth is not configured",
+      });
+    }
+
+    // 쿠키에서 access_token 확인 (이미 로그인된 사용자)
     const accessToken = req.cookies?.access_token;
-    if (!forceLogin && accessToken) {
+
+    if (accessToken) {
       try {
         // JWT 검증하여 사용자 정보 추출
         const user = await this.authService.validateAccessToken(accessToken);
 
         if (user) {
-          // 이미 로그인된 사용자 - Frontend 승인 화면으로 리다이렉트
+          // 이미 로그인된 사용자 - MCP Proxy callback으로 리다이렉트
           this.logger.log(
-            `✅ MCP OAuth - Already logged in, redirecting to consent, userId: ${user.id.substring(0, 8)}, clientName: ${clientName}`,
+            `✅ MCP OAuth - Already logged in, userId: ${user.id.substring(0, 8)}, clientName: ${clientName}`,
           );
 
-          const consentUrl = new URL(
-            `${this.frontendBaseURL()}/auth/mcp-consent`,
+          const redirectUrl = new URL(callbackUrl);
+          redirectUrl.searchParams.set("state", state);
+          redirectUrl.searchParams.set(
+            "grant",
+            this.issueMcpOAuthGrant(user.id, state),
           );
-          consentUrl.searchParams.set("mcp_oauth", "true");
-          consentUrl.searchParams.set("state", state);
-          consentUrl.searchParams.set(
-            "client_name",
-            clientName || "MCP Client",
-          );
-          consentUrl.searchParams.set(
-            "scope",
-            scope || "mcp:tools mcp:read mcp:write",
-          );
-          consentUrl.searchParams.set("callback_url", callbackUrl);
 
-          return res.redirect(consentUrl.toString());
+          return res.redirect(redirectUrl.toString());
         }
       } catch (error) {
         // 토큰 검증 실패 - 로그인 페이지로 이동
@@ -1443,21 +1282,15 @@ export class AuthController {
 
     // 로그인되지 않은 사용자 - Frontend 로그인 페이지로 리다이렉트
     // MCP OAuth 파라미터를 쿼리스트링으로 전달
-    const frontendLoginUrl = new URL(`${this.frontendBaseURL()}/login`);
+    const frontendLoginUrl = new URL(`${process.env.FRONTEND_URL}/login`);
     frontendLoginUrl.searchParams.set("mcp_oauth", "true");
     frontendLoginUrl.searchParams.set("state", state);
     frontendLoginUrl.searchParams.set(
       "client_name",
       clientName || "MCP Client",
     );
-    frontendLoginUrl.searchParams.set(
-      "scope",
-      scope || "mcp:tools mcp:read mcp:write",
-    );
+    frontendLoginUrl.searchParams.set("scope", scope || "mcp:tools");
     frontendLoginUrl.searchParams.set("callback_url", callbackUrl);
-    if (forceLogin) {
-      frontendLoginUrl.searchParams.set("force_login", "1");
-    }
 
     this.logger.debug(
       { frontendLoginUrl: frontendLoginUrl.toString() },
@@ -1473,16 +1306,16 @@ export class AuthController {
    * 이 엔드포인트는 로그인된 사용자만 호출 가능
    */
   @Post("oauth/mcp/complete")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CsrfGuard)
   @ApiOperation({ summary: "MCP OAuth 로그인 완료 (Frontend에서 호출)" })
   async mcpOAuthComplete(
-    @Body() body: { state: string; callback_url: string },
+    @Body() body: { state: string },
     @CurrentUser() user: User,
     @Res() res: Response,
   ) {
-    const { state, callback_url } = body;
+    const { state } = body;
 
-    if (!state || !callback_url) {
+    if (!state) {
       return res.status(400).json({
         error: "invalid_request",
         error_description: "Missing required parameters",
@@ -1496,7 +1329,7 @@ export class AuthController {
       return res.status(403).json({
         error: "consent_required",
         code: "CONSENT_REQUIRED",
-        message: "Required terms consent is still missing.",
+        message: "필수 약관 동의가 필요합니다.",
       });
     }
 
@@ -1505,9 +1338,12 @@ export class AuthController {
     );
 
     // MCP Proxy callback URL 생성
-    const redirectUrl = new URL(callback_url);
+    const redirectUrl = new URL(this.getMcpOAuthCallbackUrl());
     redirectUrl.searchParams.set("state", state);
-    redirectUrl.searchParams.set("user_id", user.id);
+    redirectUrl.searchParams.set(
+      "grant",
+      this.issueMcpOAuthGrant(user.id, state),
+    );
 
     return res.json({
       success: true,
@@ -1520,7 +1356,7 @@ export class AuthController {
    * 소셜 로그인 사용자가 최초 로그인 시 필수 약관 동의를 받은 후 호출
    */
   @Post("consent")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CsrfGuard)
   @ApiOperation({ summary: "OAuth 로그인 후 약관 동의 완료" })
   @ApiResponse({
     status: 200,
@@ -1529,7 +1365,7 @@ export class AuthController {
       type: "object",
       properties: {
         success: { type: "boolean", example: true },
-        message: { type: "string", example: "Required consent has been recorded." },
+        message: { type: "string", example: "약관 동의가 완료되었습니다." },
       },
     },
   })
@@ -1544,47 +1380,14 @@ export class AuthController {
 
       return res.status(200).json({
         success: true,
-        message: "Required consent has been recorded.",
+        message: "약관 동의가 완료되었습니다.",
       });
     } catch (error) {
       this.logger.error(`Consent update failed for user ${user.id}:`, error);
       return res.status(400).json({
         success: false,
-        message: error.message || "Failed to record the required consent.",
+        message: error.message || "약관 동의 처리 중 오류가 발생했습니다.",
       });
     }
-  }
-
-  @Post("cookie-consent")
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "Record cookie consent preferences" })
-  @ApiResponse({ status: 200, description: "Cookie consent recorded" })
-  async recordCookieConsent(
-    @CurrentUser() user: User,
-    @Body() consentDto: CookieConsentDto,
-    @Req() req: ExpressRequest,
-  ) {
-    const rawUserAgent = req.headers["user-agent"];
-    const userAgent = Array.isArray(rawUserAgent) ? rawUserAgent[0] : rawUserAgent;
-    const sessionId =
-      req.cookies?.["connect.sid"] ||
-      req.cookies?.session ||
-      req.cookies?.access_token ||
-      undefined;
-
-    await this.authService.recordCookieConsent(
-      user.id,
-      consentDto,
-      {
-        userId: user.id,
-        ipAddress: req.ip || req.socket?.remoteAddress,
-        userAgent,
-        sessionId,
-      },
-    );
-
-    return {
-      success: true,
-    };
   }
 }

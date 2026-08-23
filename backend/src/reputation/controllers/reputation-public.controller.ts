@@ -12,6 +12,7 @@ import { Controller, Get, Param, ParseUUIDPipe, Logger } from "@nestjs/common";
 import { AggregatorService } from "../services/aggregator.service";
 import { getUserLevel, UserLevel } from "../enums/title-code.enum";
 import { ReputationPeriod } from "../enums/reputation-period.enum";
+import { Public } from "../../common/decorators/public.decorator";
 
 /**
  * 사용자 레벨 응답 DTO
@@ -24,6 +25,7 @@ interface UserLevelResponse {
 }
 
 @Controller("reputation")
+@Public()
 export class ReputationPublicController {
   private readonly logger = new Logger(ReputationPublicController.name);
 

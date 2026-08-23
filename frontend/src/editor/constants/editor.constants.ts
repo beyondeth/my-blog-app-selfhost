@@ -17,8 +17,8 @@ export const IMAGE_UPLOAD_CONFIG = {
   MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
   MAX_FILES: 10, // 최대 10개 이미지
   MAX_TOTAL_SIZE: 50 * 1024 * 1024, // 50MB (10개 * 5MB)
-  ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-  ALLOWED_EXTENSIONS: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
+  ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
+  ALLOWED_EXTENSIONS: ['.jpg', '.jpeg', '.png', '.webp'],
   API_ENDPOINT: '/api/v1/upload/image',
 } as const;
 

@@ -8,6 +8,7 @@ import JoinButton from './JoinButton';
 import type { Community } from '@/types/community';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useRouter } from 'next/navigation';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface CommunityCardProps {
   community: Community;
@@ -45,6 +46,7 @@ const CommunityCard = React.memo(function CommunityCard({
       (community.creatorId && user?.id && community.creatorId === user.id)
   );
   const iconFit = community.iconImageFit ?? 'contain';
+  const iconUrl = community.iconUrl ? normalizeImageUrl(community.iconUrl) : '';
   const getIconContainerClasses = (size: 'sm' | 'md') =>
     cn(
       'flex-shrink-0 flex items-center justify-center rounded-full overflow-hidden',
@@ -69,11 +71,11 @@ const CommunityCard = React.memo(function CommunityCard({
       >
         {/* 아이콘 */}
         <div className={getIconContainerClasses('sm')}>
-          {community.iconUrl ? (
+          {iconUrl ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={community.iconUrl}
+                src={iconUrl}
                 alt={community.name}
                 className={cn('w-full h-full', iconImageClass)}
               />
@@ -119,11 +121,11 @@ const CommunityCard = React.memo(function CommunityCard({
         {/* 아이콘 */}
         <Link href={`/c/${community.slug}`} className="flex-shrink-0">
           <div className={getIconContainerClasses('md')}>
-            {community.iconUrl ? (
+            {iconUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={community.iconUrl}
+                  src={iconUrl}
                   alt={community.name}
                   className={cn('w-full h-full', iconImageClass)}
                 />

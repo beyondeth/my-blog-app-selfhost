@@ -72,7 +72,7 @@ export default function ValueSection() {
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-black dark:text-white mb-6">
             왜{' '}
             <span className="bg-gradient-to-r from-cyan-500 to-purple-500 bg-clip-text text-transparent">
-              Codebase.blog
+              Aigory
             </span>
             인가?
           </h2>

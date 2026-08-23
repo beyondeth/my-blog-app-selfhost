@@ -110,8 +110,11 @@ export class FilesAPI {
 
       // 3. 업로드 완료 알림
       const completeData: UploadCompleteDto = {
+        tempId: presignedResponse.tempId,
         fileKey: presignedResponse.fileKey,
-        fileUrl: `https://myblogdata84.s3.us-east-1.amazonaws.com/${presignedResponse.fileKey}`,
+        // 백엔드가 storage provider에 맞는 accessUrl을 생성하므로
+        // provider-specific public URL을 프론트에서 조립하지 않는다.
+        fileUrl: presignedResponse.fileKey,
         fileName: file.name,
         mimeType: file.type,
         fileSize: file.size,

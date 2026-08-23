@@ -13,7 +13,6 @@ import { AccountSettings } from "./entities/account-settings.entity";
 import { UserIdentity } from "./entities/user-identity.entity";
 import { UserDeletionLog } from "./entities/user-deletion-log.entity";
 import { UserDeletionService } from "./services/user-deletion.service";
-import { UserDeletionDebugService } from "./services/user-deletion-debug.service";
 import { DataRetentionService } from "./services/data-retention.service";
 import { IdentityService } from "./services/identity.service";
 import { File } from "../files/entities/file.entity";
@@ -26,6 +25,7 @@ import { EmailApproval } from "../email/entities/email-approval.entity";
 import { EmailModule } from "../email/email.module";
 import { FilesModule } from "../files/files.module";
 import { AuditModule } from "../audit/audit.module";
+import { RefreshSession } from "../auth/entities/refresh-session.entity";
 
 @Module({
   imports: [
@@ -43,6 +43,7 @@ import { AuditModule } from "../audit/audit.module";
       Comment,
       Report,
       Follow,
+      RefreshSession,
     ]),
     EventEmitterModule,
     forwardRef(() => EmailModule),
@@ -54,7 +55,6 @@ import { AuditModule } from "../audit/audit.module";
     UsersCommandService,
     UsersService,
     UserDeletionService,
-    UserDeletionDebugService,
     DataRetentionService,
     IdentityService,
   ],
@@ -64,7 +64,6 @@ import { AuditModule } from "../audit/audit.module";
     UsersCommandService,
     UsersService,
     UserDeletionService,
-    UserDeletionDebugService,
     DataRetentionService,
     IdentityService,
   ],

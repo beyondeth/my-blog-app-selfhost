@@ -1,8 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
-import { Strategy } from "passport-github2";
+import { Strategy, type StrategyOptions } from "passport-github2";
 import { ConfigService } from "@nestjs/config";
 import { AuthService } from "../auth.service";
+import {
+  isDefaultOAuthCallback,
+  isPlaceholderValue,
+  isProductionEnvironment,
+} from "../../config/environment.config";
 
 @Injectable()
 export class GitHubStrategy extends PassportStrategy(Strategy, "github") {
@@ -12,26 +17,50 @@ export class GitHubStrategy extends PassportStrategy(Strategy, "github") {
   ) {
     const clientID = configService.get("GITHUB_CLIENT_ID");
     const clientSecret = configService.get("GITHUB_CLIENT_SECRET");
+    const callbackURL = configService.get("GITHUB_CALLBACK_URL");
+    const isProduction = isProductionEnvironment();
+    const hasAnySetting =
+      [clientID, clientSecret].some((value) => Boolean(value?.trim())) ||
+      (Boolean(callbackURL?.trim()) &&
+        !isPlaceholderValue(callbackURL) &&
+        !isDefaultOAuthCallback(callbackURL, "github"));
+    const isConfigured =
+      !isPlaceholderValue(clientID) &&
+      !isPlaceholderValue(clientSecret) &&
+      !isPlaceholderValue(callbackURL) &&
+      (!isProduction || !isDefaultOAuthCallback(callbackURL, "github"));
 
-    // Use dummy values if not configured to prevent startup errors
-    super({
-      clientID: clientID || "dummy-client-id",
-      clientSecret: clientSecret || "dummy-client-secret",
-      callbackURL:
-        configService.get("GITHUB_CALLBACK_URL") ||
-        "http://localhost:3000/api/v1/auth/github/callback",
-      // GitHub OAuth 계정 선택 화면을 강제한다.
-      authorizationURL:
-        "https://github.com/login/oauth/authorize?prompt=select_account",
+    if (isProduction && hasAnySetting && !isConfigured) {
+      throw new Error(
+        "GitHub OAuth configuration is partial or uses a placeholder; provide GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and GITHUB_CALLBACK_URL together",
+      );
+    }
+
+    const strategyOptions = {
+      clientID:
+        clientID ||
+        (isProduction
+          ? "disabled-github-provider"
+          : "development-github-client-id"),
+      clientSecret:
+        clientSecret ||
+        (isProduction
+          ? "disabled-github-provider"
+          : "development-github-client-secret"),
+      ...(callbackURL || !isProduction
+        ? {
+            callbackURL:
+              callbackURL ||
+              "http://localhost:3000/api/v1/auth/github/callback",
+          }
+        : {}),
       scope: ["user:email"], // Request email scope to get user's email
-    });
+    } as unknown as StrategyOptions;
+
+    super(strategyOptions as any);
 
     // Store whether GitHub OAuth is properly configured
-    this.isConfigured = !!(
-      clientID &&
-      clientSecret &&
-      clientID !== "your-github-client-id"
-    );
+    this.isConfigured = isConfigured;
   }
 
   private isConfigured: boolean;

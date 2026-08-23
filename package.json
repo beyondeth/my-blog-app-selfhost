@@ -1,15 +1,24 @@
 {
-	"dependencies": {
-		"@hookform/resolvers": "^5.1.1",
-		"@radix-ui/react-alert-dialog": "^1.1.14",
-		"@radix-ui/react-dialog": "^1.1.14",
-		"@tanstack/query-sync-storage-persister": "^5.81.2",
-		"@tanstack/react-query": "^5.81.2",
-		"@tanstack/react-query-persist-client": "^5.81.2",
-		"react-hook-form": "^7.58.1",
-		"zod": "^3.25.67"
-	},
-	"devDependencies": {
-		"baseline-browser-mapping": "^2.10.8"
-	}
+  "name": "aigory-blog",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "check:secrets": "node scripts/check-tracked-secrets.mjs",
+    "audit:production": "node scripts/quality-dependency-audit.mjs . backend frontend mcp-proxy-server"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.1.1",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@tanstack/query-sync-storage-persister": "^5.81.2",
+    "@tanstack/react-query": "^5.81.2",
+    "@tanstack/react-query-persist-client": "^5.81.2",
+    "react-hook-form": "^7.58.1",
+    "zod": "^3.25.67"
+  }
 }

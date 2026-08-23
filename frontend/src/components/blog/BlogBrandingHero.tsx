@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Blog } from '@/types';
 import { hexToRgbaString } from '@/lib/color';
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 import { FiEdit } from 'react-icons/fi';
 
 interface BlogBrandingHeroProps {
@@ -41,7 +42,6 @@ export function BlogBrandingHero({
   const showTitle = Boolean(resolvedTitle);
   const showSubtitle = iconTextEnabled && iconSubtitleEnabled && Boolean(resolvedSubtitle);
   const hasAnyText = showLabel || showTitle || showSubtitle;
-  const showIconBox = Boolean(blog.iconUrl);
   const overlayColor = brandColor ? hexToRgbaString(brandColor, 0.22) : null;
   const coverFitClass =
     blog.coverImageFit === 'contain' ? 'object-contain bg-slate-950/70' : 'object-cover';
@@ -49,6 +49,9 @@ export function BlogBrandingHero({
     blog.iconImageFit === 'cover' ? 'object-cover' : 'object-contain bg-white/70';
   const iconBadgeFitClass =
     blog.iconImageFit === 'cover' ? 'object-cover' : 'object-contain';
+  const coverImageUrl = blog.coverImageUrl ? normalizeImageUrl(blog.coverImageUrl) : null;
+  const iconImageUrl = blog.iconUrl ? normalizeImageUrl(blog.iconUrl) : null;
+  const showIconBox = Boolean(iconImageUrl);
   const shouldRenderOverlay = Boolean(overlayColor);
   const overlayStyle = overlayColor
     ? blog.coverImageUrl
@@ -66,9 +69,9 @@ export function BlogBrandingHero({
       )}
     >
       <div className="absolute inset-0">
-        {blog.coverImageUrl ? (
+        {coverImageUrl ? (
           <Image
-            src={blog.coverImageUrl}
+            src={coverImageUrl}
             alt={`${blog.name} cover`}
             fill
             priority={false}
@@ -96,7 +99,7 @@ export function BlogBrandingHero({
               {showIconBox && (
                 <div className="relative w-16 h-16 rounded-2xl bg-white/90 flex items-center justify-center overflow-hidden shadow-lg ring-1 ring-black/10">
                   <Image
-                    src={blog.iconUrl as string}
+                    src={iconImageUrl as string}
                     alt={`${blog.name} icon`}
                     fill
                     sizes="64px"
@@ -156,9 +159,9 @@ export function BlogBrandingHero({
 
       {isBadgePlacement && showIconBox && (
         <div className="absolute left-8 -bottom-10 w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white dark:border-gray-900 bg-white/95 dark:bg-gray-900/70 shadow-2xl flex items-center justify-center overflow-hidden">
-          {blog.iconUrl ? (
+          {iconImageUrl ? (
             <Image
-              src={blog.iconUrl}
+              src={iconImageUrl}
               alt={`${blog.name} icon`}
               fill
               sizes="96px"

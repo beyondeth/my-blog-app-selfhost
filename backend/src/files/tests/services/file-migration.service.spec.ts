@@ -7,7 +7,11 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { FileMigrationService } from "../../services/file-migration.service";
 import { File } from "../../entities/file.entity";
-import { FileContext } from "../../entities/file-context.entity";
+import {
+  FileContext,
+  FileContextType,
+  FilePurpose,
+} from "../../entities/file-context.entity";
 import { S3Service } from "../../services/s3.service";
 import { ContextualFileService } from "../../services/contextual-file.service";
 import { MockRepository } from "../test-utils/repository.mock";
@@ -162,7 +166,7 @@ describe("FileMigrationService", () => {
       fileRepository.setData([v1File]);
 
       // Upload the file to mock S3
-      s3Service.uploadFile(null as any, v1File.fileKey);
+      s3Service.seedFile(v1File.fileKey);
 
       // Act
       const result = await service.migrateToV2({
@@ -179,7 +183,7 @@ describe("FileMigrationService", () => {
       // Verify S3 operations
       expect(s3Service.copyFile).toHaveBeenCalledWith(
         "uploads/images/2024/01/test.jpg",
-        expect.stringMatching(/^v2\/users\/user-123\/general\//),
+        expect.stringMatching(/^v2\/users\/user-123\/content\/posts\/misc\//),
       );
       expect(s3Service.deleteFile).toHaveBeenCalledWith(
         "uploads/images/2024/01/test.jpg",
@@ -188,7 +192,9 @@ describe("FileMigrationService", () => {
       // Verify file was updated
       expect(fileRepository.save).toHaveBeenCalled();
       const savedFile = fileRepository.save.mock.calls[0][0] as File;
-      expect(savedFile.fileKey).toMatch(/^v2\/users\/user-123\/general\//);
+      expect(savedFile.fileKey).toMatch(
+        /^v2\/users\/user-123\/content\/posts\/misc\//,
+      );
       expect(savedFile.contextId).toBeDefined();
     });
 
@@ -220,7 +226,7 @@ describe("FileMigrationService", () => {
       // Arrange
       const v1Files = MockFactory.createMockFileBatch(25, true);
       fileRepository.setData(v1Files);
-      v1Files.forEach((f) => s3Service.uploadFile(null as any, f.fileKey));
+      v1Files.forEach((file) => s3Service.seedFile(file.fileKey));
 
       // Act
       const result = await service.migrateToV2({
@@ -233,9 +239,10 @@ describe("FileMigrationService", () => {
       expect(result.progress.processed).toBe(25);
       expect(result.progress.successful).toBe(25);
 
-      // Verify batching (should have been called 3 times: 10 + 10 + 5)
-      const queryBuilderCalls = fileRepository.createQueryBuilder.mock.calls;
-      expect(queryBuilderCalls.length).toBeGreaterThanOrEqual(3);
+      expect(fileRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 10 }),
+      );
+      expect(s3Service.copyFile).toHaveBeenCalledTimes(25);
     });
 
     it("should handle S3 copy failures gracefully", async () => {
@@ -298,21 +305,23 @@ describe("FileMigrationService", () => {
       // Mock the relationship
       file.posts = Promise.resolve([post]);
       fileRepository.setData([file]);
-      s3Service.uploadFile(null as any, file.fileKey);
+      s3Service.seedFile(file.fileKey);
 
       // Act
       const migratedFile = await service["migrateFileToContext"](file);
 
       // Assert
       expect(migratedFile).toBeDefined();
-      expect(contextualFileService.findOrCreateContext).toHaveBeenCalledWith(
-        "post",
-        "post-123",
-        "content",
-        "user-123",
+      expect(contextRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contextType: FileContextType.POST,
+          contextId: "post-123",
+          purpose: FilePurpose.CONTENT,
+          ownerId: "user-123",
+        }),
       );
       expect(migratedFile!.fileKey).toMatch(
-        /^v2\/users\/user-123\/post\/content\//,
+        /^v2\/users\/user-123\/content\/posts\/post-123\//,
       );
     });
 
@@ -325,44 +334,49 @@ describe("FileMigrationService", () => {
       });
       file.posts = Promise.resolve([]);
       fileRepository.setData([file]);
-      s3Service.uploadFile(null as any, file.fileKey);
+      s3Service.seedFile(file.fileKey);
 
       // Act
       const migratedFile = await service["migrateFileToContext"](file);
 
       // Assert
-      expect(contextualFileService.findOrCreateContext).toHaveBeenCalledWith(
-        "profile",
-        "user-123",
-        "avatar",
-        "user-123",
+      expect(contextRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contextType: FileContextType.PROFILE,
+          contextId: "user-123",
+          purpose: FilePurpose.AVATAR,
+          ownerId: "user-123",
+        }),
       );
       expect(migratedFile!.fileKey).toMatch(
         /^v2\/users\/user-123\/profile\/avatar\//,
       );
     });
 
-    it("should use general context for unclassified files", async () => {
+    it("should use a system context for unclassified files", async () => {
       // Arrange
       const file = MockFactory.createMockFile({
         userId: "user-123",
         fileKey: "uploads/misc/2024/01/random.pdf",
+        fileType: "document",
       });
       file.posts = Promise.resolve([]);
       fileRepository.setData([file]);
-      s3Service.uploadFile(null as any, file.fileKey);
+      s3Service.seedFile(file.fileKey);
 
       // Act
       const migratedFile = await service["migrateFileToContext"](file);
 
       // Assert
-      expect(contextualFileService.findOrCreateContext).toHaveBeenCalledWith(
-        "system",
-        "user-123",
-        "general",
-        "user-123",
+      expect(contextRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contextType: FileContextType.SYSTEM,
+          contextId: "user-123",
+          purpose: FilePurpose.ATTACHMENT,
+          ownerId: "user-123",
+        }),
       );
-      expect(migratedFile!.fileKey).toMatch(/^v2\/users\/user-123\/general\//);
+      expect(migratedFile!.fileKey).toMatch(/^v2\/system\/misc\//);
     });
   });
 
@@ -379,7 +393,7 @@ describe("FileMigrationService", () => {
       });
 
       fileRepository.setData([successfulFile, failingFile]);
-      s3Service.uploadFile(null as any, successfulFile.fileKey);
+      s3Service.seedFile(successfulFile.fileKey);
 
       // First file succeeds
       s3Service.copyFile.mockResolvedValueOnce({
@@ -446,7 +460,7 @@ describe("FileMigrationService", () => {
       // Arrange
       const files = MockFactory.createMockFileBatch(10, true);
       fileRepository.setData(files);
-      files.forEach((f) => s3Service.uploadFile(null as any, f.fileKey));
+      files.forEach((file) => s3Service.seedFile(file.fileKey));
 
       // Act - Run concurrent migrations
       const results = await Promise.all([
@@ -454,12 +468,10 @@ describe("FileMigrationService", () => {
         service.migrateToV2({ batchSize: 5, dryRun: false }),
       ]);
 
-      // Assert - Should handle without conflicts
-      const totalProcessed = results.reduce(
-        (sum, r) => sum + r.progress.processed,
-        0,
-      );
-      expect(totalProcessed).toBeLessThanOrEqual(10);
+      // Assert - concurrent callers share one migration execution.
+      expect(results[0]).toBe(results[1]);
+      expect(results[0].progress.processed).toBe(10);
+      expect(s3Service.copyFile).toHaveBeenCalledTimes(10);
     });
   });
 });

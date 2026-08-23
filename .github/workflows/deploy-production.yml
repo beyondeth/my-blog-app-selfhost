@@ -1,105 +1,118 @@
-name: Deploy to Production (Oracle Free Tier)
+name: Deploy Aigory to Oracle
 
-# 메인 브랜치 푸시 시 자동 배포
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:  # 수동 실행 허용
+  workflow_run:
+    workflows: ["Aigory production quality"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Full 40-character commit SHA that passed the quality workflow
+        required: true
+        type: string
+      initial_cutover:
+        description: Permanently delete the old material workload before first start
+        required: true
+        default: false
+        type: boolean
 
-# Concurrency control - 동시 실행 방지
 concurrency:
-  group: deploy-production-${{ github.ref }}
-  cancel-in-progress: true
+  group: aigory-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
-    name: Deploy to Production Server
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # 타임아웃 30분으로 단축 (최적화 완료)
-    environment: production  # Environment Secrets 사용
-
+    timeout-minutes: 60
+    environment: production
+    env:
+      RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.release_sha }}
+      INITIAL_CUTOVER: ${{ github.event_name == 'workflow_dispatch' && inputs.initial_cutover || false }}
     steps:
-      # 1. 코드 체크아웃
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      # 2. Environment Secrets에서 .env.production 생성
-      - name: Create .env.production from Environment Secrets
+      - name: Verify quality workflow completed successfully
+        if: github.event_name == 'workflow_run'
+        env:
+          QUALITY_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          QUALITY_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          QUALITY_EVENT: ${{ github.event.workflow_run.event }}
         run: |
-          cat > .env.production << 'EOF'
-          ${{ secrets.ENV_FILE }}
-          EOF
+          test "$QUALITY_CONCLUSION" = success
+          test "$QUALITY_BRANCH" = main
+          test "$QUALITY_EVENT" = push
 
-      # 2-1. 공개 환경변수(NEXT_PUBLIC_*) 누락 여부 사전 검증
-      - name: Validate public env vars
+      - name: Validate immutable release reference
+        env:
+          RELEASE_SHA: ${{ env.RELEASE_SHA }}
         run: |
-          set -e
-          required_vars=(
-            NEXT_PUBLIC_API_URL
-            NEXT_PUBLIC_BACKEND_URL
-            NEXT_PUBLIC_SITE_URL
-            NEXT_PUBLIC_MIXPANEL_TOKEN
-            NEXT_PUBLIC_GA_MEASUREMENT_ID
-          )
-          for var in "${required_vars[@]}"; do
-            value="$(grep -E "^${var}=" .env.production | cut -d= -f2- || true)"
-            if [ -z "$value" ]; then
-              echo "::error::${var} is missing or empty in .env.production"
-              exit 1
-            fi
-          done
-          echo "✅ All required NEXT_PUBLIC env vars found."
+          if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'release_sha must be a full commit SHA' >&2
+            exit 1
+          fi
 
-      # 3. 배포 스크립트 및 환경 파일 업로드
-      - name: Upload deployment files to server
-        uses: appleboy/scp-action@v0.1.7
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: ".env.production,scripts/deploy-production-optimized.sh"
-          target: "/home/ubuntu/my-blog-app/"
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 1
+
+      - name: Verify checked-out SHA and package release
+        env:
+          RELEASE_SHA: ${{ env.RELEASE_SHA }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git archive --format=tar.gz --output=aigory-release.tar.gz "$RELEASE_SHA"
+
+      - name: Materialize protected production environment
+        env:
+          AIGORY_ENV_FILE_BASE64: ${{ secrets.AIGORY_ENV_FILE_BASE64 }}
+        run: |
+          umask 077
+          printf '%s' "$AIGORY_ENV_FILE_BASE64" | base64 --decode > aigory.env
+          test -s aigory.env
+          grep -q '^NEXT_PUBLIC_SITE_URL=https://aigory.com$' aigory.env
+          grep -q '^PAYMENTS_ENABLED=false$' aigory.env
+          grep -q '^MOCK_PAYMENT_ENABLED=false$' aigory.env
+          grep -q '^ADMIN_DEBUG_ENABLED=false$' aigory.env
+          grep -q '^BACKUP_S3_BUCKET=aigory-blog-prod-backups$' aigory.env
+
+      - name: Upload immutable release
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634
+        with:
+          host: ${{ secrets.AIGORY_DEPLOY_HOST }}
+          username: ${{ secrets.AIGORY_DEPLOY_USER }}
+          key: ${{ secrets.AIGORY_DEPLOY_SSH_KEY }}
+          source: aigory-release.tar.gz,aigory.env
+          target: /tmp/aigory-deploy
           overwrite: true
-          strip_components: 0
 
-      # 4. SSH로 배포 스크립트 실행
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Install and activate release
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262
+        env:
+          RELEASE_SHA: ${{ env.RELEASE_SHA }}
+          INITIAL_CUTOVER: ${{ env.INITIAL_CUTOVER }}
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ secrets.AIGORY_DEPLOY_HOST }}
+          username: ${{ secrets.AIGORY_DEPLOY_USER }}
+          key: ${{ secrets.AIGORY_DEPLOY_SSH_KEY }}
           port: 22
-          timeout: 900s  # 15분 SSH 타임아웃
-          command_timeout: 900s
-          script_stop: true  # 에러 발생 시 즉시 중단
+          timeout: 1200s
+          command_timeout: 3000s
+          envs: RELEASE_SHA,INITIAL_CUTOVER
+          script_stop: true
           script: |
-            set -e
-            echo "=========================================="
-            echo "프로덕션 배포 시작: $(date)"
-            echo "=========================================="
-
-            # 스크립트 실행 권한 설정
-            chmod +x /home/ubuntu/my-blog-app/scripts/deploy-production-optimized.sh
-
-            # 최적화된 배포 스크립트 실행
-            cd /home/ubuntu/my-blog-app
-            bash scripts/deploy-production-optimized.sh
-
-            echo "=========================================="
-            echo "✅ GitHub Actions 배포 완료"
-            echo "=========================================="
-
-      # 5. 배포 실패 시 알림
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "❌ 프로덕션 배포 실패!"
-          echo "롤백을 실행하세요: ssh ubuntu@server 'cd /home/ubuntu/my-blog-app && bash scripts/rollback.sh'"
-
-      # 6. 배포 성공 시 알림
-      - name: Notify on success
-        if: success()
-        run: |
-          echo "✅ 프로덕션 배포 성공!"
+            set -Eeuo pipefail
+            [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+            release_dir="/opt/aigory-blog/releases/$RELEASE_SHA"
+            sudo install -d -o ubuntu -g ubuntu -m 750 "$release_dir" /etc/aigory-blog
+            tar -xzf /tmp/aigory-deploy/aigory-release.tar.gz -C "$release_dir"
+            sudo install -o root -g root -m 600 /tmp/aigory-deploy/aigory.env /etc/aigory-blog/.env.production
+            chmod +x "$release_dir/scripts/deploy-aigory-production.sh" "$release_dir/scripts/remove-material-ledger.sh" "$release_dir/scripts/backup-aigory-postgres.sh"
+            sudo env INITIAL_CUTOVER="$INITIAL_CUTOVER" bash "$release_dir/scripts/deploy-aigory-production.sh" "$release_dir" "$RELEASE_SHA"
+            rm -f /tmp/aigory-deploy/aigory-release.tar.gz /tmp/aigory-deploy/aigory.env

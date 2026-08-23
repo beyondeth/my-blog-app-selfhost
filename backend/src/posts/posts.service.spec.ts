@@ -1,201 +1,163 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { Repository } from "typeorm";
-import { getRepositoryToken } from "@nestjs/typeorm";
-import { PostsService } from "./posts.service";
-import { Post } from "./entities/post.entity";
-import { PostStats } from "./entities/post-stats.entity";
-import { PostMetadata } from "./entities/post-metadata.entity";
-import { File } from "../files/entities/file.entity";
-import { FileContext } from "../files/entities/file-context.entity";
-import { Blog } from "../blogs/entities/blog.entity";
-import { User } from "../users/entities/user.entity";
-import { FilesService } from "../files/files.service";
-import { CdnService } from "../files/services/cdn.service";
-import { MarkdownRendererService } from "../common/services/markdown-renderer.service";
-import { ContentProcessingService } from "../content-processing/services/content-processing.service";
-import { CacheService } from "../cache/cache.service";
-import { CacheMetricsService } from "../metrics/cache-metrics.service";
-import { BookmarksService } from "../bookmarks/bookmarks.service";
-import { LikeService } from "./services/like.service";
-import { EventEmitter2 } from "@nestjs/event-emitter";
-import { RedisLockService } from "../redis/redis-lock.service";
-import { PostMapperService } from "./services/post-mapper.service";
-import { PostCacheService } from "./services/post-cache.service";
-import { PostFileService } from "./services/post-file.service";
-import { PostContentService } from "./services/post-content.service";
-import { PostReadService } from "./services/post-read.service";
-import { PostInteractionService } from "./services/post-interaction.service";
-import { PostCreationService } from "./services/post-creation.service";
-import { ThumbnailService } from "./services/thumbnail.service";
-import { CloudflareService } from "../cloudflare/cloudflare.service";
-import { DataSource } from "typeorm";
-import { getQueueToken } from "@nestjs/bullmq";
-import { POST_PROCESSING_QUEUE } from "./queues/post-processing.queue";
+jest.mock("./queues/post-processing.queue", () => ({
+  POST_PROCESSING_QUEUE: "post-processing",
+}));
 
-describe("PostsService - Facade", () => {
+import { Test, TestingModule } from "@nestjs/testing";
+import { getRepositoryToken } from "@nestjs/typeorm";
+import { Blog } from "../blogs/entities/blog.entity";
+import { Role } from "../common/enums/role.enum";
+import { FileContext } from "../files/entities/file-context.entity";
+import { File } from "../files/entities/file.entity";
+import { User } from "../users/entities/user.entity";
+import { Post } from "./entities/post.entity";
+import { PostMetadata } from "./entities/post-metadata.entity";
+import { PostStats } from "./entities/post-stats.entity";
+import { PostsService } from "./posts.service";
+import { PostCreationService } from "./services/post-creation.service";
+import { PostMapperService } from "./services/post-mapper.service";
+
+describe("PostsService facade", () => {
   let service: PostsService;
-  let postCreationService: jest.Mocked<PostCreationService>;
-  let postMapperService: jest.Mocked<PostMapperService>;
-  let postReadService: jest.Mocked<PostReadService>;
+
+  const postCreationService = {
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  };
+  const postMapperService = {
+    toPostDto: jest.fn(),
+  };
+
+  const user = {
+    id: "user-1",
+    username: "testuser",
+    email: "test@example.com",
+    role: Role.USER,
+  } as User;
 
   beforeEach(async () => {
-    const mockPostCreationService = {
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    };
-
-    const mockPostMapperService = {
-      toPostDto: jest.fn(),
-    };
-
-    const mockPostReadService = {
-      findMyPublishedPosts: jest.fn(),
-      findMyPublishedPostById: jest.fn(),
-      getRelatedPosts: jest.fn(),
-    };
+    const repositoryTokens = [
+      Post,
+      PostStats,
+      PostMetadata,
+      File,
+      FileContext,
+      Blog,
+    ].map((entity) => ({
+      provide: getRepositoryToken(entity),
+      useValue: {},
+    }));
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PostsService,
-        { provide: DataSource, useValue: {} },
-        { provide: getRepositoryToken(Post), useValue: {} },
-        { provide: getRepositoryToken(PostStats), useValue: {} },
-        { provide: getRepositoryToken(PostMetadata), useValue: {} },
-        { provide: getRepositoryToken(File), useValue: {} },
-        { provide: getRepositoryToken(FileContext), useValue: {} },
-        { provide: getRepositoryToken(Blog), useValue: {} },
-        { provide: FilesService, useValue: {} },
-        { provide: CdnService, useValue: {} },
-        { provide: MarkdownRendererService, useValue: {} },
-        { provide: ContentProcessingService, useValue: {} },
-        { provide: CacheService, useValue: {} },
-        { provide: CacheMetricsService, useValue: {} },
-        { provide: BookmarksService, useValue: {} },
-        { provide: LikeService, useValue: {} },
-        { provide: EventEmitter2, useValue: {} },
-        { provide: RedisLockService, useValue: {} },
-        { provide: PostMapperService, useValue: mockPostMapperService },
-        { provide: PostCacheService, useValue: {} },
-        { provide: PostFileService, useValue: {} },
-        { provide: PostContentService, useValue: {} },
-        { provide: PostReadService, useValue: mockPostReadService },
-        { provide: PostInteractionService, useValue: {} },
-        { provide: PostCreationService, useValue: mockPostCreationService },
-        { provide: ThumbnailService, useValue: {} },
-        { provide: CloudflareService, useValue: {} },
-        { provide: getQueueToken(POST_PROCESSING_QUEUE), useValue: {} },
-      ],
-    }).compile();
+      providers: [PostsService, ...repositoryTokens],
+    })
+      .useMocker((token) => {
+        if (token === PostCreationService) {
+          return postCreationService;
+        }
+        if (token === PostMapperService) {
+          return postMapperService;
+        }
+        return {};
+      })
+      .compile();
 
-    service = module.get<PostsService>(PostsService);
-    postCreationService = module.get(
-      PostCreationService,
-    ) as jest.Mocked<PostCreationService>;
-    postMapperService = module.get(
-      PostMapperService,
-    ) as jest.Mocked<PostMapperService>;
-    postReadService = module.get(
-      PostReadService,
-    ) as jest.Mocked<PostReadService>;
+    service = module.get(PostsService);
   });
 
-  it("should be defined", () => {
-    expect(service).toBeDefined();
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
-  describe("create", () => {
-    it("should delegate to PostCreationService and map to DTO", async () => {
-      const mockDto: any = { title: "Test" };
-      const mockUser: any = { id: "user1" };
-      const mockPost: any = { id: "post1", blog: {} };
-      const mockResponseDto: any = { id: "post1", title: "Test" };
+  it("delegates post creation and maps the resulting post", async () => {
+    const createPostDto = {
+      title: "Test Post",
+      content: "<p>Test content</p>",
+      category: "Test Category",
+    } as any;
+    const files = [{ id: "file-1" }] as File[];
+    const post = {
+      id: "post-1",
+      blog: { id: "blog-1", slug: "test-blog" },
+    } as Post;
+    const mappedPost = { id: "post-1", title: "Test Post" } as any;
+    postCreationService.create.mockResolvedValue(post);
+    postMapperService.toPostDto.mockResolvedValue(mappedPost);
 
-      postCreationService.create.mockResolvedValue(mockPost);
-      postMapperService.toPostDto.mockResolvedValue(mockResponseDto);
+    await expect(
+      service.create(createPostDto, user, files, "127.0.0.1", "organization-1"),
+    ).resolves.toBe(mappedPost);
 
-      const result = await service.create(mockDto, mockUser);
-
-      expect(postCreationService.create).toHaveBeenCalledWith(
-        mockDto,
-        mockUser,
-        undefined,
-        undefined,
-      );
-      expect(postMapperService.toPostDto).toHaveBeenCalledWith(mockPost, {
-        user: mockUser,
-        blog: mockPost.blog,
-      });
-      expect(result).toEqual(mockResponseDto);
+    expect(postCreationService.create).toHaveBeenCalledWith(
+      createPostDto,
+      user,
+      files,
+      "127.0.0.1",
+      "organization-1",
+    );
+    expect(postMapperService.toPostDto).toHaveBeenCalledWith(post, {
+      user,
+      blog: post.blog,
     });
   });
 
-  describe("findMyPublishedPostsForMcp", () => {
-    it("should delegate to PostReadService and map the results", async () => {
-      const options = {
-        page: 2,
-        limit: 10,
-        search: "mcp",
-        category: "Tech",
-        tag: "read",
-      };
-      const posts = [
-        { id: "post-1", blog: { id: "blog-1" } },
-        { id: "post-2", blog: { id: "blog-1" } },
-      ] as any[];
+  it("uses the same creation contract for the MCP fast path", async () => {
+    const createPostDto = {
+      title: "Fast Post",
+      content: "<p>Fast content</p>",
+      category: "Test Category",
+    } as any;
+    const post = {
+      id: "post-fast",
+      blog: { id: "blog-1", slug: "test-blog" },
+    } as Post;
+    const mappedPost = { id: "post-fast" } as any;
+    postCreationService.create.mockResolvedValue(post);
+    postMapperService.toPostDto.mockResolvedValue(mappedPost);
 
-      postReadService.findMyPublishedPosts.mockResolvedValue({
-        posts: posts as any,
-        total: 2,
-        page: 2,
-        limit: 10,
-      });
-      postMapperService.toPostDto
-        .mockResolvedValueOnce({ id: "post-1", title: "First" } as any)
-        .mockResolvedValueOnce({ id: "post-2", title: "Second" } as any);
+    await expect(
+      service.createFast(createPostDto, user, "organization-1"),
+    ).resolves.toBe(mappedPost);
 
-      const result = await service.findMyPublishedPostsForMcp(
-        "user-1",
-        options,
-      );
-
-      expect(postReadService.findMyPublishedPosts).toHaveBeenCalledWith(
-        "user-1",
-        options,
-      );
-      expect(postMapperService.toPostDto).toHaveBeenNthCalledWith(1, posts[0]);
-      expect(postMapperService.toPostDto).toHaveBeenNthCalledWith(2, posts[1]);
-      expect(result).toEqual({
-        items: [
-          { id: "post-1", title: "First" },
-          { id: "post-2", title: "Second" },
-        ],
-        total: 2,
-        page: 2,
-        limit: 10,
-      });
-    });
+    expect(postCreationService.create).toHaveBeenCalledWith(
+      createPostDto,
+      user,
+      undefined,
+      undefined,
+      "organization-1",
+    );
   });
 
-  describe("findMyPublishedPostForMcp", () => {
-    it("should delegate to PostReadService and map a single post", async () => {
-      const post = { id: "post-9", blog: { id: "blog-1" } } as any;
-      const dto = { id: "post-9", title: "Deep dive" } as any;
+  it("delegates updates and maps the updated post", async () => {
+    const updatePostDto = { title: "Updated Post" } as any;
+    const post = {
+      id: "post-1",
+      blog: { id: "blog-1", slug: "test-blog" },
+    } as Post;
+    const mappedPost = { id: "post-1", title: "Updated Post" } as any;
+    postCreationService.update.mockResolvedValue(post);
+    postMapperService.toPostDto.mockResolvedValue(mappedPost);
 
-      postReadService.findMyPublishedPostById.mockResolvedValue(post);
-      postMapperService.toPostDto.mockResolvedValue(dto);
+    await expect(
+      service.update(
+        "post-1",
+        updatePostDto,
+        user,
+        undefined,
+        "organization-1",
+      ),
+    ).resolves.toBe(mappedPost);
 
-      const result = await service.findMyPublishedPostForMcp(
-        "user-1",
-        "post-9",
-      );
-
-      expect(postReadService.findMyPublishedPostById).toHaveBeenCalledWith(
-        "user-1",
-        "post-9",
-      );
-      expect(postMapperService.toPostDto).toHaveBeenCalledWith(post);
-      expect(result).toEqual(dto);
+    expect(postCreationService.update).toHaveBeenCalledWith(
+      "post-1",
+      updatePostDto,
+      user,
+      undefined,
+      "organization-1",
+    );
+    expect(postMapperService.toPostDto).toHaveBeenCalledWith(post, {
+      user,
+      blog: post.blog,
     });
   });
 });

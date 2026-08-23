@@ -25,6 +25,7 @@ const KEYS = {
   ACCESS_TOKEN: 'oauth:access:',     // 액세스 토큰
   REFRESH_TOKEN: 'oauth:refresh:',   // 리프레시 토큰
   SESSION: 'oauth:session:',         // 인증 세션 (state)
+  GRANT_JTI: 'oauth:grant-jti:',     // 사용된 Backend grant ID (재사용 방지)
   TOKEN_BY_USER: 'oauth:user:',      // 사용자별 토큰 목록
   REFRESH_BY_USER: 'oauth:user:refresh:', // 사용자별 리프레시 토큰 목록
 } as const;
@@ -212,6 +213,17 @@ export class OAuthStorage {
     }
 
     return session;
+  }
+
+  /**
+   * Backend authorization grant의 jti를 일회성으로 소비합니다.
+   * Redis SET NX로 동시 콜백에서도 정확히 한 요청만 성공합니다.
+   */
+  async consumeGrantJti(jti: string, expiresAt: number): Promise<boolean> {
+    const ttl = Math.max(1, expiresAt - Math.floor(Date.now() / 1000));
+    const key = `${KEYS.GRANT_JTI}${this.hashToken(jti)}`;
+    const result = await this.redis.set(key, 'consumed', 'EX', ttl, 'NX');
+    return result === 'OK';
   }
 
   // ===== 인증 코드 관리 =====

@@ -19,19 +19,17 @@ import type {
   StoredClient,
 } from './types.js';
 import { OAuthErrorCodes } from './types.js';
-import { normalizeLegacyScope } from './scope-normalization.js';
 
 const router = Router();
 
-// 허용된 redirect URI 패턴 (Claude, ChatGPT, Perplexity, OpenAI review)
+// 허용된 redirect URI 패턴 (Claude, ChatGPT)
 const ALLOWED_REDIRECT_PATTERNS = [
-  /^https:\/\/claude\.ai\/api\/mcp\/auth_callback(?:\/.*)?$/, // Claude 프로덕션
-  /^https:\/\/.*\.claude\.ai\/api\/mcp\/auth_callback(?:\/.*)?$/, // Claude 서브도메인
-  /^https:\/\/chatgpt\.com\/connector\/oauth\/[^/]+$/, // ChatGPT connector callback
-  /^https:\/\/(?:[a-z0-9-]+\.)?perplexity\.(?:ai|com)\/rest\/connections\/oauth_callback(?:\/.*)?$/, // Perplexity connector callback
-  /^https:\/\/platform\.openai\.com\/apps-manage\/oauth$/, // OpenAI app review callback
-  /^http:\/\/localhost(?::\d+)?\/.+$/, // 로컬 개발
-  /^http:\/\/127\.0\.0\.1(?::\d+)?\/.+$/, // 로컬 개발
+  /^https:\/\/claude\.ai\//,                    // Claude 프로덕션
+  /^https:\/\/.*\.claude\.ai\//,                // Claude 서브도메인
+  /^https:\/\/chatgpt\.com\//,                  // ChatGPT 프로덕션
+  /^https:\/\/.*\.chatgpt\.com\//,              // ChatGPT 서브도메인
+  /^http:\/\/localhost(:\d+)?\//,               // 로컬 개발
+  /^http:\/\/127\.0\.0\.1(:\d+)?\//,            // 로컬 개발
 ];
 
 /**
@@ -164,14 +162,29 @@ export function createClientRegistrationRouter(storage: OAuthStorage): Router {
 
       const request = validation.data!;
 
+      // 중복 등록 체크. 기존 등록의 client secret은 최초 응답 이후
+      // 다시 공개하지 않는다.
+      const primaryRedirectUri = request.redirect_uris[0];
+      const existingClient = await storage.findClientByRedirectUri(primaryRedirectUri);
+
+      if (existingClient) {
+        logger.debug({
+          clientId: existingClient.clientId,
+          redirectUri: primaryRedirectUri,
+        }, '⚠️ Duplicate OAuth client registration rejected');
+
+        return res.status(409).json({
+          error: OAuthErrorCodes.INVALID_CLIENT_METADATA,
+          error_description: 'A client is already registered for this redirect_uri',
+        });
+      }
+
       // 새 클라이언트 생성
       const clientId = storage.generateClientId();
       const clientSecret = storage.generateClientSecret();
       const now = Math.floor(Date.now() / 1000);
 
       // 저장할 클라이언트 데이터
-      const normalizedScope = normalizeLegacyScope(request.scope);
-
       const client: StoredClient = {
         clientId,
         clientSecret,
@@ -180,7 +193,7 @@ export function createClientRegistrationRouter(storage: OAuthStorage): Router {
         redirectUris: request.redirect_uris,
         clientName: request.client_name || 'Unknown Client',
         clientUri: request.client_uri,
-        scope: normalizedScope,
+        scope: request.scope || 'mcp:tools mcp:read mcp:write',
         tokenEndpointAuthMethod: request.token_endpoint_auth_method || 'client_secret_post',
         grantTypes: request.grant_types || ['authorization_code', 'refresh_token'],
         responseTypes: request.response_types || ['code'],

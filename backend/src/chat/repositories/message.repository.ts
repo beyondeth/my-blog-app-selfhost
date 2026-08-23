@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource, In } from "typeorm";
 import { Message } from "../entities/message.entity";
@@ -25,6 +25,45 @@ export class MessageRepository {
     try {
       const savedMessages: Message[] = [];
 
+      const conversationIds = [
+        ...new Set(messages.map((message) => message.conversationId)),
+      ];
+      const conversations = await queryRunner.manager.find(Conversation, {
+        where: { id: In(conversationIds) },
+        select: [
+          "id",
+          "user1Id",
+          "user2Id",
+          "user1DeletedAt",
+          "user2DeletedAt",
+        ],
+      });
+      const conversationsById = new Map(
+        conversations.map((conversation) => [
+          String(conversation.id).toLowerCase(),
+          conversation,
+        ]),
+      );
+
+      for (const message of messages) {
+        const conversation = conversationsById.get(
+          String(message.conversationId).toLowerCase(),
+        );
+        const normalizedSenderId = String(message.senderId).toLowerCase();
+        const isParticipant =
+          conversation &&
+          [conversation.user1Id, conversation.user2Id].some(
+            (participantId) =>
+              String(participantId).toLowerCase() === normalizedSenderId,
+          );
+
+        if (!isParticipant) {
+          throw new ForbiddenException(
+            "Message sender is not a conversation participant",
+          );
+        }
+      }
+
       // Batch insert all messages
       const messageEntities = messages.map((msg) =>
         this.repository.create({
@@ -40,10 +79,6 @@ export class MessageRepository {
       savedMessages.push(...result);
 
       // 대화별로 lastMessageAt 업데이트 및 deletedAt 리셋
-      const conversationIds = [
-        ...new Set(messages.map((m) => m.conversationId)),
-      ];
-
       // 대화별 발신자 ID 수집 (새 메시지를 보낸 사용자들)
       const conversationSenders = new Map<string, Set<string>>();
       messages.forEach((msg) => {
@@ -63,11 +98,9 @@ export class MessageRepository {
         //    - user2가 메시지를 보냈으면 user2DeletedAt = null
         //    - 이렇게 하면 나간 후 새 메시지가 있는 대화가 자동으로 다시 표시됨
 
-        // Entity를 사용하여 대화 조회 (컬럼명 문제 방지)
-        const conversation = await queryRunner.manager.findOne(Conversation, {
-          where: { id: conversationId },
-          select: ["id", "user1Id", "user2Id"],
-        });
+        const conversation = conversationsById.get(
+          String(conversationId).toLowerCase(),
+        );
 
         if (conversation) {
           // 새 메시지가 전송되면 lastMessageAt만 업데이트

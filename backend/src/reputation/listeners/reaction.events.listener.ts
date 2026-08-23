@@ -89,6 +89,7 @@ export class ReactionEventsListener {
         metadata: {
           likedBy: payload.userId,
           likeCount: payload.likeCount,
+          outboxEventId: payload.outboxEventId,
         },
       });
 
@@ -100,6 +101,7 @@ export class ReactionEventsListener {
         `좋아요 평판 큐 추가 실패: ${error.message}`,
         error.stack,
       );
+      throw error;
     }
   }
 
@@ -155,6 +157,7 @@ export class ReactionEventsListener {
         occurredAt: new Date(),
         metadata: {
           bookmarkedBy: payload.userId,
+          outboxEventId: payload.outboxEventId,
         },
       });
 
@@ -166,6 +169,7 @@ export class ReactionEventsListener {
         `북마크 평판 큐 추가 실패: ${error.message}`,
         error.stack,
       );
+      throw error;
     }
   }
 }

@@ -16,8 +16,7 @@ import { Follow } from "../follows/entities/follow.entity";
 import { RedisLockService } from "../redis/redis-lock.service";
 import { CacheService, CacheKeys, CacheTTL } from "../cache/cache.service";
 import { CdnService } from "../files/services/cdn.service";
-import { EventEmitter2 } from "@nestjs/event-emitter";
-import { CacheInvalidationEvents } from "../common/events/cache.events";
+import { OrganizationsService } from "../organizations/organizations.service";
 
 @Injectable()
 export class BlogsService {
@@ -176,10 +175,14 @@ export class BlogsService {
     private redisLockService: RedisLockService,
     private cacheService: CacheService,
     private cdnService: CdnService,
-    private eventEmitter: EventEmitter2,
+    private organizationsService: OrganizationsService,
   ) {}
 
-  async create(createBlogDto: CreateBlogDto, user: User): Promise<Blog> {
+  async create(
+    createBlogDto: CreateBlogDto,
+    user: User,
+    organizationId?: string,
+  ): Promise<Blog> {
     // 분산 락을 사용하여 중복 생성 방지
     const lockKey = `blog:create:user:${user.id}`;
     const lockTtl = 10000; // 10초
@@ -191,8 +194,22 @@ export class BlogsService {
         lockTtl,
         async () => {
           // 사용자가 이미 블로그를 가지고 있는지 확인 (한 사용자당 하나의 블로그만)
+          const organization = organizationId
+            ? await this.organizationsService.assertMember(
+                organizationId,
+                user.id,
+              )
+            : await this.organizationsService.ensurePersonalOrganization(
+                user.id,
+                user.username || user.email?.split("@")[0],
+              );
+          const resolvedOrganizationId = organizationId || organization.id;
+
           const userBlog = await this.blogRepository.findOne({
-            where: { userId: user.id },
+            where: {
+              userId: user.id,
+              organizationId: resolvedOrganizationId,
+            },
           });
 
           if (userBlog) {
@@ -213,6 +230,7 @@ export class BlogsService {
           const blog = this.blogRepository.create({
             ...createBlogDto,
             userId: user.id,
+            organizationId: resolvedOrganizationId,
           });
 
           const savedBlog = await this.blogRepository.save(blog);
@@ -233,9 +251,9 @@ export class BlogsService {
     }
   }
 
-  async findOne(id: string): Promise<Blog> {
+  async findOne(id: string, organizationId?: string): Promise<Blog> {
     const blog = await this.blogRepository.findOne({
-      where: { id },
+      where: { id, ...(organizationId ? { organizationId } : {}) },
       relations: ["owner"],
     });
 
@@ -247,7 +265,7 @@ export class BlogsService {
   }
 
   async findOneBySlug(slug: string, user?: any): Promise<Blog> {
-    this.logger.debug(
+    console.log(
       `[BlogsService] findOneBySlug - slug: ${slug}, user: ${user?.id || "none"}`,
     );
 
@@ -260,10 +278,10 @@ export class BlogsService {
       throw new NotFoundException("블로그를 찾을 수 없습니다.");
     }
 
-    this.logger.debug(
+    console.log(
       `[BlogsService] Blog found - id: ${blog.id}, userId: ${blog.userId}, isPublic: ${blog.isPublic}`,
     );
-    this.logger.debug(
+    console.log(
       `[BlogsService] User check - user.id: ${user?.id}, blog.userId: ${blog.userId}, match: ${user?.id === blog.userId}`,
     );
 
@@ -272,7 +290,7 @@ export class BlogsService {
     const isOwner = user && String(user.id) === String(blog.userId);
 
     if (!blog.isPublic && !isOwner) {
-      this.logger.debug(
+      console.log(
         `[BlogsService] Private blog, not owner - returning limited info`,
       );
       return {
@@ -283,19 +301,17 @@ export class BlogsService {
       } as any;
     }
 
-    this.logger.debug(
-      `[BlogsService] Returning full blog info - owner: ${isOwner}`,
-    );
+    console.log(`[BlogsService] Returning full blog info - owner: ${isOwner}`);
     return blog;
   }
 
-  async findByUserId(userId: string): Promise<Blog[]> {
+  async findByUserId(userId: string, organizationId?: string): Promise<Blog[]> {
     this.logger.debug(
       `[BlogsService] findByUserId - Looking for blogs for user ID: ${userId.substring(0, 8)}...`,
     );
 
     const blogs = await this.blogRepository.find({
-      where: { userId },
+      where: { userId, ...(organizationId ? { organizationId } : {}) },
       order: { createdAt: "DESC" },
     });
 
@@ -324,8 +340,11 @@ export class BlogsService {
    * @param userId 사용자 ID
    * @returns Blog 객체 또는 null
    */
-  async findBlogByUserId(userId: string): Promise<Blog | null> {
-    const blogs = await this.findByUserId(userId);
+  async findBlogByUserId(
+    userId: string,
+    organizationId?: string,
+  ): Promise<Blog | null> {
+    const blogs = await this.findByUserId(userId, organizationId);
     return blogs.length > 0 ? blogs[0] : null;
   }
 
@@ -336,12 +355,12 @@ export class BlogsService {
     return count === 0;
   }
 
-  async update(id: string, updateBlogDto: UpdateBlogDto): Promise<Blog> {
-    const blog = await this.findOne(id);
-
-    // 변경 전 스냅샷 (캐시 무효화 이벤트용)
-    const previousIsPublic = blog.isPublic;
-    const previousAllowComments = blog.allowComments;
+  async update(
+    id: string,
+    updateBlogDto: UpdateBlogDto,
+    organizationId?: string,
+  ): Promise<Blog> {
+    const blog = await this.findOne(id, organizationId);
 
     // isPublic과 allowComments 필드가 없는 경우 기본값 설정
     // 데이터베이스에 필드가 아직 없을 수 있으므로 임시로 처리
@@ -359,40 +378,7 @@ export class BlogsService {
     }
 
     await this.blogRepository.save(updatedBlog);
-
-    // isPublic 변경 시 피드 캐시 무효화 이벤트 발행
-    if (
-      updateBlogDto.isPublic !== undefined &&
-      updateBlogDto.isPublic !== previousIsPublic
-    ) {
-      this.logger.log(
-        `Blog ${id} visibility changed: ${previousIsPublic} → ${updateBlogDto.isPublic}`,
-      );
-      this.eventEmitter.emit(CacheInvalidationEvents.BLOG_UPDATED, {
-        blogId: blog.id,
-        blogSlug: blog.alias || blog.slug,
-        changes: { isPublic: true },
-      });
-    }
-
-    // allowComments 변경 시 이벤트 발행
-    if (
-      updateBlogDto.allowComments !== undefined &&
-      updateBlogDto.allowComments !== previousAllowComments
-    ) {
-      this.logger.log(
-        `Blog ${id} allowComments changed: ${previousAllowComments} → ${updateBlogDto.allowComments}`,
-      );
-      this.eventEmitter.emit(CacheInvalidationEvents.BLOG_SETTINGS_CHANGED, {
-        blogId: blog.id,
-        blogSlug: blog.alias || blog.slug,
-        settingKey: "allowComments",
-        oldValue: previousAllowComments,
-        newValue: updateBlogDto.allowComments,
-      });
-    }
-
-    return await this.findOne(id);
+    return await this.findOne(id, organizationId);
   }
 
   /**
@@ -460,45 +446,23 @@ export class BlogsService {
     identifier: string,
     user?: any,
   ): Promise<Blog | any> {
+    this.logger.debug(`[Alias System] Looking up identifier: ${identifier}`);
+
+    // @ 제거 (프론트엔드에서 @park로 보낼 수 있음)
     const cleanIdentifier = identifier.replace("@", "");
-    const startedAt = Date.now();
-    let lastMarkAt = startedAt;
-    const stepDurations: string[] = [];
-    const markStep = (label: string) => {
-      const now = Date.now();
-      stepDurations.push(`${label}=${now - lastMarkAt}ms`);
-      lastMarkAt = now;
-    };
-    const logLookup = (result: string) => {
-      const totalMs = Date.now() - startedAt;
-      const message =
-        `[BLOG_IDENTIFIER_LOOKUP] identifier=${cleanIdentifier} result=${result} ` +
-        `total=${totalMs}ms steps=${stepDurations.join(" ")}`;
 
-      if (totalMs >= 500) {
-        this.logger.warn(message);
-        return;
-      }
-
-      this.logger.debug(message);
-    };
-    const returnWithLog = <T>(value: T, result: string): T => {
-      logLookup(result);
-      return value;
-    };
-
-    this.logger.debug(`[Alias System] Looking up identifier: ${cleanIdentifier}`);
-
+    // 1. 캐시에서 먼저 확인
     const cacheKey = CacheKeys.IDENTIFIER_TO_BLOG(cleanIdentifier);
     const cached = await this.cacheService.get(cacheKey);
-    markStep("cache_lookup");
 
     if (cached) {
       this.logger.debug(`[Alias Cache] Cache hit for: ${cleanIdentifier}`);
 
+      // 캐시된 데이터에 follow 정보가 없는 경우에만 추가 조회
       const blog = cached as Blog;
       const isOwner = user && String(user.id) === String(blog.userId);
 
+      // Follow 정보 추가 (팔로워 수 표시용) - 캐시에는 없는 경우
       if (blog?.owner?.id && user && !isOwner && !(blog as any).followInfo) {
         const [followersCount, followingCount] = await Promise.all([
           this.followRepository.count({
@@ -522,6 +486,7 @@ export class BlogsService {
           isFollowedByUser: !!isFollowing,
         };
 
+        // 캐시 업데이트 (follow 정보 포함)
         await this.cacheService.set(cacheKey, blog, CacheTTL.SHORT);
       }
 
@@ -529,6 +494,7 @@ export class BlogsService {
         blog.owner.socialLinks = blog.owner.profile.socialLinks;
       }
 
+      // 캐시에서 가져온 데이터도 프로필 평탄화 필요 (캐시되기 전에 평탄화되었을 수 있음)
       if (blog?.owner?.profile && !blog.owner.profileImage) {
         blog.owner.name = blog.owner.profile.name;
         blog.owner.profileImage = blog.owner.profile.profileImage;
@@ -537,11 +503,13 @@ export class BlogsService {
         blog.owner.socialLinks = blog.owner.profile.socialLinks;
         blog.owner.lastLoginProvider = blog.owner.profile.lastLoginProvider;
 
+        // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
         if (blog.owner.profileImage) {
           if (
             blog.owner.profileImage.startsWith("v2/") ||
             blog.owner.profileImage.startsWith("uploads/")
           ) {
+            // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
             blog.owner.profileImage = this.cdnService.generateCdnUrlFromKey(
               blog.owner.profileImage,
             );
@@ -551,23 +519,21 @@ export class BlogsService {
           }
         }
       }
-      markStep("cache_hydration");
 
-      return returnWithLog(
-        this.checkBlogAccessAndReturn(blog, user),
-        "cache-hit",
-      );
+      return this.checkBlogAccessAndReturn(blog, user);
     }
 
-    let blog = await this.blogRepository
+    // 2. alias로 조회 시도 (QueryBuilder로 최적화)
+    const blogQueryBuilder = this.blogRepository
       .createQueryBuilder("blog")
       .leftJoinAndSelect("blog.owner", "owner")
       .leftJoinAndSelect("owner.profile", "profile")
-      .where("blog.alias = :alias", { alias: cleanIdentifier })
-      .getOne();
-    markStep("alias_lookup");
+      .where("blog.alias = :alias", { alias: cleanIdentifier });
+
+    let blog = await blogQueryBuilder.getOne();
 
     if (blog) {
+      // Follow 정보 추가 (팔로워 수 표시용)
       if (blog?.owner?.id && user && String(user.id) !== String(blog.userId)) {
         const [followersCount, followingCount] = await Promise.all([
           this.followRepository.count({
@@ -592,6 +558,7 @@ export class BlogsService {
         };
       }
 
+      // 블로그 소유자 프로필 정보 평탄화 (users.service.ts와 동일한 패턴)
       if (blog?.owner?.profile) {
         blog.owner.name = blog.owner.profile.name;
         blog.owner.profileImage = blog.owner.profile.profileImage;
@@ -600,11 +567,13 @@ export class BlogsService {
         blog.owner.socialLinks = blog.owner.profile.socialLinks;
         blog.owner.lastLoginProvider = blog.owner.profile.lastLoginProvider;
 
+        // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
         if (blog.owner.profileImage) {
           if (
             blog.owner.profileImage.startsWith("v2/") ||
             blog.owner.profileImage.startsWith("uploads/")
           ) {
+            // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
             blog.owner.profileImage = this.cdnService.generateCdnUrlFromKey(
               blog.owner.profileImage,
             );
@@ -615,18 +584,16 @@ export class BlogsService {
         }
       }
 
+      // 캐시에 저장
       await this.cacheService.set(cacheKey, blog, CacheTTL.SHORT);
       this.logger.debug(
         `[Alias Cache] Cached blog for alias: ${cleanIdentifier}`,
       );
-      markStep("alias_hydration");
 
-      return returnWithLog(
-        this.checkBlogAccessAndReturn(blog, user),
-        "alias-hit",
-      );
+      return this.checkBlogAccessAndReturn(blog, user);
     }
 
+    // 3. old_aliases 테이블에서 조회 (SEO 보호)
     const oldAlias = await this.oldAliasRepository
       .createQueryBuilder("oldAlias")
       .leftJoinAndSelect("oldAlias.blog", "blog")
@@ -634,7 +601,6 @@ export class BlogsService {
       .leftJoinAndSelect("owner.profile", "profile")
       .where("oldAlias.oldAlias = :oldAlias", { oldAlias: cleanIdentifier })
       .getOne();
-    markStep("old_alias_lookup");
 
     if (oldAlias && oldAlias.blog) {
       this.logger.log(
@@ -643,6 +609,7 @@ export class BlogsService {
 
       blog = oldAlias.blog;
 
+      // Follow 정보 추가 (팔로워 수 표시용)
       if (blog?.owner?.id && user && String(user.id) !== String(blog.userId)) {
         const [followersCount, followingCount] = await Promise.all([
           this.followRepository.count({
@@ -667,6 +634,7 @@ export class BlogsService {
         };
       }
 
+      // 블로그 소유자 프로필 정보 평탄화 (users.service.ts와 동일한 패턴)
       if (blog?.owner?.profile) {
         blog.owner.name = blog.owner.profile.name;
         blog.owner.profileImage = blog.owner.profile.profileImage;
@@ -675,11 +643,13 @@ export class BlogsService {
         blog.owner.socialLinks = blog.owner.profile.socialLinks;
         blog.owner.lastLoginProvider = blog.owner.profile.lastLoginProvider;
 
+        // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
         if (blog.owner.profileImage) {
           if (
             blog.owner.profileImage.startsWith("v2/") ||
             blog.owner.profileImage.startsWith("uploads/")
           ) {
+            // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
             blog.owner.profileImage = this.cdnService.generateCdnUrlFromKey(
               blog.owner.profileImage,
             );
@@ -689,31 +659,30 @@ export class BlogsService {
           }
         }
       }
-      markStep("old_alias_hydration");
 
+      // 301 리다이렉트 정보와 함께 반환
       const blogWithAccess = this.checkBlogAccessAndReturn(blog, user);
-      return returnWithLog(
-        {
-          ...blogWithAccess,
-          shouldRedirect: true,
-          redirectTo: oldAlias.blog.alias
-            ? `@${oldAlias.blog.alias}`
-            : oldAlias.blog.slug,
-          redirectType: "301",
-        },
-        "old-alias-redirect",
-      );
+
+      return {
+        ...blogWithAccess,
+        shouldRedirect: true,
+        redirectTo: oldAlias.blog.alias
+          ? `@${oldAlias.blog.alias}`
+          : oldAlias.blog.slug,
+        redirectType: "301", // Permanent redirect (SEO 보호)
+      };
     }
 
+    // 4. slug로 폴백 (기존 시스템 호환성)
     blog = await this.blogRepository
       .createQueryBuilder("blog")
       .leftJoinAndSelect("blog.owner", "owner")
       .leftJoinAndSelect("owner.profile", "profile")
       .where("blog.slug = :slug", { slug: cleanIdentifier })
       .getOne();
-    markStep("slug_lookup");
 
     if (blog) {
+      // Follow 정보 추가 (팔로워 수 표시용)
       if (blog?.owner?.id && user && String(user.id) !== String(blog.userId)) {
         const [followersCount, followingCount] = await Promise.all([
           this.followRepository.count({
@@ -738,39 +707,36 @@ export class BlogsService {
         };
       }
 
+      // 캐시에 저장
       await this.cacheService.set(cacheKey, blog, CacheTTL.SHORT);
       this.logger.debug(
         `[Alias Cache] Cached blog for slug: ${cleanIdentifier}`,
       );
 
-      if (blog.alias && cleanIdentifier !== blog.alias) {
-        this.logger.log(
-          `[Alias System] URL normalization: ${cleanIdentifier} → ${blog.alias}`,
-        );
-        markStep("slug_hydration");
-        const blogWithAccess = this.checkBlogAccessAndReturn(blog, user);
-        return returnWithLog(
-          {
+      // FIX: slug로 찾았더라도, alias가 존재하면 항상 리다이렉트 (URL 정규화)
+      if (blog.alias) {
+        // slug나 @없는 alias로 접속했을 때 항상 @alias로 리다이렉트
+        if (cleanIdentifier !== blog.alias) {
+          this.logger.log(
+            `[Alias System] URL normalization: ${cleanIdentifier} → ${blog.alias}`,
+          );
+          const blogWithAccess = this.checkBlogAccessAndReturn(blog, user);
+          return {
             ...blogWithAccess,
             shouldRedirect: true,
             redirectTo: `@${blog.alias}`,
             redirectType: "301",
-          },
-          "slug-normalize-redirect",
-        );
+          };
+        }
       }
 
       this.logger.debug(
         `[Alias System] Found by slug (fallback): ${cleanIdentifier}`,
       );
-      markStep("slug_hydration");
-      return returnWithLog(
-        this.checkBlogAccessAndReturn(blog, user),
-        "slug-hit",
-      );
+      return this.checkBlogAccessAndReturn(blog, user);
     }
 
-    logLookup("not-found");
+    // 모든 방법으로 찾지 못함
     throw new NotFoundException("블로그를 찾을 수 없습니다.");
   }
 
@@ -970,6 +936,7 @@ export class BlogsService {
     blogId: string,
     newAlias: string,
     userId: string,
+    organizationId?: string,
   ): Promise<Blog> {
     // @ 제거
     const cleanAlias = newAlias.replace("@", "");
@@ -983,7 +950,10 @@ export class BlogsService {
     try {
       // 1. 블로그 조회 및 소유자 확인 (트랜잭션 내에서 FOR UPDATE 사용)
       const blog = await queryRunner.manager.findOne(Blog, {
-        where: { id: blogId },
+        where: {
+          id: blogId,
+          ...(organizationId ? { organizationId } : {}),
+        },
         lock: { mode: "pessimistic_write" }, // 비관적 락으로 동시 수정 방지
       });
 

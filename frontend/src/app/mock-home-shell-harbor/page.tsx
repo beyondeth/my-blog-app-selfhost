@@ -171,7 +171,7 @@ export default function MockHomeShellHarborPage() {
                 <span className="absolute -bottom-1 left-2 h-3 w-3 rotate-45 bg-[#264653] dark:bg-[#6CC3B2]" />
               </div>
               <div>
-                <p className="text-base font-semibold">codebase.blog</p>
+                <p className="text-base font-semibold">aigory.com</p>
                 <p className="text-xs text-[#4B5563] dark:text-[#A9B4C2]">
                   AI + 오픈소스 커뮤니티 뉴스룸
                 </p>

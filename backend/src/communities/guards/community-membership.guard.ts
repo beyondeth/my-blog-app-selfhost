@@ -69,11 +69,18 @@ export class CommunityMembershipGuard implements CanActivate {
           communityIdentifier,
         );
 
+      const organizationId = request.organizationContext?.organizationId;
       community = await this.communityRepository.findOne({
         where: isUuid
-          ? { id: communityIdentifier }
-          : { slug: communityIdentifier },
-        select: ["id", "creatorId", "slug", "name"],
+          ? {
+              id: communityIdentifier,
+              ...(organizationId ? { organizationId } : {}),
+            }
+          : {
+              slug: communityIdentifier,
+              ...(organizationId ? { organizationId } : {}),
+            },
+        select: ["id", "creatorId", "slug", "name", "organizationId"],
       });
 
       if (!community) {
@@ -83,9 +90,9 @@ export class CommunityMembershipGuard implements CanActivate {
       request.community = community;
     }
 
-    // 플랫폼 관리자(admin)는 커뮤니티 멤버십 없이 접근 허용
-    if (String(user.role || "").toLowerCase() === "admin") {
-      return true;
+    const organizationId = request.organizationContext?.organizationId;
+    if (organizationId && community.organizationId !== organizationId) {
+      throw new NotFoundException("커뮤니티를 찾을 수 없습니다");
     }
 
     // 4. 차단 여부 확인 (우선)

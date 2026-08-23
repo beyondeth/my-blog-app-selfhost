@@ -23,7 +23,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { FiImage, FiUpload, FiCheck, FiMove, FiMenu } from 'react-icons/fi';
 import { toast } from 'sonner';
-import { validateImageFile } from '@/utils/imageUtils';
+import { normalizeImageUrl, validateImageFile } from '@/utils/imageUtils';
 import { useUploadFile } from '@/hooks/useFiles';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -70,6 +70,8 @@ function SortableImageItem({ image, isSelected, onRemove, onSelect }: SortableIm
     transition,
     isDragging,
   } = useSortable({ id: image.id });
+
+  const imageSrc = image.preview || normalizeImageUrl(image.url) || `/api/v1/files/${image.id}/download`;
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -120,7 +122,7 @@ function SortableImageItem({ image, isSelected, onRemove, onSelect }: SortableIm
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={image.preview || image.url || `/api/v1/files/${image.id}/download`}
+              src={imageSrc}
               alt={image.name}
               className="w-full h-full object-cover select-none"
               onError={(e) => {
@@ -303,7 +305,11 @@ export default function ImageUploadManager({
         // Use accessUrl if available, otherwise fall back to fileUrl
         const uploadedImage: UploadedImageInfo = {
           id: result.id.toString(),
-          url: (result as any).accessUrl || (result as any).fileUrl || `/api/v1/files/${result.id}/download`,
+          url: normalizeImageUrl(
+            (result as any).accessUrl ||
+              (result as any).fileUrl ||
+              `/api/v1/files/${result.id}/download`,
+          ),
           name: file.name,
           size: file.size,
           isUploading: false,
@@ -478,7 +484,7 @@ export default function ImageUploadManager({
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp"
           onChange={(e) => handleFileSelect(e.target.files)}
           className="hidden"
         />

@@ -22,6 +22,9 @@ import {
 } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { CommunityRolesGuard } from "../guards/community-roles.guard";
+import { CommunityOrganizationGuard } from "../guards/community-organization.guard";
+import { OrganizationContextGuard } from "../../organizations/guards/organization-context.guard";
+import { RequireOrganizationContext } from "../../organizations/decorators/organization-context.decorator";
 import {
   CommunityRoles,
   ModeratorOnly,
@@ -53,6 +56,8 @@ import {
  */
 @ApiTags("Community Reports")
 @Controller("community/:slug")
+@UseGuards(OrganizationContextGuard, CommunityOrganizationGuard)
+@RequireOrganizationContext()
 export class CommunityReportController {
   constructor(private readonly reportService: CommunityReportService) {}
 

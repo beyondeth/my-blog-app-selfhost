@@ -1,23 +1,18 @@
 import { Metadata } from 'next';
 import LegalPageLayout from '@/components/legal/LegalPageLayout';
-import { getRequestLocale } from '@/lib/i18n/server';
-import { getLegalCopy } from '@/lib/legal';
-import { getLegalPageMetadata } from '../_shared';
 
-export async function generateMetadata(): Promise<Metadata> {
-  return getLegalPageMetadata('privacy-policy');
-}
+export const metadata: Metadata = {
+  title: '개인정보처리방침 | Aigory',
+  description: 'Aigory의 개인정보 처리방침을 확인하세요.',
+};
 
 /**
  * 개인정보처리방침 페이지
  */
-export default async function PrivacyPage() {
-  const locale = await getRequestLocale();
-  const copy = getLegalCopy(locale, 'privacy-policy');
-
+export default function PrivacyPage() {
   return (
     <LegalPageLayout
-      title={copy.title}
+      title="개인정보처리방침"
       documentType="privacy-policy"
     />
   );

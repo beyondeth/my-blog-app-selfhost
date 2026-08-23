@@ -94,12 +94,12 @@ export class ChatService {
         (conversation.user2Id === currentUserId && conversation.user2DeletedAt);
 
       if (currentUserLeft) {
-        this.logger.debug(
+        console.log(
           "[ChatService] User had left this conversation, but returning it (will reset on first message)",
         );
       }
 
-      this.logger.debug("[ChatService] Returning existing conversation:", {
+      console.log("[ChatService] Returning existing conversation:", {
         conversationId: conversation.id,
         user1Username: conversation.user1?.username,
         user2Username: conversation.user2?.username,
@@ -118,12 +118,12 @@ export class ChatService {
         .orIgnore() // PostgreSQL: ON CONFLICT DO NOTHING
         .execute();
 
-      this.logger.debug("[ChatService] New conversation created between:", {
+      console.log("[ChatService] New conversation created between:", {
         user1Id,
         user2Id,
       });
     } catch (error) {
-      this.logger.error("[ChatService] Error creating conversation:", error);
+      console.error("[ChatService] Error creating conversation:", error);
       // Continue to try fetching in case it was created by another request
     }
 
@@ -134,13 +134,13 @@ export class ChatService {
     });
 
     if (!conversation) {
-      this.logger.error(
+      console.error(
         "[ChatService] Failed to create or find conversation after insert attempt",
       );
       throw new Error("Failed to create or find conversation");
     }
 
-    this.logger.debug("[ChatService] Conversation ready:", {
+    console.log("[ChatService] Conversation ready:", {
       conversationId: conversation.id,
       user1Username: conversation.user1?.username,
       user2Username: conversation.user2?.username,
@@ -218,10 +218,7 @@ export class ChatService {
   async getConversations(userId: string): Promise<ConversationWithUnread[]> {
     // Only log in development mode
     if (process.env.NODE_ENV === "development") {
-      this.logger.debug(
-        "[ChatService] getConversations called for userId:",
-        userId,
-      );
+      console.log("[ChatService] getConversations called for userId:", userId);
     }
 
     // Check cache first
@@ -231,7 +228,7 @@ export class ChatService {
     >("chat", cacheKey);
     if (cached) {
       if (process.env.NODE_ENV === "development") {
-        this.logger.debug(
+        console.log(
           "[ChatService] Returning cached conversations for user:",
           userId,
         );
@@ -289,58 +286,57 @@ export class ChatService {
       ]),
     );
 
-    // 2. 배치 쿼리로 모든 대화방의 unreadCount를 한 번에 조회 (N+1 → 2 쿼리로 최적화)
-    // Raw SQL로 복잡한 조건 처리 (user1/user2별 lastReadAt)
-    let unreadCountMap = new Map<string, number>();
+    // 2. 각 대화방의 unreadCount 계산
+    // 아직 개별 쿼리지만 이전보다는 최적화됨 (lastMessage는 이미 배치로 처리)
+    const conversationsWithUnreadCount = await Promise.all(
+      conversations.map(async (conv) => {
+        // 현재 사용자의 lastReadAt 타임스탬프
+        const lastReadAt =
+          userId === conv.user1Id ? conv.user1LastReadAt : conv.user2LastReadAt;
 
-    if (conversationIds.length > 0) {
-      const unreadCountsRaw = await this.messageRepository.query(
-        `
-        SELECT 
-          m."conversationId",
-          COUNT(*) as "unreadCount"
-        FROM messages m
-        INNER JOIN conversations c ON c.id = m."conversationId"
-        WHERE m."conversationId" = ANY($1)
-          AND m."senderId" != $2
-          AND m."isDeleted" = false
-          AND (
-            (c."user1Id" = $2 AND (c."user1LastReadAt" IS NULL OR m."createdAt" > c."user1LastReadAt"))
-            OR
-            (c."user2Id" = $2 AND (c."user2LastReadAt" IS NULL OR m."createdAt" > c."user2LastReadAt"))
-          )
-        GROUP BY m."conversationId"
-        `,
-        [conversationIds, userId],
-      );
+        // 상대방이 보낸 메시지 중 lastReadAt 이후 메시지 카운트
+        let unreadCount = 0;
+        if (!lastReadAt) {
+          // lastReadAt이 없으면 모든 상대방 메시지가 unread
+          unreadCount = await this.messageRepository
+            .createQueryBuilder("message")
+            .where("message.conversationId = :conversationId", {
+              conversationId: conv.id,
+            })
+            .andWhere("message.senderId != :userId", { userId })
+            .andWhere("message.isDeleted = false")
+            .getCount();
+        } else {
+          // lastReadAt 이후 메시지만 카운트
+          unreadCount = await this.messageRepository
+            .createQueryBuilder("message")
+            .where("message.conversationId = :conversationId", {
+              conversationId: conv.id,
+            })
+            .andWhere("message.senderId != :userId", { userId })
+            .andWhere("message.isDeleted = false")
+            .andWhere("message.createdAt > :lastReadAt", { lastReadAt })
+            .getCount();
+        }
 
-      unreadCountMap = new Map(
-        unreadCountsRaw.map((r: any) => [
-          r.conversationId,
-          parseInt(r.unreadCount, 10),
-        ]),
-      );
-    }
+        // 맵에서 미리 조회된 lastMessage 가져오기 (N+1 문제 해결)
+        const lastMessage = lastMessageMap.get(conv.id) || null;
 
-    // 동기적 매핑 (비동기 루프 제거)
-    const conversationsWithUnreadCount = conversations.map((conv) => {
-      const lastMessage = lastMessageMap.get(conv.id) || null;
-      const unreadCount = unreadCountMap.get(conv.id) || 0;
+        // formatAuthorData 패턴 적용 (PostsService와 동일)
+        if (conv.user1) {
+          this.formatAuthorData(conv.user1);
+        }
+        if (conv.user2) {
+          this.formatAuthorData(conv.user2);
+        }
 
-      // formatAuthorData 패턴 적용 (PostsService와 동일)
-      if (conv.user1) {
-        this.formatAuthorData(conv.user1);
-      }
-      if (conv.user2) {
-        this.formatAuthorData(conv.user2);
-      }
-
-      return {
-        ...conv,
-        unreadCount,
-        lastMessage,
-      };
-    });
+        return {
+          ...conv,
+          unreadCount,
+          lastMessage,
+        };
+      }),
+    );
 
     /**
      * 대화 목록 캐싱 개선
@@ -363,7 +359,7 @@ export class ChatService {
     page = 1,
     limit = 10,
   ): Promise<{ messages: Message[]; hasMore: boolean }> {
-    this.logger.debug("[ChatService] getMessages called:", {
+    console.log("[ChatService] getMessages called:", {
       conversationId,
       userId,
       userIdType: typeof userId,
@@ -378,7 +374,7 @@ export class ChatService {
         limit,
       );
       if (cachedMessages.length > 0) {
-        this.logger.debug(
+        console.log(
           "[ChatService] Returning cached messages:",
           cachedMessages.length,
         );
@@ -399,7 +395,7 @@ export class ChatService {
     });
 
     if (!conversation) {
-      this.logger.error(
+      console.error(
         "[ChatService] Conversation not found for messages:",
         conversationId,
       );
@@ -411,7 +407,7 @@ export class ChatService {
     const user2IdStr = String(conversation.user2Id).toLowerCase();
     const userIdStr = String(userId).toLowerCase();
 
-    this.logger.debug("[ChatService] Message authorization check:", {
+    console.log("[ChatService] Message authorization check:", {
       conversationId,
       user1Id: conversation.user1Id,
       user1Username: conversation.user1?.username,
@@ -423,17 +419,14 @@ export class ChatService {
     });
 
     if (user1IdStr !== userIdStr && user2IdStr !== userIdStr) {
-      this.logger.error(
-        "[ChatService] Message authorization failed - FORBIDDEN:",
-        {
-          conversationId,
-          user1IdStr,
-          user2IdStr,
-          userIdStr,
-          user1Username: conversation.user1?.username,
-          user2Username: conversation.user2?.username,
-        },
-      );
+      console.error("[ChatService] Message authorization failed - FORBIDDEN:", {
+        conversationId,
+        user1IdStr,
+        user2IdStr,
+        userIdStr,
+        user1Username: conversation.user1?.username,
+        user2Username: conversation.user2?.username,
+      });
       throw new ForbiddenException("Not authorized to view this conversation");
     }
 
@@ -494,7 +487,7 @@ export class ChatService {
   async sendMessage(senderId: string, dto: CreateMessageDto): Promise<Message> {
     // Only log in development
     if (process.env.NODE_ENV === "development") {
-      this.logger.debug("[ChatService] sendMessage called:", {
+      console.log("[ChatService] sendMessage called:", {
         senderId,
         conversationId: dto.conversationId,
         contentLength: dto.content?.length,
@@ -509,43 +502,12 @@ export class ChatService {
 
     if (!conversation) {
       if (process.env.NODE_ENV === "development") {
-        this.logger.error(
+        console.error(
           "[ChatService] Conversation not found:",
           dto.conversationId,
         );
       }
       throw new NotFoundException("Conversation not found");
-    }
-
-    // DUAL WRITE STRATEGY: Queue message first for immediate display
-    const queuedMessage = await this.queueService.queueMessage({
-      conversationId: dto.conversationId,
-      senderId,
-      content: dto.content,
-      tempId: dto.tempId,
-    });
-
-    // Check if the sender had left this conversation and reset if they're re-entering
-    const senderHadLeft =
-      (conversation.user1Id === senderId && conversation.user1DeletedAt) ||
-      (conversation.user2Id === senderId && conversation.user2DeletedAt);
-
-    if (senderHadLeft) {
-      if (process.env.NODE_ENV === "development") {
-        this.logger.debug(
-          "[ChatService] Sender is re-entering conversation, resetting deletedAt",
-        );
-      }
-      // Reset the deletedAt field for the sender to reactivate the conversation
-      if (conversation.user1Id === senderId) {
-        await this.conversationRepository.update(dto.conversationId, {
-          user1DeletedAt: null,
-        });
-      } else if (conversation.user2Id === senderId) {
-        await this.conversationRepository.update(dto.conversationId, {
-          user2DeletedAt: null,
-        });
-      }
     }
 
     // Convert IDs to strings for comparison (handling potential UUID type mismatch)
@@ -555,7 +517,7 @@ export class ChatService {
 
     if (user1IdStr !== senderIdStr && user2IdStr !== senderIdStr) {
       if (process.env.NODE_ENV === "development") {
-        this.logger.error(
+        console.error(
           "[ChatService] User not part of conversation - FORBIDDEN",
         );
       }
@@ -571,11 +533,42 @@ export class ChatService {
     const isBlocked = await this.checkBlock(senderId, recipientId);
     if (isBlocked) {
       if (process.env.NODE_ENV === "development") {
-        this.logger.error(
+        console.error(
           "[ChatService] Message blocked - users have blocked each other",
         );
       }
       throw new ForbiddenException("Cannot send message to blocked user");
+    }
+
+    // Queueing and database updates must only happen after all access checks pass.
+    const queuedMessage = await this.queueService.queueMessage({
+      conversationId: dto.conversationId,
+      senderId,
+      content: dto.content,
+      tempId: dto.tempId,
+    });
+
+    // Check if the sender had left this conversation and reset if they're re-entering
+    const senderHadLeft =
+      (conversation.user1Id === senderId && conversation.user1DeletedAt) ||
+      (conversation.user2Id === senderId && conversation.user2DeletedAt);
+
+    if (senderHadLeft) {
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          "[ChatService] Sender is re-entering conversation, resetting deletedAt",
+        );
+      }
+      // Reset the deletedAt field for the sender to reactivate the conversation
+      if (conversation.user1Id === senderId) {
+        await this.conversationRepository.update(dto.conversationId, {
+          user1DeletedAt: null,
+        });
+      } else if (conversation.user2Id === senderId) {
+        await this.conversationRepository.update(dto.conversationId, {
+          user2DeletedAt: null,
+        });
+      }
     }
 
     // Create message with queued message ID for consistency
@@ -625,7 +618,7 @@ export class ChatService {
       await this.conversationRepository.update(dto.conversationId, updateData);
 
       if (process.env.NODE_ENV === "development") {
-        this.logger.debug(
+        console.log(
           `[ChatService] 수신자(${recipientId})가 대화방에 있어서 자동 읽음 처리`,
         );
       }
@@ -637,7 +630,7 @@ export class ChatService {
       (conversation.user2Id === recipientId && conversation.user2DeletedAt);
 
     if (recipientHasLeft && process.env.NODE_ENV === "development") {
-      this.logger.debug(
+      console.log(
         "[ChatService] 수신자가 삭제했던 대화에 새 메시지 전송 - 대화 목록에 다시 표시됨 (이전 메시지는 보이지 않음)",
       );
       // deletedAt은 유지하여 이전 메시지는 보이지 않도록 함
@@ -674,13 +667,13 @@ export class ChatService {
           });
 
         if (process.env.NODE_ENV === "development") {
-          this.logger.debug(
+          console.log(
             `[ChatService] 수신자(${recipientId})가 대화방에 없어서 message-notification 발생`,
           );
         }
       } else {
         if (process.env.NODE_ENV === "development") {
-          this.logger.debug(
+          console.log(
             `[ChatService] 수신자(${recipientId})가 대화방에 있어서 notification 생략 (자동 읽음 처리됨)`,
           );
         }
@@ -691,12 +684,12 @@ export class ChatService {
         this.chatGateway.server
           .to(`user:${recipientId}`)
           .emit("conversation-list-refresh");
-        this.logger.debug(
+        console.log(
           "[ChatService] Sent conversation-list-refresh event to recipient who had left",
         );
       }
 
-      this.logger.debug("[ChatService] Message broadcasted via WebSocket:", {
+      console.log("[ChatService] Message broadcasted via WebSocket:", {
         conversationId: dto.conversationId,
         messageId: fullMessage.id,
         recipientId,
@@ -705,6 +698,30 @@ export class ChatService {
     }
 
     return fullMessage;
+  }
+
+  async assertConversationParticipant(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    const conversation = await this.conversationRepository.findOne({
+      where: { id: conversationId },
+      select: ["id", "user1Id", "user2Id"],
+    });
+
+    if (!conversation) {
+      throw new NotFoundException("Conversation not found");
+    }
+
+    const normalizedUserId = String(userId).toLowerCase();
+    const isParticipant = [conversation.user1Id, conversation.user2Id].some(
+      (participantId) =>
+        String(participantId).toLowerCase() === normalizedUserId,
+    );
+
+    if (!isParticipant) {
+      throw new ForbiddenException("Not authorized");
+    }
   }
 
   async markAsRead(messageId: string, userId: string): Promise<Message> {
@@ -830,7 +847,7 @@ export class ChatService {
   }
 
   async checkBlock(user1Id: string, user2Id: string): Promise<boolean> {
-    this.logger.debug("[ChatService] checkBlock called:", { user1Id, user2Id });
+    console.log("[ChatService] checkBlock called:", { user1Id, user2Id });
 
     try {
       // Check if either user has blocked the other
@@ -841,7 +858,7 @@ export class ChatService {
         ],
       });
 
-      this.logger.debug("[ChatService] Block check result:", {
+      console.log("[ChatService] Block check result:", {
         user1Id,
         user2Id,
         blockFound: !!block,
@@ -856,7 +873,7 @@ export class ChatService {
 
       return !!block;
     } catch (error) {
-      this.logger.error("[ChatService] Error checking block:", error);
+      console.error("[ChatService] Error checking block:", error);
       // On error, allow the message (don't block due to system error)
       return false;
     }
@@ -865,7 +882,6 @@ export class ChatService {
   async deleteMessage(messageId: string, userId: string): Promise<void> {
     const message = await this.messageRepository.findOne({
       where: { id: messageId },
-      relations: ["conversation"],
     });
 
     if (!message) {
@@ -874,13 +890,6 @@ export class ChatService {
 
     if (message.senderId !== userId) {
       throw new ForbiddenException("Can only delete your own messages");
-    }
-
-    // 거래 채팅 메시지는 삭제 불가 (법적 보존 의무)
-    if (message.conversation?.type === "transaction") {
-      throw new ForbiddenException(
-        "거래 관련 메시지는 삭제할 수 없습니다",
-      );
     }
 
     // Soft delete
@@ -957,14 +966,14 @@ export class ChatService {
       await this.conversationRepository.update(conversationId, {
         user1DeletedAt: new Date(),
       });
-      this.logger.debug(
+      console.log(
         `[ChatService] User ${userId} left conversation ${conversationId} (as user1)`,
       );
     } else {
       await this.conversationRepository.update(conversationId, {
         user2DeletedAt: new Date(),
       });
-      this.logger.debug(
+      console.log(
         `[ChatService] User ${userId} left conversation ${conversationId} (as user2)`,
       );
     }
@@ -1002,7 +1011,7 @@ export class ChatService {
           userId: userId,
         });
 
-      this.logger.debug(
+      console.log(
         `[ChatService] Emitted user-left event for conversation ${conversationId}`,
       );
     }

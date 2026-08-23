@@ -52,6 +52,7 @@ export class AdminPostsService {
     limit = 20,
     sortBy = "createdAt",
     sortOrder: "ASC" | "DESC" = "DESC",
+    organizationId?: string,
   ) {
     const where: FindOptionsWhere<Post> = {};
 
@@ -68,6 +69,9 @@ export class AdminPostsService {
 
     if (filters.startDate && filters.endDate) {
       where.createdAt = Between(filters.startDate, filters.endDate);
+    }
+    if (organizationId) {
+      where.blog = { organizationId };
     }
 
     const [posts, total] = await this.postRepository.findAndCount({

@@ -19,7 +19,6 @@ import {
   CommunityRecoverySnapshot,
   CommunitySidebarWidget,
   CommunitySidebarWidgetEntry,
-  CommunityBookmark,
 } from "./entities";
 import { CommunityStats } from "./entities/community-stats.entity";
 import { StatsSnapshot } from "../common/entities/stats-snapshot.entity";
@@ -44,7 +43,6 @@ import {
   CommunityModerationController,
   CommunityReportController,
   CommunityWidgetController,
-  PopularCommunityPostsController,
 } from "./controllers";
 import { CommunityStatsController } from "./controllers/community-stats.controller";
 
@@ -54,6 +52,8 @@ import {
   CommunityMembershipGuard,
   CommunityBanGuard,
   CommunityVisibilityGuard,
+  CommunityOrganizationGuard,
+  CommunityResourceScopeGuard,
 } from "./guards";
 
 // 외부 모듈
@@ -61,8 +61,7 @@ import { UsersModule } from "../users/users.module";
 import { CacheModule } from "../cache/cache.module";
 import { RedisModule } from "../redis/redis.module";
 import { FilesModule } from "../files/files.module";
-import { PopularPostsModule } from "../popular-posts/popular-posts.module";
-import { PostsModule } from "../posts/posts.module";
+import { ContentProcessingModule } from "../content-processing/content-processing.module";
 
 /**
  * 커뮤니티 모듈
@@ -105,14 +104,12 @@ import { PostsModule } from "../posts/posts.module";
       CommunitySidebarWidgetEntry,
       CommunityStats,
       StatsSnapshot,
-      CommunityBookmark,
     ]),
     UsersModule,
     CacheModule,
     RedisModule,
     FilesModule, // V2 ContextualFile 이미지 업로드
-    PopularPostsModule, // 커뮤니티 인기글 전용 API read path
-    PostsModule,
+    ContentProcessingModule,
   ],
   providers: [
     // 서비스
@@ -131,6 +128,8 @@ import { PostsModule } from "../posts/posts.module";
     CommunityMembershipGuard,
     CommunityBanGuard,
     CommunityVisibilityGuard,
+    CommunityOrganizationGuard,
+    CommunityResourceScopeGuard,
   ],
   controllers: [
     CommunityController,
@@ -139,7 +138,6 @@ import { PostsModule } from "../posts/posts.module";
     CommunityReportController,
     CommunityWidgetController,
     CommunityStatsController,
-    PopularCommunityPostsController,
   ],
   exports: [
     // 다른 모듈에서 사용할 수 있도록 export
@@ -152,6 +150,8 @@ import { PostsModule } from "../posts/posts.module";
     CommunityWidgetService,
     CommunityPostViewService,
     CommunityStatsService,
+    CommunityOrganizationGuard,
+    CommunityResourceScopeGuard,
   ],
 })
 export class CommunitiesModule {}

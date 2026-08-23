@@ -52,6 +52,7 @@ import {
   DESTRUCTIVE_SURFACE_CLASS,
 } from '@/constants/accessibility';
 import ImageCropperModal from '@/components/ui/ImageCropperModal';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 type ImageFitMode = 'cover' | 'contain';
 
@@ -133,22 +134,22 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
   const joinPolicyOptions = [
     {
       value: JoinPolicy.OPEN,
-      label: 'Open',
-      description: 'Anyone can join immediately.',
+      label: '누구나 가입',
+      description: '모든 사용자가 즉시 가입할 수 있습니다.',
       icon: Globe,
       accent: 'text-green-500',
     },
     {
       value: JoinPolicy.RESTRICTED,
-      label: 'Approval required',
-      description: 'New members must be approved by the moderation team.',
+      label: '승인 필요',
+      description: '가입 신청 후 운영진 승인이 필요합니다.',
       icon: Shield,
       accent: 'text-yellow-500',
     },
     {
       value: JoinPolicy.PRIVATE,
-      label: 'Private',
-      description: 'People can join only through an invite link.',
+      label: '비공개',
+      description: '초대 링크로만 가입할 수 있습니다.',
       icon: Lock,
       accent: 'text-red-500',
     },
@@ -180,7 +181,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
     const payload: Partial<typeof formData> = {};
     const trimmedName = formData.name.trim();
     if (!trimmedName) {
-      setError('Please enter a community name.');
+      setError('커뮤니티 이름을 입력해주세요.');
       return;
     }
 
@@ -202,7 +203,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
       setGeneralSaveSuccess(true);
       setTimeout(() => setGeneralSaveSuccess(false), 2000);
     } catch (err: any) {
-      setError(err.message || 'Failed to update the basic information.');
+      setError(err.message || '기본 정보를 업데이트하지 못했습니다.');
     } finally {
       setGeneralSaving(false);
     }
@@ -222,10 +223,10 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
       await updateMutation.mutateAsync({ joinPolicy: joinPolicyDraft });
       await refetch();
       setFormData(prev => ({ ...prev, joinPolicy: joinPolicyDraft }));
-      setSuccess('Join policy updated.');
+      setSuccess('가입 정책이 변경되었습니다.');
       setTimeout(() => setSuccess(''), 2000);
     } catch (err: any) {
-      setError(err.message || 'Failed to update the join policy.');
+      setError(err.message || '가입 정책 변경에 실패했습니다.');
     } finally {
       setJoinPolicySaving(false);
     }
@@ -236,7 +237,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
     if (formData.isPublic === newValue) return;
     setFormData((prev) => ({ ...prev, isPublic: newValue }));
     setError('');
-    setVisibilityFeedback({ type: 'info', text: 'Saving your settings...' });
+    setVisibilityFeedback({ type: 'info', text: '설정을 저장하고 있습니다...' });
 
     try {
       await updateMutation.mutateAsync({ isPublic: newValue });
@@ -244,18 +245,18 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
       setVisibilityFeedback({
         type: 'success',
         text: newValue
-          ? 'Community discovery in lists and search is enabled.'
-          : 'Community discovery in lists and search is disabled.',
+          ? '커뮤니티 목록/검색에 노출하도록 설정했습니다.'
+          : '커뮤니티 목록/검색 노출을 비활성화했습니다.',
       });
     } catch (err: any) {
-      setError(err.message || 'Failed to update discovery visibility.');
+      setError(err.message || '공개 설정 변경에 실패했습니다.');
       // 롤백
       if (community) {
         setFormData((prev) => ({ ...prev, isPublic: community.isPublic }));
       }
       setVisibilityFeedback({
         type: 'error',
-        text: err.message || 'Unable to update community discovery visibility.',
+        text: err.message || '공개 설정을 업데이트하지 못했습니다.',
       });
     }
   }, [formData.isPublic, updateMutation, community, refetch]);
@@ -264,7 +265,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
     if (formData.isPostDiscoverable === newValue) return;
     setFormData((prev) => ({ ...prev, isPostDiscoverable: newValue }));
     setError('');
-    setPostVisibilityFeedback({ type: 'info', text: 'Saving your settings...' });
+    setPostVisibilityFeedback({ type: 'info', text: '설정을 저장하고 있습니다...' });
 
     try {
       await updateMutation.mutateAsync({ isPostDiscoverable: newValue });
@@ -272,11 +273,11 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
       setPostVisibilityFeedback({
         type: 'success',
         text: newValue
-          ? 'Community post discovery is enabled.'
-          : 'Community post discovery is disabled.',
+          ? '커뮤니티 게시물 노출을 활성화했습니다.'
+          : '커뮤니티 게시물 노출을 비활성화했습니다.',
       });
     } catch (err: any) {
-      setError(err.message || 'Failed to update post discovery.');
+      setError(err.message || '게시물 노출 설정 변경에 실패했습니다.');
       if (community) {
         setFormData((prev) => ({
           ...prev,
@@ -285,7 +286,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
       }
       setPostVisibilityFeedback({
         type: 'error',
-        text: err.message || 'Unable to update post discovery visibility.',
+        text: err.message || '게시물 노출 설정을 업데이트하지 못했습니다.',
       });
     }
   }, [formData.isPostDiscoverable, updateMutation, community, refetch]);
@@ -294,23 +295,23 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
   const applyNsfwValue = useCallback(async (newValue: boolean) => {
     setFormData((prev) => ({ ...prev, isNsfw: newValue }));
     setError('');
-    setNsfwFeedback({ type: 'info', text: 'Saving your settings...' });
+    setNsfwFeedback({ type: 'info', text: '설정을 저장하고 있습니다...' });
 
     try {
       await updateMutation.mutateAsync({ isNsfw: newValue });
       await refetch();
       setNsfwFeedback({
         type: 'success',
-        text: newValue ? 'The community is now marked as NSFW.' : 'The NSFW label has been removed.',
+        text: newValue ? 'NSFW 커뮤니티로 표시했습니다.' : 'NSFW 표시를 해제했습니다.',
       });
     } catch (err: any) {
-      setError(err.message || 'Failed to update the NSFW setting.');
+      setError(err.message || 'NSFW 설정 변경에 실패했습니다.');
       if (community) {
         setFormData((prev) => ({ ...prev, isNsfw: community.isNsfw }));
       }
       setNsfwFeedback({
         type: 'error',
-        text: err.message || 'Unable to update the NSFW setting.',
+        text: err.message || 'NSFW 설정을 업데이트하지 못했습니다.',
       });
     }
   }, [updateMutation, community, refetch]);
@@ -339,8 +340,8 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
 
   const getDisplayHelperText = useCallback((mode: ImageFitMode) => {
     return mode === 'cover'
-      ? 'Fills the entire frame, even if part of the image is cropped.'
-      : 'Keeps the original aspect ratio and fills the empty space with the background color.';
+      ? '이미지를 잘라서라도 영역 전체를 채웁니다.'
+      : '이미지 비율을 유지하며 여백은 배경색으로 채웁니다.';
   }, []);
 
   // 파일 선택 인터셉터
@@ -348,11 +349,11 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-         setBrandingFeedbackMessage(field, { type: 'error', text: 'Please select an image file.' });
+         setBrandingFeedbackMessage(field, { type: 'error', text: '이미지 파일만 선택 가능합니다.' });
          return;
       }
       if (file.size > 10 * 1024 * 1024) {
-        setBrandingFeedbackMessage(field, { type: 'error', text: 'Files must be 10MB or smaller.' });
+        setBrandingFeedbackMessage(field, { type: 'error', text: '파일 크기는 10MB 이하여야 합니다.' });
         return;
       }
 
@@ -370,13 +371,13 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
   // 실제 업로드 로직 (File 객체 직접 수신)
   const uploadIcon = useCallback(async (file: File) => {
     setIconUploading(true);
-    setBrandingFeedbackMessage('icon', { type: 'info', text: 'Uploading icon...' });
+    setBrandingFeedbackMessage('icon', { type: 'info', text: '아이콘을 업로드하는 중입니다...' });
     try {
       await communityService.uploadCommunityImage(slug, 'icon', file);
       await refetch();
-      setBrandingFeedbackMessage('icon', { type: 'success', text: 'Icon uploaded.' });
+      setBrandingFeedbackMessage('icon', { type: 'success', text: '아이콘을 업로드했습니다.' });
     } catch (err: any) {
-      setBrandingFeedbackMessage('icon', { type: 'error', text: err.message || 'Failed to upload the icon.' });
+      setBrandingFeedbackMessage('icon', { type: 'error', text: err.message || '아이콘 업로드에 실패했습니다.' });
     } finally {
       setIconUploading(false);
     }
@@ -384,13 +385,13 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
 
   const uploadBanner = useCallback(async (file: File) => {
     setBannerUploading(true);
-    setBrandingFeedbackMessage('banner', { type: 'info', text: 'Uploading banner...' });
+    setBrandingFeedbackMessage('banner', { type: 'info', text: '배너를 업로드하는 중입니다...' });
     try {
       await communityService.uploadCommunityImage(slug, 'banner', file);
       await refetch();
-      setBrandingFeedbackMessage('banner', { type: 'success', text: 'Banner uploaded.' });
+      setBrandingFeedbackMessage('banner', { type: 'success', text: '배너를 업로드했습니다.' });
     } catch (err: any) {
-      setBrandingFeedbackMessage('banner', { type: 'error', text: err.message || 'Failed to upload the banner.' });
+      setBrandingFeedbackMessage('banner', { type: 'error', text: err.message || '배너 업로드에 실패했습니다.' });
     } finally {
       setBannerUploading(false);
     }
@@ -414,13 +415,13 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
   
   const handleIconRemove = useCallback(async () => {
     setIconUploading(true);
-    setBrandingFeedbackMessage('icon', { type: 'info', text: 'Removing icon...' });
+    setBrandingFeedbackMessage('icon', { type: 'info', text: '아이콘을 삭제하는 중입니다...' });
     try {
       await updateMutation.mutateAsync({ iconUrl: null });
       await refetch();
-      setBrandingFeedbackMessage('icon', { type: 'success', text: 'Icon removed.' });
+      setBrandingFeedbackMessage('icon', { type: 'success', text: '아이콘을 삭제했습니다.' });
     } catch (err: any) {
-      setBrandingFeedbackMessage('icon', { type: 'error', text: err?.message || 'Failed to remove the icon.' });
+      setBrandingFeedbackMessage('icon', { type: 'error', text: err?.message || '아이콘 삭제에 실패했습니다.' });
     } finally {
       setIconUploading(false);
     }
@@ -428,13 +429,13 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
 
   const handleBannerRemove = useCallback(async () => {
     setBannerUploading(true);
-    setBrandingFeedbackMessage('banner', { type: 'info', text: 'Removing banner...' });
+    setBrandingFeedbackMessage('banner', { type: 'info', text: '배너를 삭제하는 중입니다...' });
     try {
       await updateMutation.mutateAsync({ bannerUrl: null });
       await refetch();
-      setBrandingFeedbackMessage('banner', { type: 'success', text: 'Banner removed.' });
+      setBrandingFeedbackMessage('banner', { type: 'success', text: '배너를 삭제했습니다.' });
     } catch (err: any) {
-      setBrandingFeedbackMessage('banner', { type: 'error', text: err?.message || 'Failed to remove the banner.' });
+      setBrandingFeedbackMessage('banner', { type: 'error', text: err?.message || '배너 삭제에 실패했습니다.' });
     } finally {
       setBannerUploading(false);
     }
@@ -449,13 +450,13 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
         ...prev,
         [target]: mode,
       }));
-      setBrandingFeedbackMessage(target, { type: 'info', text: 'Saving display mode...' });
+      setBrandingFeedbackMessage(target, { type: 'info', text: '표시 방식을 저장하는 중입니다...' });
       const payload = target === 'icon' ? { iconImageFit: mode } : { bannerImageFit: mode };
       try {
         await updateMutation.mutateAsync(payload);
         await refetch();
-        const label = mode === 'cover' ? 'Fill frame' : 'Keep aspect ratio';
-        setBrandingFeedbackMessage(target, { type: 'success', text: `Updated to ${label.toLowerCase()}.` });
+        const label = mode === 'cover' ? '화면에 맞춤' : '원본 비율';
+        setBrandingFeedbackMessage(target, { type: 'success', text: `${label} 방식으로 업데이트했습니다.` });
       } catch (err: any) {
         setImageFitModes((prev) => ({
           ...prev,
@@ -465,7 +466,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
           target,
           {
             type: 'error',
-            text: err?.message || 'Unable to update the display mode.',
+            text: err?.message || '표시 방식을 업데이트하지 못했습니다.',
           }
         );
       }
@@ -514,15 +515,15 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
           <div className="mb-6 space-y-1">
             <h2 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
               <Settings className="w-5 h-5" />
-              Basic information
+              기본 정보
             </h2>
-            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>Update the community name and description.</p>
+            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>커뮤니티 이름과 설명을 업데이트하세요.</p>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-2">
               <label htmlFor="name" className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                Community name
+                커뮤니티 이름
               </label>
               <input
                 type="text"
@@ -530,15 +531,15 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 maxLength={50}
-                placeholder="Community name"
+                placeholder="커뮤니티 이름"
                 className={SETTINGS_INPUT_CLASS}
               />
-              <p className="text-xs text-gray-500 dark:text-gray-300">2-50 characters. Letters, numbers, and spaces are allowed.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-300">2-50자, 한글/영문/숫자/공백 사용 가능</p>
             </div>
 
             <div className="space-y-2">
               <label htmlFor="description" className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                Community description
+                커뮤니티 설명
               </label>
               <textarea
                 id="description"
@@ -548,14 +549,14 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                     setFormData({ ...formData, description: e.target.value });
                   }
                 }}
-                rows={8}
+                rows={4}
                 maxLength={500}
-                placeholder="Introduce your community..."
-                className={`${SETTINGS_INPUT_CLASS} min-h-[240px]`}
+                placeholder="커뮤니티를 소개해주세요..."
+                className={`${SETTINGS_INPUT_CLASS} min-h-[120px]`}
               />
               <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-300">
                 <span>{formData.description.length}/500</span>
-                <span>This text appears in the community profile.</span>
+                <span>소개 문구는 커뮤니티 정보에 표시됩니다</span>
               </div>
             </div>
 
@@ -572,12 +573,12 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                 }`}
               >
                 {generalSaveSuccess
-                  ? 'Basic information saved.'
+                  ? '기본 정보가 저장되었습니다.'
                   : generalSaving
-                  ? 'Saving...'
+                  ? '저장 중...'
                   : isGeneralDirty
-                  ? 'You have unsaved changes.'
-                  : 'Everything is up to date.'}
+                  ? '변경 사항이 있습니다.'
+                  : '최신 상태입니다.'}
               </div>
               <button
                 onClick={handleGeneralSave}
@@ -587,7 +588,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                 {generalSaving ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  'Save changes'
+                  '변경 사항 저장'
                 )}
               </button>
             </div>
@@ -599,23 +600,23 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
           <div className="mb-6 space-y-1">
             <h2 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
               <ImageIcon className="w-5 h-5" />
-              Branding
+              브랜딩
             </h2>
-            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>Replace the icon and banner, then adjust how each image is displayed.</p>
+            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>아이콘과 배너를 교체하고 표시 방식을 설정하세요.</p>
           </div>
 
           <div className="space-y-6">
             <div className={`${SETTINGS_CARD_CLASS} p-5 space-y-5`}>
               <div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Community icon</p>
-                <p className="text-xs text-gray-500 dark:text-gray-300">Shown on profiles and in community lists.</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">커뮤니티 아이콘</p>
+                <p className="text-xs text-gray-500 dark:text-gray-300">프로필 및 목록에 표시되는 아이콘입니다.</p>
               </div>
               <div className="flex flex-col gap-6 lg:flex-row">
                 <div className="flex flex-1 flex-col items-center text-center">
                   {community.iconUrl ? (
                     <TintedImagePreview
-                      src={community.iconUrl}
-                      alt="Community icon"
+                      src={normalizeImageUrl(community.iconUrl)}
+                      alt="커뮤니티 아이콘"
                       className="mx-auto h-24 w-24"
                       roundedClassName="rounded-full"
                       imageFit={imageFitModes.icon}
@@ -631,20 +632,20 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                       {iconUploading ? (
                         <div className="flex items-center gap-2">
                           <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
-                          Uploading...
+                          업로드 중...
                         </div>
                       ) : (
                         <>
                           <Upload className="h-6 w-6 text-gray-400 dark:text-gray-500" />
                           <span className="text-center text-xs">
-                            Click to choose an image (JPG, PNG, GIF, or WebP up to 10MB)
+                            클릭해서 이미지 선택 (JPG·PNG·GIF·WebP, 10MB 이하)
                           </span>
                         </>
                       )}
                     </button>
                   )}
                   <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                    Recommended 150x150px
+                    권장 150x150px
                   </p>
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
                     <button
@@ -658,7 +659,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                       ) : (
                         <Upload className="h-4 w-4" />
                       )}
-                      {iconUploading ? 'Uploading...' : 'Choose new image'}
+                      {iconUploading ? '업로드 중...' : '새 이미지 선택'}
                     </button>
                     {community.iconUrl && (
                       <button
@@ -672,12 +673,12 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                         onClick={handleIconRemove}
                       >
                         <FiX className="h-4 w-4" />
-                        Remove
+                        삭제
                       </button>
                     )}
                   </div>
                   <div className="mt-4 flex flex-col items-center gap-2 text-xs text-gray-500 dark:text-gray-300">
-                    <p>JPG, PNG, GIF, or WebP / up to 10MB</p>
+                    <p>JPG·PNG·GIF·WebP / 최대 10MB</p>
                     {community.iconUrl && (
                       <>
                         <div className="inline-flex rounded-full border border-gray-200 bg-white p-1 dark:border-[#3A414F] dark:bg-[#1F2229]">
@@ -694,7 +695,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                             )}
                             disabled={iconUploading}
                           >
-                            {mode === 'cover' ? 'Fill frame' : 'Keep aspect ratio'}
+                            {mode === 'cover' ? '화면에 맞춤' : '원본 비율'}
                           </button>
                         ))}
                         </div>
@@ -723,7 +724,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
               <input
                 ref={iconInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
+                accept="image/jpeg,image/png,image/webp"
                 className="hidden"
                 onChange={(e) => handleFileSelect('icon', e)}
                 disabled={iconUploading}
@@ -732,15 +733,15 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
 
             <div className={`${SETTINGS_CARD_CLASS} p-5 space-y-5`}>
               <div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Community banner</p>
-                <p className="text-xs text-gray-500 dark:text-gray-300">Background image shown at the top of the community.</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">커뮤니티 배너</p>
+                <p className="text-xs text-gray-500 dark:text-gray-300">커뮤니티 상단에 표시되는 배경 이미지입니다.</p>
               </div>
               <div className="flex flex-col gap-6 lg:flex-row">
                 <div className="flex flex-1 flex-col items-center text-center">
                   {community.bannerUrl ? (
                     <TintedImagePreview
-                      src={community.bannerUrl}
-                      alt="Community banner"
+                      src={normalizeImageUrl(community.bannerUrl)}
+                      alt="커뮤니티 배너"
                       className="mx-auto h-40 w-full"
                       roundedClassName="rounded-2xl"
                       imageFit={imageFitModes.banner}
@@ -756,20 +757,20 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                       {bannerUploading ? (
                         <div className="flex items-center gap-2">
                           <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
-                          Uploading...
+                          업로드 중...
                         </div>
                       ) : (
                         <>
                           <ImageIcon className="h-8 w-8 text-gray-400 dark:text-gray-500" />
                           <span className="text-center text-xs">
-                            Click to choose an image (JPG, PNG, GIF, or WebP up to 10MB)
+                            클릭해서 이미지 선택 (JPG·PNG·GIF·WebP, 10MB 이하)
                           </span>
                         </>
                       )}
                     </button>
                   )}
                   <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                    Recommended 1200x300px
+                    권장 1200x300px
                   </p>
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
                     <button
@@ -783,7 +784,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                       ) : (
                         <Upload className="h-4 w-4" />
                       )}
-                      {bannerUploading ? 'Uploading...' : 'Choose new image'}
+                      {bannerUploading ? '업로드 중...' : '새 이미지 선택'}
                     </button>
                     {community.bannerUrl && (
                       <button
@@ -797,12 +798,12 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                         onClick={handleBannerRemove}
                       >
                         <FiX className="h-4 w-4" />
-                        Remove
+                        삭제
                       </button>
                     )}
                   </div>
                   <div className="mt-4 flex flex-col items-center gap-2 text-xs text-gray-500 dark:text-gray-300">
-                    <p>JPG, PNG, GIF, or WebP / up to 10MB</p>
+                    <p>JPG·PNG·GIF·WebP / 최대 10MB</p>
                     {community.bannerUrl && (
                       <>
                         <div className="inline-flex rounded-full border border-gray-200 bg-white p-1 dark:border-[#3A414F] dark:bg-[#1F2229]">
@@ -819,7 +820,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                             )}
                             disabled={bannerUploading}
                           >
-                            {mode === 'cover' ? 'Fill frame' : 'Keep aspect ratio'}
+                            {mode === 'cover' ? '화면에 맞춤' : '원본 비율'}
                           </button>
                         ))}
                         </div>
@@ -848,7 +849,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
               <input
                 ref={bannerInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
+                accept="image/jpeg,image/png,image/webp"
                 className="hidden"
                 onChange={(e) => handleFileSelect('banner', e)}
                 disabled={bannerUploading}
@@ -862,9 +863,9 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
           <div className="mb-6 space-y-1">
             <h2 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
               <Users className="w-5 h-5" />
-              Join policy
+              가입 정책
             </h2>
-            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>Choose how people join this community.</p>
+            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>커뮤니티 가입 방식을 선택하세요.</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 mb-4">
@@ -900,7 +901,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <p className="text-xs text-gray-500 dark:text-gray-300">
-              Changes apply only after you click save.
+              정책을 변경한 뒤 저장을 눌러야 실제로 적용됩니다.
             </p>
             <button
               type="button"
@@ -912,7 +913,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
               }
               className={`${SETTINGS_PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}
             >
-              {joinPolicySaving ? 'Saving...' : 'Save'}
+              {joinPolicySaving ? '저장 중...' : '저장'}
             </button>
           </div>
         </section>
@@ -922,9 +923,9 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
           <div className="mb-6 space-y-1">
             <h2 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
               <Globe className="w-5 h-5" />
-              Visibility settings
+              공개 설정
             </h2>
-            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>Control discovery and NSFW labeling for this community.</p>
+            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>커뮤니티 노출과 NSFW 여부를 제어합니다.</p>
           </div>
 
           <div className="space-y-4">
@@ -934,10 +935,10 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                   htmlFor="isPublic"
                   className="text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Show community in lists and search
+                  커뮤니티 목록/검색 노출
                 </label>
                 <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
-                  The community appears in discovery lists and search results. When disabled, it is accessible only by direct link.
+                  커뮤니티 목록과 검색 결과에 표시됩니다. 끄면 링크로만 접근할 수 있습니다.
                 </p>
               </div>
               <Switch
@@ -968,10 +969,10 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                   htmlFor="isPostDiscoverable"
                   className="text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Show posts across discovery surfaces
+                  커뮤니티 게시물 노출
                 </label>
                 <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
-                  Posts can appear on the home feed, in search, and in trending surfaces.
+                  홈피드, 검색, 트렌딩 영역에 게시물이 표시됩니다.
                 </p>
               </div>
               <Switch
@@ -998,7 +999,7 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
 
             {isVisibilityLocked && (
               <p className="text-xs text-gray-500 dark:text-gray-300">
-                Private communities are member-only, so discovery toggles are disabled.
+                비공개 커뮤니티는 멤버만 접근할 수 있어 노출 설정이 비활성화됩니다.
               </p>
             )}
 
@@ -1008,10 +1009,10 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                   htmlFor="isNsfw"
                   className="text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  NSFW (adult content)
+                  NSFW (성인 콘텐츠)
                 </label>
                 <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
-                  Mark this community if it contains content intended for adults only.
+                  18세 이상 콘텐츠를 포함하는 커뮤니티입니다.
                 </p>
               </div>
               <Switch
@@ -1037,14 +1038,14 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
             {formData.isNsfw && !isAdultVerified && (
               <div className="rounded-lg border border-orange-200 dark:border-orange-700/60 bg-orange-50 dark:bg-orange-900/20 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <p className="text-sm text-orange-800 dark:text-orange-200">
-                  This community is now marked as NSFW. You will not be able to view it yourself until adult verification is complete.
+                  NSFW로 전환했습니다. 성인 인증을 완료하기 전까지는 본인도 커뮤니티를 볼 수 없습니다.
                 </p>
                 <button
                   type="button"
                   onClick={() => setShowVerificationModal(true)}
                   className={`${SETTINGS_SUBTLE_BUTTON_CLASS} w-auto gap-2`}
                 >
-                  Verify age
+                  성인 인증하기
                 </button>
               </div>
             )}
@@ -1066,15 +1067,15 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
       <AlertDialog open={isNsfwDialogOpen} onOpenChange={setIsNsfwDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark this community as NSFW?</AlertDialogTitle>
+            <AlertDialogTitle>NSFW로 전환하시겠어요?</AlertDialogTitle>
             <AlertDialogDescription>
-              The community will be labeled as adult content. Until adult verification is complete, you will not be able to view it yourself. Do you want to continue?
+              성인 콘텐츠 커뮤니티로 표시되며, 성인 인증을 완료하기 전까지는 본인도 커뮤니티를 볼 수 없습니다. 계속 진행하시겠습니까?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelNsfwChange}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={handleCancelNsfwChange}>취소</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmNsfwChange}>
-              Continue
+              전환하기
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1085,11 +1086,11 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
         onClose={() => setShowVerificationModal(false)}
         onVerified={() => {
           setShowVerificationModal(false);
-          setSuccess('Adult verification completed.');
+          setSuccess('성인 인증이 완료되었습니다.');
           setTimeout(() => setSuccess(''), 2000);
         }}
-        title="Adult verification required"
-        description="You need age verification to manage an NSFW community."
+        title="성인 인증 필요"
+        description="NSFW 커뮤니티를 관리하려면 본인 인증이 필요합니다."
       />
         {/* 크롭 모달 */}
         {croppingField && (

@@ -85,7 +85,7 @@ benchmark_build() {
     # Docker 빌드 실행
     if docker build \
         -f "$dockerfile" \
-        -t "codebase-frontend:$tag" \
+        -t "aigory-blog-frontend:$tag" \
         --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
         --build-arg NEXT_PUBLIC_BACKEND_URL="$NEXT_PUBLIC_BACKEND_URL" \
         --build-arg NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_SITE_URL" \
@@ -101,7 +101,7 @@ benchmark_build() {
         BUILD_TIMES["$tag"]=$ELAPSED
 
         # 이미지 크기 확인
-        IMAGE_SIZE=$(docker images "codebase-frontend:$tag" --format "{{.Size}}")
+        IMAGE_SIZE=$(docker images "aigory-blog-frontend:$tag" --format "{{.Size}}")
         log "이미지 크기: $IMAGE_SIZE"
 
         # node_modules COPY 시간 추출 (있는 경우)

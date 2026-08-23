@@ -1,4 +1,4 @@
-import { Module, Logger } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 import { MailerModule } from "@nestjs-modules/mailer";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
@@ -12,8 +12,9 @@ import { User } from "../users/entities/user.entity";
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        const logger = new Logger(EmailModule.name);
-
+        const emailMode = String(
+          configService.get("EMAIL_MODE", "smtp"),
+        ).toLowerCase();
         // 이메일 설정 유효성 검증
         const host =
           configService.get("SMTP_HOST") || configService.get("EMAIL_HOST");
@@ -28,40 +29,40 @@ import { User } from "../users/entities/user.entity";
           configService.get("SMTP_PASS") || configService.get("EMAIL_PASS");
         const from =
           configService.get("SMTP_FROM") || configService.get("EMAIL_FROM");
+        const brandName = configService.get("EMAIL_BRAND_NAME", "Aigory");
+        const replyTo = configService.get(
+          "EMAIL_REPLY_TO",
+          "noreply@localhost",
+        );
+        const defaultFrom = `"${brandName}" <${replyTo}>`;
 
-        // 개발 환경에서 디버그 로그
         if (process.env.NODE_ENV === "development") {
-          logger.debug("Email Module Configuration:", {
-            host,
-            port,
-            user: user ? `${user.substring(0, 3)}***` : "undefined",
-            userFull: user,
-            userLength: user ? user.length : 0,
-            pass: pass ? `${pass.substring(0, 2)}***` : "undefined",
-            passLength: pass ? pass.length : 0,
-            from,
-            env: process.env.NODE_ENV,
-          });
+          console.log("Email module initialized", { mode: emailMode, port });
+        }
 
-          // 환경 변수 직접 확인
-          logger.debug("Direct environment check:", {
-            SMTP_HOST: process.env.SMTP_HOST,
-            SMTP_USER: process.env.SMTP_USER,
-            SMTP_USER_LENGTH: process.env.SMTP_USER
-              ? process.env.SMTP_USER.length
-              : 0,
-            SMTP_PASS: process.env.SMTP_PASS
-              ? `${process.env.SMTP_PASS.substring(0, 2)}***`
-              : "undefined",
-            SMTP_PASS_LENGTH: process.env.SMTP_PASS
-              ? process.env.SMTP_PASS.length
-              : 0,
-          });
+        if (emailMode === "console") {
+          if (process.env.NODE_ENV === "production") {
+            throw new Error("EMAIL_MODE=console is not allowed in production");
+          }
+
+          console.warn(
+            "EMAIL_MODE=console: email delivery is disabled; sensitive values remain redacted.",
+          );
+
+          return {
+            transport: {
+              streamTransport: true,
+              buffer: true,
+            },
+            defaults: {
+              from: from || defaultFrom,
+            },
+          };
         }
 
         // 필수 환경 변수 검증
         if (!host || !user || !pass) {
-          logger.error("Missing required email configuration:", {
+          console.error("Missing required email configuration:", {
             host: !!host,
             user: !!user,
             pass: !!pass,
@@ -82,7 +83,7 @@ import { User } from "../users/entities/user.entity";
             },
             // TLS 설정 추가
             tls: {
-              rejectUnauthorized: false, // 개발 환경에서만
+              rejectUnauthorized: process.env.NODE_ENV === "production",
             },
             // 디버그 옵션 비활성화
             debug: false,
@@ -93,7 +94,7 @@ import { User } from "../users/entities/user.entity";
             socketTimeout: 10000,
           },
           defaults: {
-            from: from || '"codebase.blog" <info@codebase.blog>',
+            from: from || defaultFrom,
           },
         };
       },

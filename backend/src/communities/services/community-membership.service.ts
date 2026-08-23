@@ -1466,7 +1466,7 @@ export class CommunityMembershipService {
 
     const saved = await this.inviteRepository.save(invite);
 
-    this.logger.log(`초대 생성: community=${communityId}, token=${token}`);
+    this.logger.log(`초대 생성: community=${communityId}`);
 
     return saved;
   }

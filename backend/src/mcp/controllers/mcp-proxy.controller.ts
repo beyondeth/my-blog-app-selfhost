@@ -1,10 +1,7 @@
 import {
   Controller,
-  Get,
   Post,
   Body,
-  Query,
-  Param,
   UseGuards,
   Req,
   HttpCode,
@@ -24,35 +21,27 @@ import { ApiKeyGuard } from "../guards/api-key.guard";
 import { PostsService } from "../../posts/posts.service";
 import { CreatePostDto } from "../../posts/dto/create-post.dto";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import { Repository } from "typeorm";
 import { User } from "../../users/entities/user.entity";
-import { Blog } from "../../blogs/entities/blog.entity";
 import { ExternalImageDownloadService } from "../../files/services/external-image-download.service";
 import { Public } from "../../common/decorators/public.decorator";
 import { UsageService } from "../../usage/usage.service";
 import { FilesService } from "../../files/files.service";
 import { CreateUploadUrlDto } from "../../files/dto/create-upload-url.dto";
 import { UploadCompleteDto } from "../../files/dto/upload-complete.dto";
-import { appendMcpAiDisclosureFooter } from "../utils/ai-disclosure-footer.util";
-import { KnowledgeQueryService } from "../../knowledge/services/knowledge-query.service";
-import { toKnowledgeSlug } from "../../knowledge/utils/knowledge-slug.util";
-import {
-  containsRawMermaidFence,
-  MCP_RAW_MERMAID_ERROR_MESSAGE,
-} from "../../common/utils/legacy-mermaid.util";
 
 /**
  * MCP Proxy 컨트롤러
  * MCP 서버가 API Key를 사용하여 블로그에 포스트를 생성할 수 있도록 하는 프록시 엔드포인트
  * 보안을 위해 오직 포스트 생성만 허용하며, 다른 작업은 모두 차단됨
  *
- * Rate Limit: 분당 20회, 시간당 30회, 하루 50회 (ThrottlerGuard 사용)
+ * Rate Limit: 분당 3회, 시간당 10회, 하루 20회 (ThrottlerGuard 사용)
  * 인증: API Key (X-API-Key 헤더)
  */
 @ApiTags("MCP")
 @Controller("mcp")
 @Public() // JWT 가드를 우회
-@UseGuards(ThrottlerGuard) // Rate Limit 적용 (분당 20회, 시간당 30회, 하루 50회)
+@UseGuards(ThrottlerGuard) // Rate Limit 적용 (분당 3회, 시간당 10회, 하루 20회)
 @ApiBearerAuth()
 export class McpProxyController {
   private readonly logger = new Logger(McpProxyController.name);
@@ -61,13 +50,9 @@ export class McpProxyController {
     private readonly postsService: PostsService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(Blog)
-    private readonly blogRepository: Repository<Blog>,
     private readonly usageService: UsageService,
     private readonly externalImageDownloadService: ExternalImageDownloadService,
     private readonly filesService: FilesService,
-    private readonly dataSource: DataSource,
-    private readonly knowledgeQueryService: KnowledgeQueryService,
   ) {}
 
   /**
@@ -89,131 +74,81 @@ export class McpProxyController {
     };
   }
 
-  @Get("posts")
+  /**
+   * Issue a signed upload intent for an MCP-generated image.
+   * FilesService binds the intent to the authenticated user, organization,
+   * object key, and metadata so the completion request cannot substitute them.
+   */
+  @Post("files/upload-url")
   @UseGuards(ApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: "MCP 발행글 목록/검색",
-    description:
-      "API Key에 연결된 사용자의 발행 완료 글만 조회합니다. 검색/카테고리/태그/기간 필터를 지원합니다.",
-  })
-  @ApiResponse({ status: 200, description: "발행글 목록 반환" })
-  async listPublishedPosts(
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: "MCP 이미지 업로드 URL 생성" })
+  async createImageUploadUrl(
     @Req() req: any,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-    @Query("category") category?: string,
-    @Query("tag") tag?: string,
-    @Query("dateFrom") dateFrom?: string,
-    @Query("dateTo") dateTo?: string,
+    @Body() createUploadUrlDto: CreateUploadUrlDto,
   ) {
-    const { userId } = req.apiKey;
-    const pageNumber = Math.max(1, Number.parseInt(page || "1", 10) || 1);
-    const limitNumber = Math.min(
-      50,
-      Math.max(1, Number.parseInt(limit || "20", 10) || 20),
-    );
-
-    return this.postsService.findMyPublishedPostsForMcp(userId, {
-      page: pageNumber,
-      limit: limitNumber,
-      search,
-      category,
-      tag,
-      dateFrom,
-      dateTo,
-    });
-  }
-
-  @Get("posts/:postId")
-  @UseGuards(ApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: "MCP 발행글 단건 읽기",
-    description:
-      "API Key에 연결된 사용자의 발행 완료 글 1건을 상세 조회합니다.",
-  })
-  @ApiResponse({ status: 200, description: "발행글 상세 반환" })
-  async readPublishedPost(@Req() req: any, @Param("postId") postId: string) {
-    const { userId } = req.apiKey;
-    return this.postsService.findMyPublishedPostForMcp(userId, postId);
-  }
-
-  @Get("knowledge/manifest")
-  @UseGuards(ApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: "사용자 KB manifest 조회",
-    description:
-      "API Key에 연결된 사용자의 compact knowledge manifest를 조회합니다.",
-  })
-  async getKnowledgeManifest(@Req() req: any) {
-    const { userId } = req.apiKey;
-    return this.knowledgeQueryService.getManifest(userId);
-  }
-
-  @Get("knowledge/search")
-  @UseGuards(ApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: "사용자 KB node 검색",
-    description: "사용자 knowledge node를 title/slug/path 기준으로 검색합니다.",
-  })
-  async searchKnowledgeNodes(
-    @Req() req: any,
-    @Query("query") query?: string,
-    @Query("limit") limit?: string,
-  ) {
-    const { userId } = req.apiKey;
-    if (!query?.trim()) {
-      throw new BadRequestException("query는 필수 항목입니다");
+    if (
+      createUploadUrlDto.fileType !== "image" ||
+      createUploadUrlDto.mimeType !== "image/webp"
+    ) {
+      throw new BadRequestException(
+        "MCP 이미지 업로드는 image/webp 형식만 허용됩니다",
+      );
     }
 
-    const limitNumber = Math.min(
-      20,
-      Math.max(1, Number.parseInt(limit || "10", 10) || 10),
+    const { userId, organizationId } = req.apiKey;
+    const issued = await this.filesService.createUploadUrl(
+      userId,
+      createUploadUrlDto,
+      organizationId,
     );
-    return this.knowledgeQueryService.searchNodes(userId, query.trim(), limitNumber);
+
+    return {
+      uploadUrl: issued.uploadUrl,
+      tempId: issued.tempId,
+      fileKey: issued.fileKey,
+      fileName: createUploadUrlDto.fileName,
+      mimeType: createUploadUrlDto.mimeType,
+      fileSize: createUploadUrlDto.fileSize,
+    };
   }
 
-  @Get("knowledge/nodes/:slug")
+  /** Complete an MCP image upload using the signed FilesService contract. */
+  @Post("files/upload-complete")
   @UseGuards(ApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: "사용자 KB node 상세 조회",
-    description: "node와 연결된 포스트/edge를 함께 조회합니다.",
-  })
-  async readKnowledgeNode(@Req() req: any, @Param("slug") slug: string) {
-    const { userId } = req.apiKey;
-    return this.knowledgeQueryService.readNode(userId, toKnowledgeSlug(slug));
-  }
-
-  @Get("knowledge/followups")
-  @UseGuards(ApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: "후속 포스팅 제안 목록 조회",
-    description: "pending/dismissed/accepted follow-up suggestion을 조회합니다.",
-  })
-  async listFollowupSuggestions(
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: "MCP 이미지 업로드 완료" })
+  async completeImageUpload(
     @Req() req: any,
-    @Query("status") status?: string,
+    @Body() uploadCompleteDto: UploadCompleteDto,
   ) {
-    const { userId } = req.apiKey;
-    return this.knowledgeQueryService.listFollowups(userId, status);
-  }
+    if (
+      uploadCompleteDto.fileType !== "image" ||
+      uploadCompleteDto.mimeType !== "image/webp"
+    ) {
+      throw new BadRequestException(
+        "MCP 이미지 업로드는 image/webp 형식만 허용됩니다",
+      );
+    }
 
-  @Post("knowledge/followups/:id/dismiss")
-  @UseGuards(ApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: "후속 포스팅 제안 dismiss",
-    description: "원하지 않는 follow-up suggestion을 dismissed 처리합니다.",
-  })
-  async dismissFollowupSuggestion(@Req() req: any, @Param("id") id: string) {
-    const { userId } = req.apiKey;
-    return this.knowledgeQueryService.dismissFollowup(userId, id);
+    const { userId, organizationId } = req.apiKey;
+    const file = await this.filesService.uploadComplete(
+      userId,
+      uploadCompleteDto,
+      organizationId,
+    );
+
+    return {
+      fileId: file.id,
+      publicUrl: file.accessUrl,
+      descriptor: {
+        id: file.id,
+        fileKey: file.fileKey,
+        fileName: file.originalName,
+        mimeType: file.mimeType,
+        fileSize: file.fileSize,
+      },
+    };
   }
 
   /**
@@ -237,7 +172,7 @@ export class McpProxyController {
   @ApiResponse({ status: 400, description: "잘못된 요청" })
   async createPost(@Req() req: any, @Body() createPostDto: CreatePostDto) {
     // API Key 정보 추출 (ApiKeyGuard에서 설정)
-    const { userId, blogId } = req.apiKey;
+    const { userId, blogId, organizationId } = req.apiKey;
 
     // MCP에서 오는 content_markdown은 원본 마크다운 (base64 인코딩 없음)
     // PostsService.create는 user를 통해 blogId를 자동으로 찾으므로
@@ -251,7 +186,6 @@ export class McpProxyController {
       tags: createPostDto.tags,
       category: createPostDto.category,
       qualityScore: createPostDto.qualityScore,
-      visibility: createPostDto.visibility,
       thumbnail: null, // thumbnail field removed - using thumbnailImageId only
       hasContent: !!createPostDto.content,
       thumbnailImageId: createPostDto.thumbnailImageId,
@@ -268,39 +202,9 @@ export class McpProxyController {
       );
     }
 
-    if (
-      containsRawMermaidFence(createPostDto.content_markdown) ||
-      containsRawMermaidFence(createPostDto.content)
-    ) {
-      throw new BadRequestException(MCP_RAW_MERMAID_ERROR_MESSAGE);
-    }
-
     if (!createPostDto.category) {
       throw new BadRequestException("카테고리는 필수 항목입니다");
     }
-
-    let defaultVisibility: "public" | "private" = "private";
-    try {
-      const blog = await this.blogRepository.findOne({
-        where: { id: blogId },
-        select: ["id", "isPublic", "userId"],
-      });
-
-      if (blog?.userId === userId) {
-        defaultVisibility = blog.isPublic ? "public" : "private";
-      }
-    } catch (error) {
-      this.logger.warn(
-        `[MCP Visibility] Failed to load blog visibility, fallback to private: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    const resolvedVisibility: "public" | "private" =
-      createPostDto.visibility === "private"
-        ? "private"
-        : createPostDto.visibility === "public"
-          ? "public"
-          : defaultVisibility;
 
     const postData: CreatePostDto = {
       title: createPostDto.title,
@@ -308,12 +212,12 @@ export class McpProxyController {
       tags: createPostDto.tags, // 태그는 그대로 전달 (PostCreationService에서 처리)
       category: createPostDto.category,
       qualityScore: createPostDto.qualityScore, // AI 품질 점수
-      visibility: resolvedVisibility,
-      // 마켓플레이스 판매 상품 필드
-      postType: createPostDto.postType || "blog",
       // thumbnail field removed - using thumbnailImageId only
       ...(createPostDto.thumbnailImageId && {
         thumbnailImageId: createPostDto.thumbnailImageId,
+      }),
+      ...(createPostDto.attachedFileIds && {
+        attachedFileIds: createPostDto.attachedFileIds,
       }),
     };
 
@@ -358,22 +262,13 @@ export class McpProxyController {
         );
       }
 
-      // 2. MCP 포스트 제한 체크 (월간 제한 확인)
-      const limitCheck = await this.usageService.checkMcpPostLimit(userId);
-      if (!limitCheck.canPost) {
-        this.logger.warn(
-          `[MCP Post Limit] User ${userId} exceeded limit: ${limitCheck.reason}`,
-        );
-        throw new ForbiddenException(limitCheck.reason);
-      }
-
-      // 3. User 객체 조회 (PostsService가 User를 필요로 함)
+      // 2. User 객체 조회 (PostsService가 User를 필요로 함)
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (!user) {
         throw new BadRequestException("사용자를 찾을 수 없습니다");
       }
 
-      // 4. 외부 이미지 처리 (Gemini 등 외부 URL에서 이미지 다운로드)
+      // 3. 외부 이미지 처리 (Gemini 등 외부 URL에서 이미지 다운로드)
       let processedContent = postData.content_markdown;
       let firstDownloadedImageId: string | undefined;
       let downloadedFileIds: string[] = []; // 다운로드한 모든 이미지 ID 수집 (post_files 연결용)
@@ -393,7 +288,9 @@ export class McpProxyController {
           if (externalImageUrls.length > 0) {
             this.logger.log(
               `[External Images] Found ${externalImageUrls.length} external image(s):`,
-              externalImageUrls,
+              externalImageUrls.map((url) =>
+                this.externalImageDownloadService.redactUrl(url),
+              ),
             );
 
             // 외부 이미지 다운로드 및 S3 업로드 (상세 결과 반환)
@@ -401,6 +298,7 @@ export class McpProxyController {
               await this.externalImageDownloadService.downloadExternalImages(
                 externalImageUrls,
                 userId,
+                organizationId,
               );
 
             // 성공/실패 분리
@@ -440,7 +338,7 @@ export class McpProxyController {
                 if (result.cdnUrl) {
                   urlMapping.set(result.originalUrl, result.cdnUrl);
                   this.logger.debug(
-                    `[External Images] URL mapping: ${result.originalUrl} → ${result.cdnUrl}`,
+                    `[External Images] URL mapping: ${this.externalImageDownloadService.redactUrl(result.originalUrl)} → ${result.cdnUrl}`,
                   );
                 }
               });
@@ -469,7 +367,7 @@ export class McpProxyController {
               // 에러 로깅
               failedDownloads.forEach((result) => {
                 this.logger.warn(
-                  `[External Images] Failed: ${result.originalUrl} - ${result.error}`,
+                  `[External Images] Failed: ${this.externalImageDownloadService.redactUrl(result.originalUrl)} - ${result.error}`,
                 );
               });
 
@@ -499,20 +397,25 @@ export class McpProxyController {
         }
       }
 
-      // 5. 포스트 생성 (처리된 콘텐츠 사용) (Fast Path: 150-200ms 응답, 백그라운드 처리)
+      // 4. 포스트 생성 (처리된 콘텐츠 사용) (Fast Path: 150-200ms 응답, 백그라운드 처리)
       const startTime = Date.now();
 
       // 처리된 콘텐츠로 postData 업데이트
       // 자동포스팅 시 첫 번째 이미지를 썸네일로 설정 (기존 thumbnailImageId가 없는 경우)
       // 다운로드한 이미지들을 attachedFileIds에 포함 (수동 포스팅과 동일한 동작)
+      const attachedFileIds = Array.from(
+        new Set([
+          ...(postData.attachedFileIds || []),
+          ...downloadedFileIds,
+          ...(postData.thumbnailImageId ? [postData.thumbnailImageId] : []),
+        ]),
+      );
+
       const finalPostData = {
         ...postData,
-        content_markdown:
-          typeof processedContent === "string"
-            ? appendMcpAiDisclosureFooter(processedContent)
-            : processedContent,
-        ...(downloadedFileIds.length > 0 && {
-          attachedFileIds: downloadedFileIds,
+        content_markdown: processedContent,
+        ...(attachedFileIds.length > 0 && {
+          attachedFileIds,
         }),
         ...(firstDownloadedImageId &&
           !postData.thumbnailImageId && {
@@ -528,43 +431,25 @@ export class McpProxyController {
         contentLength: finalPostData.content_markdown?.length || 0,
       });
 
-      const postDto = await this.postsService.createFast(finalPostData, user);
-
-      // 4.5. 판매 상품인 경우 ProductDetail 레코드 생성
-      if (createPostDto.postType === "product" && createPostDto.price) {
-        try {
-          const { extractPreviewContent } = await import("../../marketplace/utils/preview-extractor");
-          const previewContent = extractPreviewContent(
-            createPostDto.content_markdown || createPostDto.content,
-          );
-
-          const productDetailRepo = this.dataSource.getRepository("product_details");
-          await productDetailRepo.save({
-            postId: postDto.id,
-            price: createPostDto.price,
-            currency: "KRW",
-            productCategory: createPostDto.productCategory || "others",
-            previewContent,
-            deliveryType: "content",
-            isActive: true,
-            commissionRate: 20.0,
-          });
-          this.logger.log(
-            `🏷️ [MCP Product Created] ProductDetail for Post ${postDto.id}, price=${createPostDto.price}`,
-          );
-        } catch (pdError) {
-          // ProductDetail 생성 실패는 포스트 자체를 실패시키지 않음
-          this.logger.error(
-            `ProductDetail 생성 실패 (포스트는 생성됨): postId=${postDto.id}`,
-          );
-        }
-      }
-
-      // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
-      await this.usageService.trackMcpPost(userId);
-      this.logger.log(
-        `✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`,
+      const postDto = await this.postsService.createFast(
+        finalPostData,
+        user,
+        organizationId,
       );
+
+      // Usage is observability-only in self-hosted v1. A tracking outage must
+      // not turn a committed post into a failed request.
+      try {
+        await this.usageService.trackMcpPost(userId);
+        this.logger.log(
+          `✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `[MCP Usage Tracking] Failed after post ${postDto.id}; post remains committed`,
+          error as Error,
+        );
+      }
 
       // 캐시 무효화는 posts.service.ts의 createFast()에서 이벤트 발행을 통해 처리됨
       // CacheInvalidationListener가 'post.created' 이벤트를 받아 자동으로 처리
@@ -598,11 +483,6 @@ export class McpProxyController {
         title: postDto.title,
         url: url,
         blog: postDto.blog, // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
-        isPublished: postDto.isPublished,
-        visibility: postDto.visibility,
-        effectiveVisibility: postDto.effectiveVisibility,
-        visibilityBlockedByBlogPrivacy:
-          postDto.visibilityBlockedByBlogPrivacy,
         _meta: {
           processingTime: Date.now() - startTime,
           status: "created",
@@ -631,103 +511,7 @@ export class McpProxyController {
         throw error;
       }
 
-      // 그 외 알 수 없는 에러
-      throw new BadRequestException(
-        `포스트 생성 실패: ${error.message || "Unknown error"}`,
-      );
-    }
-  }
-
-  /**
-   * MCP 파일 업로드용 URL 생성
-   * - FilesController.createUploadUrl과 동일하지만 API Key 인증 사용
-   */
-  @Post("files/upload-url")
-  @UseGuards(ApiKeyGuard)
-  @ApiOperation({ summary: "MCP 파일 업로드 URL 생성" })
-  async createUploadUrl(
-    @Req() req: any,
-    @Body() createUploadUrlDto: CreateUploadUrlDto,
-  ) {
-    const { userId } = req.apiKey;
-    return this.filesService.createUploadUrl(userId, createUploadUrlDto);
-  }
-
-  /**
-   * MCP 파일 업로드 완료 처리
-   * - FilesController.uploadComplete와 동일하지만 API Key 인증 사용
-   */
-  @Post("files/upload-complete")
-  @UseGuards(ApiKeyGuard)
-  @ApiOperation({ summary: "MCP 파일 업로드 완료 처리" })
-  async uploadComplete(
-    @Req() req: any,
-    @Body() uploadCompleteDto: UploadCompleteDto,
-  ) {
-    const { userId } = req.apiKey;
-    const result = await this.filesService.uploadComplete(
-      userId,
-      uploadCompleteDto,
-    );
-
-    // CDN URL이 없는 경우 fileUrl(S3 Key)을 사용해서 구성
-    // (FilesService.uploadComplete가 accessUrl을 반환하긴 함)
-    return {
-      success: true,
-      fileId: result.id,
-      // accessUrl이 있으면 쓰고, 없으면 cdn.codebase.blog 형식으로 직접 구성
-      cdnUrl:
-        (result as any).accessUrl ||
-        `https://cdn.codebase.blog/${result.fileKey}`,
-    };
-  }
-
-  /**
-   * MCP 도구를 통한 이미지 업로드 (외부 URL)
-   * Phase 1 방식 (URL 다운로드)
-   */
-  @Post("images/upload")
-  @UseGuards(ApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  async uploadImage(@Req() req: any, @Body() body: { imageUrl: string }) {
-    const { userId } = req.apiKey;
-
-    if (!body.imageUrl) {
-      throw new BadRequestException("Image URL is required");
-    }
-
-    try {
-      this.logger.log(
-        `[MCP Image Upload] Request received for URL: ${body.imageUrl}`,
-      );
-
-      const result =
-        await this.externalImageDownloadService.downloadAndProcessImage(
-          body.imageUrl,
-          userId,
-        );
-
-      if (!result) {
-        throw new BadRequestException("Failed to download image");
-      }
-
-      const cdnUrl = `https://cdn.codebase.blog/${result.fileKey}`;
-
-      this.logger.log(`[MCP Image Upload] Success: ${result.id} -> ${cdnUrl}`);
-
-      return {
-        success: true,
-        fileId: result.id,
-        cdnUrl,
-      };
-    } catch (error) {
-      this.logger.error(
-        `[MCP Image Upload] Error: ${error.message}`,
-        error.stack,
-      );
-      throw new BadRequestException(
-        `Image upload failed: ${error.message || "Unknown error"}`,
-      );
+      throw new BadRequestException("포스트 생성 실패");
     }
   }
 }

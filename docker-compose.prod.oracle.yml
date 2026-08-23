@@ -1,11 +1,11 @@
 # ============================================
-# Codebase 블로그 플랫폼 - Oracle Free Tier 프로덕션 설정
+# Aigory 블로그 플랫폼 - Oracle Free Tier 프로덕션 설정
 # ============================================
 # 🎯 목표: 오라클 무료 티어 (4 OCPU, 24GB RAM) 단일 인스턴스 최적화
 # 🔧 변경사항:
 #   - Prometheus → VictoriaMetrics (메모리 75% 절감)
 #   - PostgreSQL shared_buffers 2GB → 1.5GB
-#   - Redis maxmemory 5.5GB → 1.8GB x2 (core/cache)
+#   - Redis maxmemory 5.5GB → 3.5GB
 #   - CPU Quota 3.8 OCPU (20% 여유 유지)
 #
 # 📝 사용법:
@@ -32,9 +32,13 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_CDN_BASE_URL: ${NEXT_PUBLIC_CDN_BASE_URL}
+        NEXT_PUBLIC_STORAGE_PUBLIC_URL: ${NEXT_PUBLIC_STORAGE_PUBLIC_URL}
+        NEXT_PUBLIC_MCP_BASE_URL: ${NEXT_PUBLIC_MCP_BASE_URL}
+        BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL}
         NEXT_PUBLIC_MIXPANEL_TOKEN: ${NEXT_PUBLIC_MIXPANEL_TOKEN}
         NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID}
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-frontend
+    container_name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-frontend
     env_file:
       - .env.production
     environment:
@@ -43,13 +47,17 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+      NEXT_PUBLIC_CDN_BASE_URL: ${NEXT_PUBLIC_CDN_BASE_URL}
+      NEXT_PUBLIC_STORAGE_PUBLIC_URL: ${NEXT_PUBLIC_STORAGE_PUBLIC_URL}
+      NEXT_PUBLIC_MCP_BASE_URL: ${NEXT_PUBLIC_MCP_BASE_URL}
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL}
       NEXT_PUBLIC_MIXPANEL_TOKEN: ${NEXT_PUBLIC_MIXPANEL_TOKEN}
       NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID}
       HOSTNAME: "0.0.0.0"
     ports:
       - "127.0.0.1:3001:3000"  # Next.js는 내부적으로 3000 포트 사용
     networks:
-      - codebase_network
+      - aigory_blog_network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
@@ -70,21 +78,14 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-backend
+    container_name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-backend
     env_file:
       - .env.production
     environment:
       NODE_ENV: production
       # PgBouncer 연결 (연결 풀링)
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@pgbouncer:5432/${DB_NAME:-blog_prod}
-      # Core + Cache Redis endpoints (core is default fallback).
-      REDIS_URL: redis://redis-core:6379
-      REDIS_CORE_URL: redis://redis-core:6379
-      REDIS_CACHE_URL: redis://redis-cache:6379
-      REDIS_CORE_HOST: redis-core
-      REDIS_CACHE_HOST: redis-cache
-      REDIS_CORE_PORT: 6379
-      REDIS_CACHE_PORT: 6379
+      REDIS_URL: redis://redis:6379
       # PM2 워커당 힙 메모리 (ecosystem.config.js와 일치)
       NODE_OPTIONS: "--max-old-space-size=700"
       UV_THREADPOOL_SIZE: 4
@@ -93,12 +94,10 @@ services:
     depends_on:
       pgbouncer:
         condition: service_healthy
-      redis-core:
-        condition: service_healthy
-      redis-cache:
+      redis:
         condition: service_healthy
     networks:
-      - codebase_network
+      - aigory_blog_network
     restart: unless-stopped
     # PM2는 Dockerfile CMD에서 실행 (pm2-runtime)
     healthcheck:
@@ -117,7 +116,7 @@ services:
   # ============================================
   postgres:
     image: postgres:18-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-postgres
+    container_name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-postgres
     environment:
       POSTGRES_DB: ${DB_NAME:-blog_prod}
       POSTGRES_USER: ${DB_USER}
@@ -133,7 +132,7 @@ services:
       - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
     networks:
-      - codebase_network
+      - aigory_blog_network
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME:-blog_prod}"]
@@ -158,7 +157,7 @@ services:
   # ============================================
   pgbouncer:
     image: edoburu/pgbouncer:latest
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-pgbouncer
+    container_name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-pgbouncer
     environment:
       # PostgreSQL 백엔드 연결 정보
       DB_HOST: postgres
@@ -189,7 +188,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - codebase_network
+      - aigory_blog_network
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 || exit 1"]
@@ -202,49 +201,14 @@ services:
     mem_reservation: 64m
 
   # ============================================
-  # Redis Core (queues, sessions, locks)
+  # Redis (캐시 + 큐 + 소켓)
   # ============================================
-  redis-core:
+  redis:
     image: redis:7.4-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis-core
+    container_name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-redis
     command: >
       redis-server
-      --maxmemory 1800mb
-      --maxmemory-policy noeviction
-      --appendonly yes
-      --appendfsync everysec
-      --save 900 1 300 10 60 10000
-      --tcp-backlog 511
-      --timeout 0
-      --tcp-keepalive 300
-      --maxclients 10000
-      --hz 10
-      --io-threads 2
-      --io-threads-do-reads yes
-    volumes:
-      - ${REDIS_CORE_DATA_DIR:-/mnt/data/redis-core}:/data
-    networks:
-      - codebase_network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    # 리소스 제한 (core: noeviction)
-    cpus: 1.0
-    mem_limit: 2g
-    mem_reservation: 1500m
-
-  # ============================================
-  # Redis Cache (evictable data)
-  # ============================================
-  redis-cache:
-    image: redis:7.4-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis-cache
-    command: >
-      redis-server
-      --maxmemory 1800mb
+      --maxmemory 3500mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
       --appendfsync everysec
@@ -257,18 +221,19 @@ services:
       --io-threads 2
       --io-threads-do-reads yes
     volumes:
-      - ${REDIS_CACHE_DATA_DIR:-/mnt/data/redis-cache}:/data
+      - ${REDIS_DATA_DIR:-/mnt/data/redis}:/data
     networks:
-      - codebase_network
+      - aigory_blog_network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    # 리소스 제한 (3.5GB maxmemory + 여유)
     cpus: 1.0
-    mem_limit: 2g
-    mem_reservation: 1500m
+    mem_limit: 4g
+    mem_reservation: 3g
 
   # ============================================
   # MCP Proxy (MCP 자동 포스팅 API)
@@ -278,7 +243,7 @@ services:
       context: ./mcp-proxy-server
       dockerfile: Dockerfile
       target: production
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-mcp-proxy
+    container_name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-mcp-proxy
     env_file:
       - .env.production
     environment:
@@ -288,12 +253,10 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-      redis-core:
-        condition: service_healthy
-      redis-cache:
+      redis:
         condition: service_healthy
     networks:
-      - codebase_network
+      - aigory_blog_network
     restart: unless-stopped
     command: node dist/index.js
     healthcheck:
@@ -312,57 +275,52 @@ services:
   # ============================================
   victoriametrics:
     image: victoriametrics/victoria-metrics:v1.97.0
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-victoriametrics
+    container_name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-victoriametrics
     command:
       - '--storageDataPath=/storage'
       - '--retentionPeriod=30d'  # Prometheus 15일 → VictoriaMetrics 30일
       - '--promscrape.config=/etc/victoriametrics/scrape_config.yml'
       - '--promscrape.config.strictParse=false'  # Prometheus 호환성을 위한 엄격한 파싱 비활성화
       - '--httpListenAddr=:8428'
-      # 스크랩/쿼리 캐시가 100MB 한도에서 반복 재시작하지 않도록 OS 여유 메모리 확보
-      - '--memory.allowedPercent=60'
+      # 메모리 최적화
+      - '--memory.allowedPercent=80'
     volumes:
       - ${VICTORIAMETRICS_DATA_DIR:-/mnt/data/victoriametrics}:/storage
       - ./victoriametrics/scrape_config.yml:/etc/victoriametrics/scrape_config.yml:ro
       - ./victoriametrics/alerts.yml:/etc/victoriametrics/alerts.yml:ro
     networks:
-      - codebase_network
+      - aigory_blog_network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8428/-/healthy"]
       interval: 30s
       timeout: 10s
       retries: 3
-    # 리소스 제한 (100MB는 현재 프로덕션 scrape/query 부하에서 너무 타이트함)
+    # 리소스 제한 (Prometheus 400MB → VictoriaMetrics 100MB)
     cpus: 0.1
-    mem_limit: 256m
-    mem_reservation: 128m
+    mem_limit: 100m
+    mem_reservation: 50m
 
   # ============================================
   # Grafana (모니터링 대시보드)
   # ============================================
   grafana:
     image: grafana/grafana:11.3.0
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-grafana
-    entrypoint: ["/bin/sh", "/usr/local/bin/grafana-entrypoint.sh"]
+    container_name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-grafana
     env_file:
       - .env.production
     volumes:
       - ${GRAFANA_DATA_DIR:-/mnt/data/grafana}:/var/lib/grafana
-      # Grafana provisioning (datasources, dashboards, alerting)
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      # VictoriaMetrics 데이터소스 설정
+      - ./grafana/provisioning/datasources/victoriametrics.yml:/etc/grafana/provisioning/datasources/victoriametrics.yml:ro
+      - ./grafana/provisioning/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
       # 대시보드 파일 디렉토리
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - ./scripts/grafana-entrypoint.sh:/usr/local/bin/grafana-entrypoint.sh:ro
     environment:
       - GF_INSTALL_PLUGINS=  # 플러그인 불필요 (VictoriaMetrics는 Prometheus 호환)
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_UNIFIED_ALERTING_ENABLED=true
-      - GF_ALERTING_ENABLED=true
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
       # 나머지 설정은 .env.production에서 로드
       # GF_SECURITY_ADMIN_USER, GF_SECURITY_ADMIN_PASSWORD
       # GRAFANA_ROOT_URL -> GF_SERVER_ROOT_URL
@@ -370,7 +328,7 @@ services:
     ports:
       - "127.0.0.1:3030:3000"
     networks:
-      - codebase_network
+      - aigory_blog_network
     depends_on:
       - victoriametrics
     restart: unless-stopped
@@ -387,14 +345,14 @@ services:
   # ============================================
   # Redis Exporter (Redis 메트릭 수집)
   # ============================================
-  redis-core-exporter:
+  redis-exporter:
     image: oliver006/redis_exporter:latest  # ARM64 호환
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis-core-exporter
+    container_name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-redis-exporter
     command:
-      - '--redis.addr=redis-core:6379'
+      - '--redis.addr=redis:6379'
       - '--include-system-metrics=false'  # 시스템 메트릭 제외 (CPU 절약)
     networks:
-      - codebase_network
+      - aigory_blog_network
     restart: unless-stopped
     # healthcheck 제거: 최신 이미지는 distroless로 wget/curl 없음
     # VictoriaMetrics가 정상적으로 메트릭 수집 중
@@ -403,25 +361,12 @@ services:
     mem_limit: 50m
     mem_reservation: 20m
 
-  redis-cache-exporter:
-    image: oliver006/redis_exporter:latest
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis-cache-exporter
-    command:
-      - '--redis.addr=redis-cache:6379'
-      - '--include-system-metrics=false'
-    networks:
-      - codebase_network
-    restart: unless-stopped
-    cpus: 0.1
-    mem_limit: 50m
-    mem_reservation: 20m
-
 # ============================================
 # 네트워크 설정
 # ============================================
 networks:
-  codebase_network:
-    name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-network
+  aigory_blog_network:
+    name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-network
     driver: bridge
 
 # ============================================
@@ -446,12 +391,11 @@ networks:
 #   backend:          3.0 OCPU, 4 GB (PM2 4 워커)
 #   postgres:         무제한, 7.5 GB (Async I/O, ARM64 최적화)
 #   pgbouncer:        0.2 OCPU, 128 MB (연결 풀링, ARM64 지원)
-#   redis-core:       1.0 OCPU, 2 GB (maxmemory 1.8GB)
-#   redis-cache:      1.0 OCPU, 2 GB (maxmemory 1.8GB)
+#   redis:            1.5 OCPU, 4.5 GB (maxmemory 4GB)
 #   mcp-proxy:        1.0 OCPU, 800 MB
-#   victoriametrics:  0.1 OCPU, 256 MB
+#   victoriametrics:  0.1 OCPU, 100 MB
 #   grafana:          0.2 OCPU, 300 MB
-#   redis-exporter:   0.2 OCPU, 100 MB (core + cache)
+#   redis-exporter:   0.1 OCPU, 50 MB
 #
 # 🔄 동적 스케일링 시나리오 (최적화):
 #   - 피크 타임: PM2 2 워커 → ~3.1 OCPU (8시간/일)

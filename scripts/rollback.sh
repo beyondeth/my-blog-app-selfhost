@@ -112,7 +112,7 @@ rollback_database() {
 
     # 현재 연결된 세션 종료
     log_info "데이터베이스 연결 종료..."
-    docker exec codebase-prod-backend psql -U "$DB_USER" -d "$DB_NAME" -c "
+    docker exec aigory-blog-prod-backend psql -U "$DB_USER" -d "$DB_NAME" -c "
         SELECT pg_terminate_backend(pid)
         FROM pg_stat_activity
         WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();
@@ -185,27 +185,27 @@ recover_pm2() {
     # 컨테이너가 실행될 때까지 대기
     sleep 10
 
-    if docker ps | grep -q "codebase-prod-backend"; then
+    if docker ps | grep -q "aigory-blog-prod-backend"; then
         # PM2 프로세스 상태 확인
-        if docker exec codebase-prod-backend pm2 list >/dev/null 2>&1; then
+        if docker exec aigory-blog-prod-backend pm2 list >/dev/null 2>&1; then
             # 모든 프로세스 재시작
             log_info "PM2 프로세스 재시작..."
-            docker exec codebase-prod-backend pm2 restart all
+            docker exec aigory-blog-prod-backend pm2 restart all
 
             # 워커 수 확인
             sleep 5
-            local workers=$(docker exec codebase-prod-backend pm2 jlist | grep -o '"pm_id":[0-9]*' | wc -l | tr -d ' ')
+            local workers=$(docker exec aigory-blog-prod-backend pm2 jlist | grep -o '"pm_id":[0-9]*' | wc -l | tr -d ' ')
             log_info "PM2 워커 수: $workers"
 
             if [ "$workers" -lt 2 ]; then
                 log_info "PM2 워커 스케일업 (2개)"
-                docker exec codebase-prod-backend pm2 scale codebase-backend 2
+                docker exec aigory-blog-prod-backend pm2 scale aigory-blog-backend 2
             fi
 
             log_info "✅ PM2 복구 완료"
         else
             log_error "PM2를 초기화할 수 없습니다."
-            docker exec codebase-prod-backend npm run start:prod || true
+            docker exec aigory-blog-prod-backend npm run start:prod || true
         fi
     else
         log_error "Backend 컨테이너가 실행되지 않았습니다."
@@ -221,7 +221,7 @@ health_check_after_rollback() {
 
     while [ $waited -lt $max_wait ]; do
         # Backend 헬스체크
-        if docker exec codebase-prod-backend curl -f http://localhost:3000/internal/health-check-2f4a8b9c >/dev/null 2>&1; then
+        if docker exec aigory-blog-prod-backend curl -f http://localhost:3000/internal/health-check-2f4a8b9c >/dev/null 2>&1; then
             log_info "✅ Backend 헬스체크 통과"
 
             # API 테스트
@@ -240,9 +240,9 @@ health_check_after_rollback() {
     log_error "수동 확인이 필요합니다."
 
     # PM2 로그 출력
-    if docker ps | grep -q "codebase-prod-backend"; then
+    if docker ps | grep -q "aigory-blog-prod-backend"; then
         log_error "PM2 로그:"
-        docker exec codebase-prod-backend pm2 logs --lines 50
+        docker exec aigory-blog-prod-backend pm2 logs --lines 50
     fi
 
     return 1

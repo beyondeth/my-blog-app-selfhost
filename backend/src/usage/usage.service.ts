@@ -15,11 +15,14 @@ import { UnifiedRedisService } from "../redis/unified-redis.service";
 import { InjectRedis } from "@nestjs-modules/ioredis";
 import Redis from "ioredis";
 
-// 플랜별 제한 설정
+// The self-hosted v1 does not expose subscription or payment routes. Keep
+// usage records for operator observability, but leave capacity unlimited; the
+// MCP controller's transport-level throttler remains the abuse-prevention
+// boundary.
 const PLAN_LIMITS = {
   [SubscriptionTier.FREE]: {
     [ResourceType.POST]: -1, // 일반 포스트 무제한
-    [ResourceType.MCP_POST]: 30, // MCP 자동포스팅 월 30개
+    [ResourceType.MCP_POST]: -1,
     [ResourceType.BLOG]: 1, // 블로그 1개
     [ResourceType.STORAGE]: 100, // 100MB (사용 안 함)
     [ResourceType.VIEWS]: 1000, // 월 1000 뷰 (사용 안 함)
@@ -27,7 +30,7 @@ const PLAN_LIMITS = {
   },
   [SubscriptionTier.STARTER]: {
     [ResourceType.POST]: -1, // 일반 포스트 무제한
-    [ResourceType.MCP_POST]: 200, // MCP 자동포스팅 월 200개
+    [ResourceType.MCP_POST]: -1,
     [ResourceType.BLOG]: 1, // 블로그 1개
     [ResourceType.STORAGE]: 1000, // 1GB (사용 안 함)
     [ResourceType.VIEWS]: 10000, // 월 10000 뷰 (사용 안 함)
@@ -35,7 +38,7 @@ const PLAN_LIMITS = {
   },
   [SubscriptionTier.PRO]: {
     [ResourceType.POST]: -1, // 일반 포스트 무제한
-    [ResourceType.MCP_POST]: 400, // MCP 자동포스팅 월 400개
+    [ResourceType.MCP_POST]: -1,
     [ResourceType.BLOG]: 1, // 블로그 1개
     [ResourceType.STORAGE]: 10000, // 10GB (사용 안 함)
     [ResourceType.VIEWS]: -1, // 무제한 (사용 안 함)

@@ -483,7 +483,7 @@ export default function ProfileSettingsPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleImageUpload}
                 className="hidden"
               />

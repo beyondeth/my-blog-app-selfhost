@@ -2,6 +2,7 @@
 
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 import Image from 'next/image';
 import type { CSSProperties, ReactNode } from 'react';
 
@@ -31,7 +32,8 @@ export default function TintedImagePreview({
   imageSizes = '100vw',
   unoptimized = true,
 }: TintedImagePreviewProps) {
-  const dominantColor = useDominantColor(src);
+  const normalizedSrc = normalizeImageUrl(src);
+  const dominantColor = useDominantColor(normalizedSrc);
 
   const useSolidDark = dominantColor.isNearBlack;
   const useSolidLight = dominantColor.isNearWhite;
@@ -77,7 +79,7 @@ export default function TintedImagePreview({
         </div>
       )}
       <Image
-        src={src}
+        src={normalizedSrc || src}
         alt={alt}
         fill
         sizes={imageSizes}

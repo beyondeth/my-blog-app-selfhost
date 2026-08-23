@@ -31,14 +31,22 @@ export class UrlSafetyService {
     return normalized;
   }
 
-  private async validateUrl(url: string): Promise<void> {
+  async normalizeAndValidateWithAddress(
+    url: string,
+  ): Promise<{ url: string; address: string }> {
+    const normalized = this.normalizeUrl(url);
+    const address = await this.validateUrl(normalized);
+    return { url: normalized, address };
+  }
+
+  private async validateUrl(url: string): Promise<string> {
     try {
       const urlObj = new URL(url);
-      const hostname = urlObj.hostname;
+      const hostname = urlObj.hostname.replace(/^\[|\]$/g, "");
 
       if (ipaddr.isValid(hostname)) {
         this.checkIpAddress(hostname);
-        return;
+        return hostname;
       }
 
       const ips = await this.resolveHostname(hostname);
@@ -50,11 +58,14 @@ export class UrlSafetyService {
       for (const ip of ips) {
         this.checkIpAddress(ip);
       }
+      return ips[0];
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      this.logger.warn(`URL validation failed for ${url}: ${error.message}`);
+      this.logger.warn(
+        `URL validation failed for ${this.redactUrl(url)}: ${error.message}`,
+      );
       throw new BadRequestException(
         `유효하지 않거나 접근이 제한된 URL입니다: ${error.message}`,
       );
@@ -78,6 +89,10 @@ export class UrlSafetyService {
       const blockedRanges = [
         "loopback",
         "private",
+        "carrierGradeNat",
+        "uniqueLocal",
+        "reserved",
+        "multicast",
         "linkLocal",
         "unspecified",
         "broadcast",
@@ -109,6 +124,15 @@ export class UrlSafetyService {
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       throw new BadRequestException(`유효하지 않은 IP 주소입니다: ${ip}`);
+    }
+  }
+
+  private redactUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return "<invalid-url>";
     }
   }
 }

@@ -14,6 +14,7 @@ import { JoinPolicy } from "../enums";
 describe("CommunityService - Visibility Rules", () => {
   let service: CommunityService;
   const mockCommunityRepository = {
+    count: jest.fn().mockResolvedValue(0),
     findOne: jest.fn(),
     save: jest.fn(),
     createQueryBuilder: jest.fn(),

@@ -96,9 +96,9 @@ export function extractS3KeyFromUrl(url: string): string | null {
     // Direct S3 key (already in correct format)
     if (cleanUrl.startsWith("uploads/")) return cleanUrl;
 
-    // CDN URLs: https://cdn.codebase.blog/uploads/...
-    if (cleanUrl.includes("cdn.codebase.blog/uploads/")) {
-      const pathMatch = cleanUrl.match(/cdn\.codebase\.blog\/(.+)/);
+    // CDN URLs: https://cdn.aigory.com/uploads/...
+    if (cleanUrl.includes("cdn.aigory.com/uploads/")) {
+      const pathMatch = cleanUrl.match(/cdn\.aigory\.com\/(.+)/);
       if (pathMatch) return pathMatch[1];
     }
 

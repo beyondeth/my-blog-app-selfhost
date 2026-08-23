@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -8,12 +8,14 @@ import { AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
-import { safeDecodeMessage, isSafeRedirectUrl, sanitizeUserInput } from '@/lib/utils/sanitize';
-import { buildMcpOAuthConsentPath, writeMcpOAuthSession } from '@/lib/mcpOAuth';
-import { useLocaleContext } from '@/providers/LocaleProvider';
+import {
+  getSafeMcpLoopbackCallback,
+  getSafeRelativeRedirectPath,
+  safeDecodeMessage,
+  sanitizeUserInput,
+} from '@/lib/utils/sanitize';
 
 const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/reset-password'];
-const HANGUL_PATTERN = /[가-힣]/;
 
 /**
  * 로그인 페이지 메인 컴포넌트
@@ -23,7 +25,6 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, refreshUser } = useAuth();
-  const { href, locale } = useLocaleContext();
   const { resolvedTheme } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -60,74 +61,21 @@ function LoginPageContent() {
   const mcpClientName = searchParams.get('client_name') || 'Claude';
   const mcpScope = searchParams.get('scope') || 'mcp:tools';
   const registerHref = isMcpOAuth && mcpState && mcpCallbackUrl
-    ? `${href('/register')}?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
-    : href('/register');
-  const loginHeading = isMcpOAuth && mcpState && mcpCallbackUrl
-    ? (locale === 'ko' ? '앱 연결' : 'App connection')
-    : (locale === 'ko' ? '다시 만나서 반가워요' : 'Welcome back');
-  const loginSubheading = isMcpOAuth && mcpState && mcpCallbackUrl
-    ? (locale === 'ko' ? '로그인 후 연결을 완료합니다.' : 'Sign in to complete the connection.')
-    : (locale === 'ko' ? '계정으로 로그인하세요' : 'Sign in to your account');
-  const deletedAccountFallback = locale === 'ko' ? '계정이 삭제되었습니다.' : 'This account was deleted.';
-  const suspendedAccountFallback = locale === 'ko' ? '계정이 정지되었습니다.' : 'This account is suspended.';
-  const suspendedReasonFallback = locale === 'ko' ? '운영 정책 위반' : 'Policy violation';
-  const loginFailedFallback = locale === 'ko' ? '로그인에 실패했습니다.' : 'Login failed.';
-  const invalidCredentialsFallback =
-    locale === 'ko'
-      ? '이메일 또는 비밀번호가 일치하지 않습니다'
-      : 'Email or password is incorrect.';
-
-  const localizeServerMessage = useCallback(
-    (message: string | null | undefined, fallback: string) => {
-      if (!message) {
-        return fallback;
-      }
-
-      if (locale === 'en' && HANGUL_PATTERN.test(message)) {
-        return fallback;
-      }
-
-      return message;
-    },
-    [locale],
-  );
+    ? `/register?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
+    : '/register';
 
   const normalizeRedirectTarget = (target?: string | null) => {
-    if (typeof window === 'undefined' || !target) {
+    const safeTarget = getSafeRelativeRedirectPath(target);
+    if (!safeTarget) {
       return '/';
     }
 
-    const trimmed = target.trim();
-    if (!trimmed) {
+    const targetPathname = safeTarget.split(/[?#]/, 1)[0];
+    if (AUTH_REDIRECT_BLOCKLIST.includes(targetPathname)) {
       return '/';
     }
 
-    if (AUTH_REDIRECT_BLOCKLIST.some(path => trimmed === path || trimmed.startsWith(`${path}?`))) {
-      return '/';
-    }
-
-    try {
-      if (!isSafeRedirectUrl(trimmed)) {
-        return '/';
-      }
-    } catch (error) {
-      console.warn('Invalid redirect target detected:', error);
-      return '/';
-    }
-
-    if (trimmed.startsWith('http')) {
-      try {
-        const parsed = new URL(trimmed);
-        if (parsed.origin !== window.location.origin) {
-          return '/';
-        }
-        return `${parsed.pathname}${parsed.search}${parsed.hash}` || '/';
-      } catch {
-        return '/';
-      }
-    }
-
-    return trimmed;
+    return safeTarget;
   };
 
   const getRedirectTargetFromParams = () => {
@@ -139,12 +87,9 @@ function LoginPageContent() {
 
     for (const value of params) {
       if (!value) continue;
-      try {
-        if (isSafeRedirectUrl(value)) {
-          return value;
-        }
-      } catch (error) {
-        console.warn('Failed to parse redirect query param:', error);
+      const safeTarget = getSafeRelativeRedirectPath(value);
+      if (safeTarget) {
+        return safeTarget;
       }
     }
 
@@ -167,7 +112,7 @@ function LoginPageContent() {
     const redirect = searchParams.get('redirect');
 
     // 리다이렉트 URL 안전성 검증
-    if (redirect && !isSafeRedirectUrl(redirect)) {
+    if (redirect && !getSafeRelativeRedirectPath(redirect)) {
       console.warn('Unsafe redirect URL detected:', redirect);
       // 안전하지 않은 URL은 제거
       const url = new URL(window.location.href);
@@ -182,19 +127,19 @@ function LoginPageContent() {
 
       if (error === 'account_deleted') {
         setAccountDeletedError({
-          message: localizeServerMessage(decodedMessage, deletedAccountFallback),
+          message: decodedMessage || '계정이 삭제되었습니다.',
           remainingDays: 0
         });
       } else if (error === 'account_suspended') {
         const until = searchParams.get('until') || '';
         const reason = searchParams.get('reason') || '';
         setAccountSuspendedError({
-          message: localizeServerMessage(decodedMessage, suspendedAccountFallback),
+          message: decodedMessage || '계정이 정지되었습니다.',
           suspensionUntil: until,
-          reason: localizeServerMessage(reason ? safeDecodeMessage(reason) : '', suspendedReasonFallback),
+          reason: reason ? safeDecodeMessage(reason) : '운영 정책 위반',
         });
       } else if (message) {
-        setLoginErrorMessage(localizeServerMessage(decodedMessage, loginFailedFallback));
+        setLoginErrorMessage(decodedMessage || '로그인에 실패했습니다.');
       }
 
       // URL에서 에러 파라미터 제거
@@ -205,14 +150,7 @@ function LoginPageContent() {
       url.searchParams.delete('until');
       window.history.replaceState({}, '', url.toString());
     }
-  }, [
-    deletedAccountFallback,
-    localizeServerMessage,
-    loginFailedFallback,
-    searchParams,
-    suspendedAccountFallback,
-    suspendedReasonFallback,
-  ]);
+  }, [searchParams]);
 
   // MCP OAuth 컨텍스트 보존
   // - 사용자가 로그인 페이지에서 회원가입 페이지로 이동해도
@@ -228,7 +166,7 @@ function LoginPageContent() {
       scope: mcpScope,
     };
 
-    writeMcpOAuthSession(mcpOAuthData);
+    sessionStorage.setItem('mcpOAuth', JSON.stringify(mcpOAuthData));
   }, [isMcpOAuth, mcpState, mcpCallbackUrl, mcpClientName, mcpScope]);
 
   const validateEmail = (email: string) => {
@@ -266,7 +204,7 @@ function LoginPageContent() {
 
     // Check for too many failed attempts
     if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
-      setLoginErrorMessage(locale === 'ko' ? '로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.' : 'Too many login attempts. Please try again later.');
+      setLoginErrorMessage('로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.');
       return;
     }
 
@@ -277,13 +215,13 @@ function LoginPageContent() {
     };
 
     if (!formData.email) {
-      errors.email = locale === 'ko' ? '이메일을 입력해주세요' : 'Enter your email.';
+      errors.email = '이메일을 입력해주세요';
     } else if (!validateEmail(formData.email)) {
-      errors.email = locale === 'ko' ? '올바른 이메일 형식이 아닙니다' : 'Enter a valid email address.';
+      errors.email = '올바른 이메일 형식이 아닙니다';
     }
 
     if (!formData.password) {
-      errors.password = locale === 'ko' ? '비밀번호를 입력해주세요' : 'Enter your password.';
+      errors.password = '비밀번호를 입력해주세요';
     }
 
     if (errors.email || errors.password) {
@@ -309,21 +247,10 @@ function LoginPageContent() {
       // ConsentGuard 타이밍 이슈 방지 (회원가입과 동일한 처리)
       await refreshUser();
 
-      if (isMcpOAuth && mcpState && mcpCallbackUrl) {
-        const mcpOAuthData = {
-          state: mcpState,
-          callback_url: mcpCallbackUrl,
-          client_name: mcpClientName,
-          scope: mcpScope,
-        };
-        writeMcpOAuthSession(mcpOAuthData);
-        router.push(buildMcpOAuthConsentPath(mcpOAuthData, locale));
-        return;
-      }
-
-      // OAuth 콜백 URL인 경우 직접 리다이렉트 (localhost:7777/callback)
-      if (returnUrl && returnUrl.includes('localhost:7777/callback')) {
-        window.location.href = returnUrl;
+      // 로컬 MCP OAuth 콜백은 정확한 loopback origin과 path만 허용한다.
+      const mcpLoopbackCallback = getSafeMcpLoopbackCallback(returnUrl);
+      if (mcpLoopbackCallback) {
+        window.location.assign(mcpLoopbackCallback);
         return;
       }
 
@@ -339,10 +266,11 @@ function LoginPageContent() {
       // 삭제된 계정 에러 체크
       if (error.response?.code === 'ACCOUNT_DELETED' || error.code === 'ACCOUNT_DELETED') {
         setAccountDeletedError({
-          message: localizeServerMessage(error.response?.message || error.message, deletedAccountFallback),
+          message: error.response?.message || error.message || '계정이 삭제되었습니다.',
           remainingDays: error.response?.remainingDays || error.remainingDays || 0,
         });
         setFormData(prev => ({ ...prev, password: '' }));
+        setIsSubmitting(false);
         setIsSubmitting(false);
         return;
       }
@@ -350,9 +278,9 @@ function LoginPageContent() {
       // 정지된 계정 에러 체크
       if (error.response?.code === 'ACCOUNT_SUSPENDED' || error.code === 'ACCOUNT_SUSPENDED') {
         setAccountSuspendedError({
-          message: localizeServerMessage(error.response?.message || error.message, suspendedAccountFallback),
+          message: error.response?.message || error.message || '계정이 정지되었습니다.',
           suspensionUntil: error.response?.suspensionUntil || error.suspensionUntil,
-          reason: localizeServerMessage(error.response?.reason || error.reason, suspendedReasonFallback),
+          reason: error.response?.reason || error.reason || '운영 정책 위반',
         });
         setFormData(prev => ({ ...prev, password: '' }));
         setIsSubmitting(false);
@@ -366,7 +294,7 @@ function LoginPageContent() {
       // Clear password on failed login
       setFormData(prev => ({ ...prev, password: '' }));
 
-      const errorMessage = localizeServerMessage(error.message, invalidCredentialsFallback);
+      const errorMessage = error.message || '이메일 또는 비밀번호가 일치하지 않습니다';
       setValidationErrors(prev => ({ ...prev, password: '' }));
       setLoginErrorMessage(errorMessage);
 
@@ -393,7 +321,7 @@ function LoginPageContent() {
             className="mb-2 sm:mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            {locale === 'ko' ? '뒤로가기' : 'Back'}
+            Back
           </button>
 
           {/* 통합된 로그인 카드 - Resend 스타일 */}
@@ -411,12 +339,36 @@ function LoginPageContent() {
                 />
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {loginHeading}
+                다시 만나서 반가워요
               </h1>
               <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                {loginSubheading}
+                계정으로 <span className="font-medium">로그인</span>하세요
               </p>
             </div>
+
+            {/* MCP OAuth 연결 요청 안내 (Claude 커스텀 커넥터) */}
+            {isMcpOAuth && mcpState && mcpCallbackUrl && (
+              <div className="mb-3 sm:mb-6 p-4 sm:p-5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 w-full">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm sm:text-base font-semibold text-indigo-900 dark:text-indigo-100">
+                      {mcpClientName} 연결 요청
+                    </h3>
+                    <p className="text-xs sm:text-sm text-indigo-700 dark:text-indigo-300 mt-1">
+                      로그인하여 {mcpClientName}에 블로그 접근 권한을 부여합니다.
+                    </p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">
+                      요청된 권한: {mcpScope.split(' ').join(', ')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 삭제된 계정 경고 */}
             {accountDeletedError && (
@@ -425,17 +377,17 @@ function LoginPageContent() {
                   <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
                     <h3 className="text-sm sm:text-base font-semibold text-red-900 dark:text-red-200 mb-1">
-                      {locale === 'ko' ? '계정이 삭제되었습니다' : 'This account was deleted'}
+                      계정이 삭제되었습니다
                     </h3>
                     <p className="text-xs sm:text-sm text-red-800 dark:text-red-300 mb-3">
                       {accountDeletedError.message}
                     </p>
                     {accountDeletedError.remainingDays === 0 && (
                       <Link
-                        href={registerHref}
+                        href="/register"
                         className="inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-lg transition-colors"
                       >
-                        {locale === 'ko' ? '회원가입 페이지로 이동' : 'Go to sign up'}
+                        회원가입 페이지로 이동
                       </Link>
                     )}
                   </div>
@@ -452,13 +404,13 @@ function LoginPageContent() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-sm sm:text-base font-semibold text-orange-900 dark:text-orange-200 mb-1">
-                      {locale === 'ko' ? '계정 이용이 정지되었습니다' : 'This account is suspended'}
+                      계정 이용이 정지되었습니다
                     </h3>
                     <p className="text-xs sm:text-sm text-orange-800 dark:text-orange-300 mb-2 font-medium">
                       {accountSuspendedError.message}
                     </p>
                     <div className="text-xs text-orange-800 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/40 p-2 rounded">
-                      <p><span className="font-bold">{locale === 'ko' ? '사유:' : 'Reason:'}</span> {accountSuspendedError.reason}</p>
+                      <p><span className="font-bold">사유:</span> {accountSuspendedError.reason}</p>
                     </div>
                   </div>
                 </div>
@@ -471,7 +423,7 @@ function LoginPageContent() {
                 <div className="flex items-start gap-2 sm:gap-3">
                   <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400 mt-0.5" />
                   <div className="text-xs sm:text-sm text-red-800 dark:text-red-300">
-                    {locale === 'ko' ? '로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.' : 'Too many login attempts. Please try again later.'}
+                    로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.
                   </div>
                 </div>
               </div>
@@ -488,14 +440,14 @@ function LoginPageContent() {
             </div>
 
             {/* 섹션 구분선 - 중요한 시각적 구분 역할 */}
-            <div className="auth-divider my-3 sm:my-6 w-full text-xs sm:text-sm">{locale === 'ko' ? '또는' : 'or'}</div>
+            <div className="auth-divider my-3 sm:my-6 w-full text-xs sm:text-sm">or</div>
 
             {/* 섹션 2: 이메일/비밀번호 로그인 */}
             <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-5 w-full">
               {/* 이메일 필드 */}
               <div className="space-y-1 sm:space-y-2">
                 <label htmlFor="email" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {locale === 'ko' ? '이메일' : 'Email'}
+                  이메일
                 </label>
                 <input
                   id="email"
@@ -520,13 +472,13 @@ function LoginPageContent() {
               <div className="space-y-1 sm:space-y-2">
                 <div className="flex items-center justify-between">
                   <label htmlFor="password" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {locale === 'ko' ? '비밀번호' : 'Password'}
+                    비밀번호
                   </label>
                   <Link
-                    href={href('/forgot-password')}
+                    href="/forgot-password"
                     className="text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
                   >
-                    {locale === 'ko' ? '비밀번호를 잊으셨나요?' : 'Forgot password?'}
+                    비밀번호를 잊으셨나요?
                   </Link>
                 </div>
                 <div className="relative">
@@ -565,7 +517,7 @@ function LoginPageContent() {
                 <p className="text-xs sm:text-sm text-center text-red-600 dark:text-red-300 font-semibold">
                   {loginErrorMessage}{' '}
                   <span className="font-normal">
-                    ({loginAttempts}/{MAX_LOGIN_ATTEMPTS} {locale === 'ko' ? '시도' : 'attempts'})
+                    ({loginAttempts}/{MAX_LOGIN_ATTEMPTS} 시도)
                   </span>
                 </p>
               )}
@@ -583,10 +535,10 @@ function LoginPageContent() {
                 {isSubmitting ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="animate-spin h-3.5 w-3.5 sm:h-4 sm:w-4 border-2 border-white border-t-transparent rounded-full" />
-                    {locale === 'ko' ? '로그인 중...' : 'Signing in...'}
+                    로그인 중...
                   </span>
                 ) : (
-                  locale === 'ko' ? '이메일로 로그인' : 'Continue with email'
+                  '이메일로 로그인'
                 )}
               </button>
             </form>
@@ -594,12 +546,12 @@ function LoginPageContent() {
             {/* Footer - Sign up 링크 */}
             <div className="mt-4 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 w-full">
               <p className="text-center text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                {locale === 'ko' ? '계정이 없으신가요?' : 'Need an account?'}{' '}
+                계정이 없으신가요?{' '}
                 <Link
                   href={registerHref}
                   className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
                 >
-                  {locale === 'ko' ? '회원가입' : 'Sign up'}
+                  회원가입
                 </Link>
               </p>
             </div>

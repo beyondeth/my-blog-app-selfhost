@@ -11,21 +11,12 @@
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
-import { PostInteractionEvents } from "../../posts/events/post-interaction.events";
+import {
+  CommentAddedEventPayload,
+  PostInteractionEvents,
+} from "../../posts/events/post-interaction.events";
 import { ReputationQueueService } from "../queues/reputation-queue.service";
 import { ReputationAction } from "../enums/reputation-action.enum";
-
-/**
- * 댓글 추가 이벤트 페이로드
- * (posts 모듈에서 정의되어 있지 않으면 여기서 정의)
- */
-interface CommentAddedEventPayload {
-  commentId: string;
-  postId: string;
-  authorId: string;
-  content?: string;
-  timestamp: Date;
-}
 
 @Injectable()
 export class CommentEventsListener {
@@ -56,6 +47,7 @@ export class CommentEventsListener {
         occurredAt: payload.timestamp,
         metadata: {
           postId: payload.postId,
+          outboxEventId: payload.outboxEventId,
         },
       });
 
@@ -67,6 +59,7 @@ export class CommentEventsListener {
         `댓글 평판 큐 추가 실패: ${error.message}`,
         error.stack,
       );
+      throw error;
     }
   }
 }

@@ -1,11 +1,3 @@
 {
-  "mcpServers": {
-    "codebase-blog-mcp": {
-      "httpUrl": "https://mcp.codebase.blog/mcp",
-      "headers": {
-        "Authorization": "Bearer blog_sk_6elsvhtm_t1CDpOY8Yuga2s9CVpqI7kCpSEJ2l7tx",
-        "Accept": "application/json, text/event-stream"
-      }
-    }
-  }
+  "mcpServers": {}
 }

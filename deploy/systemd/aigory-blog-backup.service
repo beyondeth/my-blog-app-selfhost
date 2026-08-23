@@ -1,0 +1,13 @@
+[Unit]
+Description=Aigory PostgreSQL backup to private OCI Object Storage
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/aigory-blog/app
+ExecStart=/opt/aigory-blog/app/scripts/backup-aigory-postgres.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

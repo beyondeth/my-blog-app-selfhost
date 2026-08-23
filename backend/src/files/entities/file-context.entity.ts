@@ -5,9 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
   Index,
 } from "typeorm";
 import { File } from "./file.entity";
+import { Organization } from "../../organizations/entities/organization.entity";
 
 export const FileContextType = {
   PROFILE: "profile",
@@ -44,6 +47,7 @@ export type FilePurpose = (typeof FilePurpose)[keyof typeof FilePurpose];
 @Entity("file_contexts")
 @Index(["contextType", "contextId"])
 @Index(["ownerId"])
+@Index(["organizationId"])
 export class FileContext {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -59,6 +63,13 @@ export class FileContext {
 
   @Column({ type: "uuid" })
   ownerId: string; // 파일 소유자 userId
+
+  @Column({ type: "uuid", nullable: true })
+  organizationId: string | null;
+
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "organizationId" })
+  organization: Organization | null;
 
   @Column({
     type: "enum",

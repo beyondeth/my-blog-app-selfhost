@@ -1,50 +1,53 @@
 import { Metadata } from 'next';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
+/**
+ * Landing 페이지 메타데이터
+ *
+ * @description
+ * MCP 자동포스팅 플랫폼 랜딩 페이지의 SEO 메타데이터를 설정합니다.
+ * - 타이틀, 설명, Open Graph, Twitter Card
+ * - Canonical URL 설정
+ * - 전환율 최적화를 위한 메타데이터
+ */
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
 export const metadata: Metadata = {
-  title: 'Codebase Product',
-  description:
-    'Codebase product 페이지로 이동합니다.',
-  keywords: [
-    'AI 코딩',
-    '바이브코딩',
-    'creator community',
-    '학습 허브',
-    'FAQ 아카이브',
-    'video companion',
-    'Codebase',
-  ],
+  title: 'MCP 자동 블로그 포스팅 - Aigory',
+  description: '개발자를 위한 AI 자동 블로그 포스팅 플랫폼. MCP와 Claude를 활용하여 대화만으로 전문적인 기술 블로그를 자동으로 생성하고 발행하세요. 생산성 혁신을 경험하세요.',
+  keywords: ['MCP', 'Claude', 'AI 블로그', '자동 포스팅', '개발 블로그 자동화', 'AI 글쓰기', 'Aigory'],
+
   openGraph: {
-    title: 'Codebase Product',
-    description:
-      'Codebase의 공개 product surface와 documentation 구조를 확인할 수 있습니다.',
-    url: `${siteUrl}/product`,
-    siteName: 'Codebase',
+    title: 'MCP 자동 블로그 포스팅 - Aigory',
+    description: '대화만으로 전문적인 기술 블로그를 자동으로 생성하고 발행하세요. AI와 MCP가 만나는 생산성 혁신.',
+    url: `${siteUrl}/landing`,
+    siteName: 'Aigory',
     images: [
       {
-        url: `${siteUrl}/og-image-v2.png`,
+        url: `${siteUrl}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: 'Codebase product page',
+        alt: 'Aigory MCP 자동 포스팅',
       },
     ],
     locale: 'ko_KR',
     type: 'website',
   },
+
   twitter: {
     card: 'summary_large_image',
-    title: 'Codebase Product',
-    description:
-      'Codebase의 product, docs, pricing, support surface를 확인할 수 있습니다.',
-    images: [`${siteUrl}/og-image-v2.png`],
+    title: 'MCP 자동 블로그 포스팅 - Aigory',
+    description: '대화만으로 전문적인 기술 블로그를 자동으로 생성하고 발행하세요.',
+    images: [`${siteUrl}/og-image.png`],
   },
+
   alternates: {
-    canonical: `${siteUrl}/product`,
+    canonical: `${siteUrl}/landing`,
   },
+
   robots: {
-    index: false,
-    follow: false,
+    index: true,
+    follow: true,
   },
 };
 

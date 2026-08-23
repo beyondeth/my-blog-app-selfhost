@@ -1,5 +1,5 @@
 # ============================================
-# Codebase Frontend - Next.js Ultra-Optimized Production Dockerfile V3
+# Aigory Frontend - Next.js Ultra-Optimized Production Dockerfile V3
 # ============================================
 # 🎯 목표: BuildKit 고급 기능으로 극한 최적화 (49초 → 10초)
 # 🔧 전략:
@@ -8,13 +8,13 @@
 #   - 병렬 처리 최대화
 #
 # 📝 사용법:
-#   DOCKER_BUILDKIT=1 docker build -f Dockerfile.prod.v3 -t codebase-frontend:latest .
+#   DOCKER_BUILDKIT=1 docker build -f Dockerfile.prod.v3 -t aigory-blog-frontend:latest .
 # ============================================
 
 # ============================================
 # Single Stage Build with Maximum Optimization
 # ============================================
-FROM node:22-slim AS production
+FROM node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS production
 
 # 보안: 비-루트 사용자 먼저 생성
 RUN groupadd --system --gid 1001 nodejs && \
@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # pnpm 글로벌 설치
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@9.0.0
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 

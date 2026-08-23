@@ -260,6 +260,69 @@ export function isSafeRedirectUrl(
 }
 
 /**
+ * 로그인 후 앱 내부에서 사용할 상대 경로만 허용합니다.
+ * 프로토콜 상대 URL, 역슬래시 및 제어 문자는 외부 origin으로 해석될 수 있어 거부합니다.
+ */
+export function getSafeRelativeRedirectPath(
+  target?: string | null
+): string | null {
+  const trimmed = target?.trim();
+  if (
+    !trimmed ||
+    !trimmed.startsWith('/') ||
+    trimmed.startsWith('//') ||
+    /[\\\u0000-\u001F\u007F]/.test(trimmed)
+  ) {
+    return null;
+  }
+
+  try {
+    const baseUrl = new URL('https://internal.invalid');
+    const parsed = new URL(trimmed, baseUrl);
+    if (parsed.origin !== baseUrl.origin) {
+      return null;
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 로컬 MCP 클라이언트가 로그인 완료를 받을 수 있는 단일 loopback callback만 허용합니다.
+ */
+export function getSafeMcpLoopbackCallback(
+  target?: string | null
+): string | null {
+  const trimmed = target?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const isAllowedHost =
+      parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+
+    if (
+      parsed.protocol !== 'http:' ||
+      !isAllowedHost ||
+      parsed.port !== '7777' ||
+      parsed.pathname !== '/callback' ||
+      parsed.username ||
+      parsed.password
+    ) {
+      return null;
+    }
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 메시지를 안전하게 디코딩하고 표시
  * @param encoded - 인코딩된 메시지
  * @param options - 옵션

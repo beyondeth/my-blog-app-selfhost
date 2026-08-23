@@ -22,6 +22,12 @@ import { CreateMcpApiKeyDto } from "../dto/create-mcp-api-key.dto";
 import { ValidateMcpApiKeyDto } from "../dto/validate-mcp-api-key.dto";
 import { UsageService } from "../../usage/usage.service";
 import { ResourceType } from "../../common/enums/subscription.enum";
+import { InternalMcpGuard } from "../../common/guards/internal-mcp.guard";
+import {
+  OrganizationId,
+  RequireOrganizationContext,
+} from "../../organizations/decorators/organization-context.decorator";
+import { OrganizationContextGuard } from "../../organizations/guards/organization-context.guard";
 
 /**
  * MCP API Key 관리 컨트롤러
@@ -34,6 +40,7 @@ import { ResourceType } from "../../common/enums/subscription.enum";
  * - POST /api/v1/mcp/validate-key: API Key 검증 (MCP Proxy → Backend)
  */
 @Controller("mcp")
+@UseGuards(OrganizationContextGuard)
 export class McpController {
   constructor(
     private readonly mcpApiKeyService: McpApiKeyService,
@@ -52,14 +59,20 @@ export class McpController {
    */
   @Post("keys")
   @UseGuards(JwtAuthGuard)
+  @RequireOrganizationContext()
   @HttpCode(HttpStatus.CREATED)
-  async createKey(@Request() req: any, @Body() dto: CreateMcpApiKeyDto) {
+  async createKey(
+    @Request() req: any,
+    @Body() dto: CreateMcpApiKeyDto,
+    @OrganizationId() organizationId: string,
+  ) {
     const userId = req.user.id;
 
     const result = await this.mcpApiKeyService.create(
       userId,
       dto.blogId,
       dto.name,
+      organizationId,
     );
 
     return {
@@ -76,10 +89,14 @@ export class McpController {
    */
   @Get("keys")
   @UseGuards(JwtAuthGuard)
-  async listKeys(@Request() req: any) {
+  @RequireOrganizationContext()
+  async listKeys(
+    @Request() req: any,
+    @OrganizationId() organizationId: string,
+  ) {
     const userId = req.user.id;
 
-    const keys = await this.mcpApiKeyService.findByUser(userId);
+    const keys = await this.mcpApiKeyService.findByUser(userId, organizationId);
 
     // Secret 제외하고 반환 (keyHint만 표시)
     const sanitizedKeys = keys.map((key) => ({
@@ -87,6 +104,7 @@ export class McpController {
       keyHint: key.keyHint,
       name: key.name,
       blogId: key.blogId,
+      organizationId: key.organizationId,
       blogName: key.blog.name,
       isActive: key.isActive,
       requestCount: key.requestCount,
@@ -126,11 +144,16 @@ export class McpController {
    */
   @Delete("keys/:id")
   @UseGuards(JwtAuthGuard)
+  @RequireOrganizationContext()
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteKey(@Request() req: any, @Param("id") id: string) {
+  async deleteKey(
+    @Request() req: any,
+    @Param("id") id: string,
+    @OrganizationId() organizationId: string,
+  ) {
     const userId = req.user.id;
 
-    await this.mcpApiKeyService.delete(id, userId);
+    await this.mcpApiKeyService.delete(id, userId, organizationId);
 
     return;
   }
@@ -151,6 +174,7 @@ export class McpController {
    */
   @Post("validate-key")
   @Public()
+  @UseGuards(InternalMcpGuard)
   @HttpCode(HttpStatus.OK)
   async validateKey(@Body() dto: ValidateMcpApiKeyDto) {
     const mcpApiKey = await this.mcpApiKeyService.validateKey(dto.apiKey);
@@ -161,6 +185,7 @@ export class McpController {
         keyId: mcpApiKey.id,
         userId: mcpApiKey.userId,
         blogId: mcpApiKey.blogId,
+        organizationId: mcpApiKey.organizationId,
         user: {
           id: mcpApiKey.user.id,
           username: mcpApiKey.user.username,
@@ -187,6 +212,7 @@ export class McpController {
    */
   @Post("keys/:id/increment-posts")
   @Public()
+  @UseGuards(InternalMcpGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   async incrementPosts(@Param("id") id: string) {
     await this.mcpApiKeyService.incrementPostsCreated(id);

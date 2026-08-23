@@ -1,9 +1,10 @@
 import {
   IsArray,
-  IsString,
-  IsNumber,
+  IsUUID,
+  IsInt,
   ValidateNested,
   Min,
+  ArrayMinSize,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiProperty } from "@nestjs/swagger";
@@ -13,7 +14,7 @@ export class ImageOrderDto {
     description: "파일 ID",
     example: "123e4567-e89b-12d3-a456-426614174000",
   })
-  @IsString()
+  @IsUUID()
   fileId: string;
 
   @ApiProperty({
@@ -21,7 +22,7 @@ export class ImageOrderDto {
     example: 0,
     minimum: 0,
   })
-  @IsNumber()
+  @IsInt()
   @Min(0)
   order: number;
 }
@@ -36,6 +37,7 @@ export class UpdateImageOrderDto {
     ],
   })
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => ImageOrderDto)
   imageOrder: ImageOrderDto[];

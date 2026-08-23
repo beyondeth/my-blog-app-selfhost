@@ -62,8 +62,8 @@ export class AccountSettings {
    * Refresh Token (JWT)
    * - Access Token 재발급용
    * - 보안: @Exclude()로 API 응답에서 제외
-   * - 길이: 500자 (JWT 토큰)
-   * - 주의: bcrypt 해싱 없이 원본 저장 (서버에서 비교)
+   * - JWT 원문이 아닌 SHA-256 digest만 저장
+   * - 유출 시 원문 refresh token을 바로 재사용할 수 없도록 함
    */
   @Column({ length: 500, nullable: true })
   @Exclude({ toPlainOnly: true })

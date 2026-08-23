@@ -11,6 +11,7 @@ import {
 } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { FileContext } from "./file-context.entity";
+import { Organization } from "../../organizations/entities/organization.entity";
 
 @Entity("files")
 @Index(["fileKey"]) // s3Key가 아닌 fileKey 사용
@@ -43,6 +44,13 @@ export class File {
 
   @Column({ name: "user_id", type: "uuid" })
   userId: string;
+
+  @Column({ type: "uuid", nullable: true })
+  organizationId: string | null;
+
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "organizationId" })
+  organization: Organization | null;
 
   @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })

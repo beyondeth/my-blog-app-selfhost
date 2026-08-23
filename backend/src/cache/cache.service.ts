@@ -11,8 +11,9 @@ export enum CacheTTL {
   VERY_SHORT = 5, // 5초 - 댓글 트리 (실시간성 중요)
 
   // 온 데이터 (중간 가치)
-  SHORT = 30, // 30초 - 실시간 데이터 (홈 피드 포함, 즉시성/부하 균형)
-  MEDIUM = 150, // 2분 30초 - 블로그/커뮤니티 정보 등 중간 가치 데이터
+  SHORT = 30, // 30초 - 실시간 데이터
+  HOME_FEED = 120, // 홈 피드 (2분, 워밍/재계산 부하 완화)
+  MEDIUM = HOME_FEED, // 2분 - 블로그/커뮤니티 정보 등 중간 가치 데이터
 
   // 콜드 데이터 (낮은 가치)
   LONG = 180, // 3분 - 기타 데이터
@@ -39,14 +40,22 @@ export const CacheKeys = {
   FEED_UNIFIED: (
     filter: string,
     sort: string,
-    period: string,
-    options: { cursor?: string | null; limit?: number } = {},
+    periodOrOptions:
+      | string
+      | { cursor?: string | null; limit?: number } = {},
+    maybeOptions: { cursor?: string | null; limit?: number } = {},
   ) => {
+    const period =
+      typeof periodOrOptions === "string" ? periodOrOptions : undefined;
+    const options =
+      typeof periodOrOptions === "string" ? maybeOptions : periodOrOptions;
     const limit = options.limit ?? 20;
     const cursorToken = options.cursor
       ? createHash("md5").update(options.cursor).digest("hex").substring(0, 8)
       : "first";
-    return `feed:unified:${filter}:${sort}:period:${period}:limit:${limit}:cursor:${cursorToken}`;
+    return period
+      ? `feed:unified:${filter}:${sort}:period:${period}:limit:${limit}:cursor:${cursorToken}`
+      : `feed:unified:v2:${filter}:${sort}:limit:${limit}:cursor:${cursorToken}`;
   },
   FEED_EDITOR_PICKS: (limit?: number) =>
     limit ? `feed:editor-picks:v2:limit:${limit}` : "feed:editor-picks:v2",
@@ -152,8 +161,7 @@ export class CacheService implements OnModuleInit {
   private cacheDeletes = 0;
 
   constructor(
-    // Cache Redis only: evictable keys (LRU allowed).
-    @InjectRedis("cache") private readonly redis: Redis,
+    @InjectRedis() private readonly redis: Redis,
     private readonly unifiedRedisService: UnifiedRedisService,
     private readonly cacheMetricsService: CacheMetricsService,
   ) {}
@@ -408,25 +416,15 @@ export class CacheService implements OnModuleInit {
    * 포스트 관련 캐시 무효화
    */
   async invalidatePostCache(postId: string, blogSlug?: string): Promise<void> {
-    // 특정 포스트 상세 캐시 삭제 (legacy + core 키 모두 정리)
-    await Promise.all([
-      this.del(CacheKeys.POST_DETAIL(postId)),
-      this.del(CacheKeys.POST_CORE(postId)),
-      this.deletePattern(`post:${postId}:*`),
-      this.deletePattern(`post:core:${postId}:*`),
-    ]);
+    // 특정 포스트 캐시 삭제
+    await this.del(CacheKeys.POST_DETAIL(postId));
 
     // 포스트 목록 캐시 무효화
     if (blogSlug) {
       await this.deletePattern(`posts:list:*:*:${blogSlug}`);
-      await this.deletePattern(`feed:blog:${blogSlug}:page:*`);
     } else {
       await this.deletePattern("posts:list:*");
     }
-
-    // 홈/통합 피드 캐시 무효화
-    await this.deletePattern("feed:home:page:*");
-    await this.deletePattern("feed:unified:*");
 
     // 통계 캐시 무효화
     await this.deletePattern("stats:*");

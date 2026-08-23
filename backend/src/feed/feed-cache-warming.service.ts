@@ -103,7 +103,6 @@ export class FeedCacheWarmingService {
    * 홈 피드 워밍 로직
    */
   private async warmUnifiedFeed(): Promise<void> {
-    // baseline(all period) 워밍
     for (const sort of this.feedSortsToWarm) {
       try {
         await this.feedService.getUnifiedFeed(
@@ -126,7 +125,6 @@ export class FeedCacheWarmingService {
       return;
     }
 
-    // period + hot/top 조합 워밍
     for (const sort of this.periodHotTopSortsToWarm) {
       for (const period of this.periodsToWarm) {
         try {

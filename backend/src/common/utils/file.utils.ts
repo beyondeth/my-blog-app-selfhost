@@ -197,6 +197,93 @@ export function isImageMimeType(mimeType: string): boolean {
   return imageMimeTypes.includes(mimeType.toLowerCase());
 }
 
+export const SAFE_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+
+/**
+ * Detect the image format from its file signature instead of trusting the
+ * multipart Content-Type header. SVG is intentionally not accepted here:
+ * serving unsanitized SVG from user-controlled storage can execute scripts in
+ * some browser/embed contexts.
+ */
+export function detectImageMimeType(buffer: Buffer): string | null {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return null;
+
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "image/jpeg";
+  }
+
+  if (buffer.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))) {
+    return "image/png";
+  }
+
+  const gifHeader = buffer.subarray(0, 6).toString("ascii");
+  if (gifHeader === "GIF87a" || gifHeader === "GIF89a") {
+    return "image/gif";
+  }
+
+  if (
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+
+  return null;
+}
+
+/**
+ * Validate an uploaded image's size, declared MIME type, and binary signature.
+ */
+export function validateImageBuffer(
+  file: { size: number; mimetype: string; buffer?: Buffer },
+  maxSize: number,
+  allowedTypes: readonly string[] = SAFE_IMAGE_MIME_TYPES,
+): { valid: boolean; error?: string; detectedMimeType?: string } {
+  if (!file || !Number.isSafeInteger(file.size) || file.size < 1) {
+    return { valid: false, error: "파일 크기가 올바르지 않습니다." };
+  }
+
+  if (file.size > maxSize) {
+    return {
+      valid: false,
+      error: `파일 크기는 최대 ${formatFileSize(maxSize)}까지 업로드할 수 있습니다.`,
+    };
+  }
+
+  if (typeof file.mimetype !== "string" || file.mimetype.length === 0) {
+    return { valid: false, error: "이미지 MIME 타입이 없습니다." };
+  }
+
+  const declaredMimeType = file.mimetype.toLowerCase();
+  const normalizedDeclaredMimeType =
+    declaredMimeType === "image/jpg" ? "image/jpeg" : declaredMimeType;
+  if (!allowedTypes.includes(normalizedDeclaredMimeType)) {
+    return {
+      valid: false,
+      error: `지원하지 않는 이미지 형식입니다. (${file.mimetype})`,
+    };
+  }
+
+  if (!file.buffer || file.buffer.length === 0) {
+    return { valid: false, error: "이미지 데이터가 비어 있습니다." };
+  }
+
+  const detectedMimeType = detectImageMimeType(file.buffer);
+  if (!detectedMimeType || detectedMimeType !== normalizedDeclaredMimeType) {
+    return {
+      valid: false,
+      error: "파일 내용이 선언된 이미지 형식과 일치하지 않습니다.",
+      detectedMimeType: detectedMimeType ?? undefined,
+    };
+  }
+
+  return { valid: true, detectedMimeType };
+}
+
 /**
  * 파일 MIME 타입 검증
  */

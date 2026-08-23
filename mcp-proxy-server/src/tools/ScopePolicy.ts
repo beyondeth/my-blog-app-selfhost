@@ -4,14 +4,6 @@ import { expandLegacyScopeTokens } from '../oauth/scope-normalization.js';
 
 const TOOL_REQUIRED_SCOPES: Record<ToolName, string[]> = {
   check_auth: ['mcp:tools'],
-  list_my_published_posts: ['mcp:tools', 'mcp:read'],
-  search_my_published_posts: ['mcp:tools', 'mcp:read'],
-  read_my_published_post: ['mcp:tools', 'mcp:read'],
-  get_knowledge_manifest: ['mcp:tools', 'mcp:read'],
-  search_knowledge_nodes: ['mcp:tools', 'mcp:read'],
-  read_knowledge_node: ['mcp:tools', 'mcp:read'],
-  list_followup_suggestions: ['mcp:tools', 'mcp:read'],
-  dismiss_followup_suggestion: ['mcp:tools', 'mcp:write'],
   get_writing_style_guide: ['mcp:tools'],
   create_post: ['mcp:tools', 'mcp:write'],
   get_image_upload_url: ['mcp:tools', 'mcp:write'],
