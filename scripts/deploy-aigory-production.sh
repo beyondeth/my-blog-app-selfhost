@@ -58,8 +58,22 @@ export DOCKER_BUILDKIT=1
 "${compose[@]}" run --rm --no-deps backend \
   node dist/src/commands/verify-production-integrations.command.js
 
-"${compose[@]}" up -d postgres redis pgbouncer
-"${compose[@]}" run --rm --no-deps backend pnpm migration:run:prod:nobuild
+"${compose[@]}" up -d postgres redis
+# Postgres may be recreated when its release-mounted configuration changes.
+# Recreate PgBouncer as well so it does not retain a stale Docker-DNS failure
+# for the replaced database container.
+"${compose[@]}" up -d --force-recreate pgbouncer
+
+for attempt in {1..10}; do
+  if "${compose[@]}" run --rm --no-deps backend pnpm migration:run:prod:nobuild; then
+    break
+  fi
+  if [[ "$attempt" == 10 ]]; then
+    "${compose[@]}" logs --tail=200 pgbouncer
+    exit 7
+  fi
+  sleep 3
+done
 
 if [[ "${INITIAL_CUTOVER:-false}" == "true" ]]; then
   CONFIRM_DELETE_MATERIAL_DATA=DELETE_AIGORY_MATERIAL_DATA \
