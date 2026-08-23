@@ -43,6 +43,12 @@ sudo install -d -o ubuntu -g ubuntu -m 750 \
   /mnt/data/aigory-blog/victoriametrics \
   /mnt/data/aigory-blog/grafana
 
+# Official images drop privileges to fixed users. The host directories are
+# created by the deploy user, so grant only the matching service accounts
+# access before the first container start.
+sudo chown 70:70 /mnt/data/aigory-blog/postgres
+sudo chown 999:1000 /mnt/data/aigory-blog/redis
+
 export DOCKER_BUILDKIT=1
 "${compose[@]}" build backend
 "${compose[@]}" build frontend
