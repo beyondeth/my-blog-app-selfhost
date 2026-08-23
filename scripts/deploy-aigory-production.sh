@@ -48,6 +48,7 @@ sudo install -d -o ubuntu -g ubuntu -m 750 \
 # access before the first container start.
 sudo chown 70:70 /mnt/data/aigory-blog/postgres
 sudo chown 999:1000 /mnt/data/aigory-blog/redis
+sudo chown -R 472:0 /mnt/data/aigory-blog/grafana
 
 export DOCKER_BUILDKIT=1
 "${compose[@]}" build backend
