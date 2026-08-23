@@ -43,6 +43,10 @@ async function main(): Promise<void> {
     region,
     endpoint,
     forcePathStyle: true,
+    // OCI's S3-compatible endpoint rejects AWS's streaming checksum
+    // (aws-chunked) transfer encoding. Backups already have a local SHA-256
+    // sidecar, so only calculate a checksum when the service requires one.
+    requestChecksumCalculation: "WHEN_REQUIRED",
     credentials: {
       accessKeyId: required(
         "BACKUP_S3_ACCESS_KEY_ID",
