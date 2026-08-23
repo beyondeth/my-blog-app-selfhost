@@ -1,5 +1,5 @@
 import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
-import nodemailer from "nodemailer";
+import { createTransport } from "nodemailer";
 import { validateProductionEnvironment } from "../config/environment.config";
 
 function required(name: string, fallbackName?: string): string {
@@ -52,7 +52,7 @@ async function main(): Promise<void> {
   console.log(`OCI backup bucket access verified: ${backupBucket}`);
 
   const smtpPort = Number(process.env.SMTP_PORT || 587);
-  const smtpTransport = nodemailer.createTransport({
+  const smtpTransport = createTransport({
     host: required("SMTP_HOST"),
     port: smtpPort,
     secure:
