@@ -280,7 +280,6 @@ export interface PostForm {
   title: string;
   content: string;
   content_markdown?: string;
-  content_type?: 'html' | 'markdown';
   thumbnail?: string;
   thumbnailImageId?: string;  // 썸네일 이미지 파일 ID
   tags?: string[];
@@ -294,6 +293,23 @@ export interface PostForm {
   postType?: 'blog' | 'product';
   price?: number;
   productCategory?: string;
+}
+
+/**
+ * 블로그 포스트 생성 요청
+ * 콘텐츠 형식은 content_markdown의 존재 여부로 서버가 결정합니다.
+ * content_type은 응답/저장 모델 필드이며 생성 요청에는 포함하지 않습니다.
+ */
+export interface CreatePostRequest {
+  title: string;
+  content?: string;
+  content_markdown?: string;
+  thumbnailImageId?: string;
+  tags?: string[];
+  category: string;
+  attachedFileIds?: string[];
+  qualityScore?: number;
+  isPublished?: boolean;
 }
 
 export interface CommentForm {
@@ -363,6 +379,7 @@ export interface CreateUploadUrlDto {
 }
 
 export interface UploadCompleteDto {
+  tempId: string;
   fileKey: string;
   fileUrl: string;
   fileName: string;
@@ -375,7 +392,7 @@ export interface PresignedUrlResponse {
   uploadUrl: string;
   fileKey: string;
   expiresIn: number;
-  tempId?: string;
+  tempId: string;
 }
 
 export interface FileStats {

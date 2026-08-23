@@ -1,12 +1,13 @@
 /**
- * 환경 변수 검증 시스템 - MCP Dual Auth 버전
+ * 환경 변수 검증 시스템 - API Key 인증 버전
  *
  * 서버 시작 전 모든 필수 환경 변수를 검증하여
  * 런타임 에러를 방지하고 설정 오류를 조기에 발견
  *
- * 지원 인증 경로:
- * - /mcp: API Key Bearer 인증
- * - /mcp-remote: OAuth 2.1 Bearer 인증
+ * 변경 사항:
+ * - OAuth2 세션 관련 변수 제거 (SESSION_ENCRYPTION_KEY, SESSION_TTL, SESSION_STRICT_MODE)
+ * - API Key 인증 방식으로 전환 (Stateless)
+ * - Rate Limiting 설정 유지 (200 req/h)
  */
 
 import { z } from 'zod';
@@ -32,7 +33,7 @@ const corsOriginsSchema = z.string()
       message: 'CORS wildcard (*) is not allowed in production. Use specific domain whitelist.'
     }
   )
-  .default('http://localhost:*');
+  .default('http://localhost:3001,http://127.0.0.1:3001');
 
 // 환경 변수 스키마 정의
 const envSchema = z.object({
@@ -42,23 +43,20 @@ const envSchema = z.object({
     .default('3002')
     .transform(Number),
   NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
-  OPENAI_APP_ENABLED: z.string()
-    .default('false')
-    .transform((val) => val === 'true'),
 
   // Backend API 설정 (필수)
   BACKEND_BASE_URL: z.string().url('BACKEND_BASE_URL must be a valid URL'),
   BACKEND_API_URL: z.string().url('BACKEND_API_URL must be a valid URL'),
   // Backend 공개 URL (브라우저가 접근할 수 있는 URL)
   BACKEND_PUBLIC_URL: z.string().url('BACKEND_PUBLIC_URL must be a valid URL'),
-  // Frontend 공개 URL (포스트 URL 표시용)
+  // 설치별 블로그 공개 URL (MCP 응답과 OAuth metadata에 사용)
+  PUBLIC_SITE_URL: z.string()
+    .url('PUBLIC_SITE_URL must be a valid URL')
+    .default(process.env.PUBLIC_SITE_URL || 'http://localhost:3001'),
+  // Legacy name retained for shared core handlers and OpenAI adapter.
   FRONTEND_URL: z.string()
     .url('FRONTEND_URL must be a valid URL')
-    .default(
-      process.env.NODE_ENV === 'production'
-        ? 'https://codebase.blog'
-        : 'http://localhost:3001'
-    ),
+    .default(process.env.FRONTEND_URL || process.env.PUBLIC_SITE_URL || 'http://localhost:3001'),
 
   // CORS 설정 (프로덕션에서 와일드카드 금지)
   CORS_ORIGINS: corsOriginsSchema,
@@ -92,8 +90,6 @@ const envSchema = z.object({
     .transform(Number),
 
   // MCP 서버 공개 URL (Claude Code 연결용)
-  // 개발: http://localhost:3002
-  // 프로덕션: https://mcp.codebase.blog
   MCP_BASE_URL: z.string()
     .url('MCP_BASE_URL must be a valid URL')
     .refine(
@@ -110,26 +106,15 @@ const envSchema = z.object({
     )
     .default(
       process.env.NODE_ENV === 'production'
-        ? 'https://mcp.codebase.blog'
+        ? 'https://mcp.example.com'
         : `http://localhost:${process.env.MCP_PROXY_PORT || 3002}`
     ),
 
-  // Redis 설정 (Core + Cache)
-  REDIS_CORE_HOST: z.string()
-    .default(process.env.REDIS_HOST || 'my-blog-app-redis-core'),
-  REDIS_CORE_PORT: z.string()
-    .regex(/^\d+$/, 'REDIS_CORE_PORT must be a number')
-    .default(process.env.REDIS_PORT || '6379')
-    .transform(Number),
-  REDIS_CACHE_HOST: z.string()
-    .default(
-      process.env.REDIS_CACHE_HOST ||
-        process.env.REDIS_HOST ||
-        'my-blog-app-redis-cache'
-    ),
-  REDIS_CACHE_PORT: z.string()
-    .regex(/^\d+$/, 'REDIS_CACHE_PORT must be a number')
-    .default(process.env.REDIS_PORT || '6379')
+  // Redis 설정 (API Key 캐싱용)
+  REDIS_HOST: z.string().default('my-blog-app-shared-redis'),
+  REDIS_PORT: z.string()
+    .regex(/^\d+$/, 'REDIS_PORT must be a number')
+    .default('6379')
     .transform(Number),
   REDIS_PASSWORD: z.string().optional(),
   API_KEY_CACHE_TTL: z.string()
@@ -137,9 +122,15 @@ const envSchema = z.object({
     .default('300') // 5분
     .transform(Number),
 
-  // Backend 통신용 공유 시크릿 (선택적)
+  // Backend 통신용 공유 시크릿 (개발에서는 선택적, 프로덕션에서는 필수)
   MCP_SHARED_SECRET: z.string()
     .min(16, 'MCP_SHARED_SECRET must be at least 16 characters')
+    .optional(),
+
+  // Optional bearer token for metrics when the proxy is reachable outside the
+  // Docker network. Without it, metrics are limited to loopback/private peers.
+  METRICS_AUTH_TOKEN: z.string()
+    .min(32, 'METRICS_AUTH_TOKEN must be at least 32 characters')
     .optional(),
 });
 
@@ -154,43 +145,49 @@ export function validateEnv(): EnvConfig {
     // 환경 변수 파싱 및 검증
     const env = envSchema.parse(process.env);
 
-    console.log('✅ Environment validation complete (MCP dual-auth mode)');
-    console.log(`📍 Environment: ${env.NODE_ENV}`);
-    console.log(`📍 MCP Proxy port: ${env.MCP_PROXY_PORT}`);
-    console.log(`🤖 OpenAI App Route Enabled: ${env.OPENAI_APP_ENABLED ? 'yes' : 'no'}`);
+    console.log('✅ 환경 변수 검증 완료 (API Key 인증 모드)');
+    console.log(`📍 환경: ${env.NODE_ENV}`);
+    console.log(`📍 MCP Proxy 포트: ${env.MCP_PROXY_PORT}`);
     console.log(`📍 MCP Base URL: ${env.MCP_BASE_URL}`);
     console.log(`📍 Backend: ${env.BACKEND_BASE_URL}`);
     console.log(`📍 Backend Public: ${env.BACKEND_PUBLIC_URL}`);
-    console.log(`📍 Frontend: ${env.FRONTEND_URL}`);
-    console.log(`🔐 Auth modes: API Key (/mcp) + OAuth 2.1 (/mcp-remote)`);
+    console.log(`📍 Public site: ${env.PUBLIC_SITE_URL}`);
+    console.log(`🔐 인증 방식: API Key (Bearer Token)`);
     console.log(`🛡️ Rate Limit: ${env.RATE_LIMIT_MAX_REQUESTS} req/${env.RATE_LIMIT_WINDOW_MS / 3600000}h`);
 
     // 프로덕션 환경 추가 검증
     if (env.NODE_ENV === 'production') {
-      console.log('\n🔍 Additional production checks:');
+      if (!env.MCP_SHARED_SECRET) {
+        throw new Error('MCP_SHARED_SECRET is required in production');
+      }
+      if (!env.REDIS_PASSWORD || env.REDIS_PASSWORD.length < 16) {
+        throw new Error('REDIS_PASSWORD with at least 16 characters is required in production');
+      }
+
+      console.log('\n🔍 프로덕션 환경 추가 검증:');
 
       // CORS 와일드카드 확인
       if (env.CORS_ORIGINS.includes('*')) {
         throw new Error('CORS wildcard is not allowed in production');
       }
-      console.log('  ✅ CORS configuration is valid');
+      console.log('  ✅ CORS 설정 안전');
 
       // HTTPS 확인
       if (!env.BACKEND_BASE_URL.startsWith('https://') && !env.BACKEND_BASE_URL.startsWith('http://backend:')) {
-        console.warn('  ⚠️ BACKEND_BASE_URL is not using HTTPS.');
+        console.warn('  ⚠️ BACKEND_BASE_URL이 HTTPS를 사용하지 않습니다.');
       } else {
-        console.log('  ✅ Backend URL configuration is valid');
+        console.log('  ✅ Backend URL 설정 안전');
       }
 
       // MCP_BASE_URL HTTPS 확인
       if (!env.MCP_BASE_URL.startsWith('https://')) {
-        console.warn('  ⚠️ MCP_BASE_URL is not using HTTPS. (Required in production)');
+        console.warn('  ⚠️ MCP_BASE_URL이 HTTPS를 사용하지 않습니다. (프로덕션 필수)');
       } else {
-        console.log('  ✅ MCP Base URL is using HTTPS');
+        console.log('  ✅ MCP Base URL HTTPS 사용 중');
       }
     }
 
-    if (!env.MCP_SHARED_SECRET) {
+    if (!env.MCP_SHARED_SECRET && env.NODE_ENV !== 'production') {
       console.warn('  ⚠️ MCP_SHARED_SECRET is not set. Internal MCP requests will rely solely on network isolation.');
     } else {
       console.log('  🔐 MCP shared secret configured');
@@ -199,7 +196,7 @@ export function validateEnv(): EnvConfig {
     return env;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('❌ Environment validation failed:');
+      console.error('❌ 환경 변수 검증 실패:');
       console.error('━'.repeat(50));
 
       error.issues.forEach(issue => {
@@ -207,15 +204,15 @@ export function validateEnv(): EnvConfig {
       });
 
       console.error('━'.repeat(50));
-      console.error('\n💡 Check your .env file and define the required environment variables.');
-      console.error('   Reference: .env.development or .env.production\n');
+      console.error('\n💡 .env 파일을 확인하고 필수 환경 변수를 설정해주세요.');
+      console.error('   참고: .env.development 또는 .env.production\n');
 
       // 개발 환경에서는 자세한 오류 표시
       if (process.env.NODE_ENV === 'development') {
-        console.error('🔍 Full validation details:', JSON.stringify(error.issues, null, 2));
+        console.error('🔍 전체 오류 정보:', JSON.stringify(error.issues, null, 2));
       }
     } else {
-      console.error('❌ Unexpected error during environment validation:', error);
+      console.error('❌ 예상치 못한 오류:', error);
     }
 
     // 서버 시작 중단

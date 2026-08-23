@@ -96,19 +96,38 @@ export class UrlSanitizerUtil {
       return "";
     }
 
-    const sanitized = this.safeDecodeURIComponent(path);
-
-    // 파일명 패턴 검증 및 정제
-    const filename = sanitized.split("/").pop() || "";
-    if (!this.FILENAME_PATTERN.test(filename)) {
-      this.logger.warn(`Invalid filename format: ${filename}`);
-      // 안전한 파일명으로 대체
-      const timestamp = Date.now();
-      return `file_${timestamp}`;
+    if (path.length > this.MAX_PARAM_LENGTH) {
+      this.logger.warn(`File path too long: ${path.length} characters`);
+      return "";
     }
 
-    // 경로 구분자 제거 (파일명만 반환)
-    return filename;
+    let decodedPath: string;
+    try {
+      decodedPath = decodeURIComponent(path);
+    } catch (error) {
+      this.logger.warn(`Failed to decode file path: ${path}`, error);
+      return "";
+    }
+
+    // Object storage keys are hierarchical paths. Validate every segment while
+    // preserving `/`, otherwise valid `uploads/...` and `v2/...` keys become
+    // impossible to retrieve from the proxy.
+    const segments = decodedPath.split("/");
+    if (
+      segments.length === 0 ||
+      segments.some(
+        (segment) =>
+          !segment ||
+          segment === "." ||
+          segment === ".." ||
+          !this.FILENAME_PATTERN.test(segment),
+      )
+    ) {
+      this.logger.warn(`Invalid file path format: ${decodedPath}`);
+      return "";
+    }
+
+    return segments.join("/");
   }
 
   /**

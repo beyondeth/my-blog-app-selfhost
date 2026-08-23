@@ -1,0 +1,122 @@
+# Resource and security overlay for the existing 2 OCPU / 12 GB ARM64 VM.
+# Usage:
+#   docker compose --env-file /etc/aigory-blog/.env.production \
+#     -f docker-compose.prod.oracle.yml \
+#     -f docker-compose.prod.oracle-small.yml up -d
+
+services:
+  frontend:
+    cpus: 0.50
+    mem_limit: 1280m
+    mem_reservation: 512m
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@pgbouncer:5432/${DB_NAME:-aigory_blog_prod}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      NODE_OPTIONS: --max-old-space-size=700
+    cpus: 1.00
+    mem_limit: 2g
+    mem_reservation: 1g
+
+  postgres:
+    volumes:
+      - ${POSTGRES_DATA_DIR:-/mnt/data/aigory-blog/postgres}:/var/lib/postgresql
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1536MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - max_connections=100
+      - -c
+      - wal_compression=on
+      - -c
+      - random_page_cost=1.1
+    cpus: 1.20
+    mem_limit: 2560m
+    mem_reservation: 1g
+    shm_size: 256mb
+
+  pgbouncer:
+    environment:
+      MAX_CLIENT_CONN: 500
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+      MAX_DB_CONNECTIONS: 40
+      MAX_USER_CONNECTIONS: 40
+    cpus: 0.10
+    mem_limit: 128m
+    mem_reservation: 32m
+
+  redis:
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --maxmemory
+      - 640mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --save
+      - "900 1 300 10 60 10000"
+      - --maxclients
+      - "2000"
+    volumes:
+      - ${REDIS_DATA_DIR:-/mnt/data/aigory-blog/redis}:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+    cpus: 0.35
+    mem_limit: 768m
+    mem_reservation: 256m
+
+  mcp-proxy:
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    cpus: 0.35
+    mem_limit: 512m
+    mem_reservation: 192m
+
+  victoriametrics:
+    volumes:
+      - ${VICTORIAMETRICS_DATA_DIR:-/mnt/data/aigory-blog/victoriametrics}:/storage
+      - ./victoriametrics/scrape_config.yml:/etc/victoriametrics/scrape_config.yml:ro
+      - ./victoriametrics/alerts.yml:/etc/victoriametrics/alerts.yml:ro
+    cpus: 0.10
+    mem_limit: 256m
+    mem_reservation: 64m
+
+  grafana:
+    volumes:
+      - ${GRAFANA_DATA_DIR:-/mnt/data/aigory-blog/grafana}:/var/lib/grafana
+      - ./grafana/provisioning/datasources/victoriametrics.yml:/etc/grafana/provisioning/datasources/victoriametrics.yml:ro
+      - ./grafana/provisioning/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    cpus: 0.15
+    mem_limit: 384m
+    mem_reservation: 128m
+
+  redis-exporter:
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    cpus: 0.05
+    mem_limit: 64m
+    mem_reservation: 16m

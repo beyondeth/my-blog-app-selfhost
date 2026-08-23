@@ -25,7 +25,11 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { MaxFileSizeValidator, ParseFilePipe } from "@nestjs/common";
+import {
+  FileTypeValidator,
+  MaxFileSizeValidator,
+  ParseFilePipe,
+} from "@nestjs/common";
 import {
   CreateCommunityWidgetDto,
   ReorderCommunityWidgetsDto,
@@ -44,9 +48,14 @@ import {
 import { Public } from "../../common/decorators/public.decorator";
 import { OptionalJwtAuthGuard } from "../../auth/guards/optional-jwt-auth.guard";
 import { CommunityVisibilityGuard } from "../guards/community-visibility.guard";
+import { CommunityOrganizationGuard } from "../guards/community-organization.guard";
+import { OrganizationContextGuard } from "../../organizations/guards/organization-context.guard";
+import { RequireOrganizationContext } from "../../organizations/decorators/organization-context.decorator";
 
 @ApiTags("Community Widgets")
 @Controller("community/:slug/widgets")
+@UseGuards(OrganizationContextGuard, CommunityOrganizationGuard)
+@RequireOrganizationContext()
 export class CommunityWidgetController {
   constructor(
     private readonly communityWidgetService: CommunityWidgetService,
@@ -190,7 +199,9 @@ export class CommunityWidgetController {
   @ApiBearerAuth()
   @ApiParam({ name: "widgetId", description: "위젯 ID" })
   @ApiOperation({ summary: "위젯 전용 이미지 업로드" })
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(
+    FileInterceptor("file", { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   @ApiConsumes("multipart/form-data")
   @ApiBody({
     schema: {
@@ -208,7 +219,10 @@ export class CommunityWidgetController {
     @Param("widgetId", new ParseUUIDPipe()) widgetId: string,
     @UploadedFile(
       new ParseFilePipe({
-        validators: [new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 })],
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /^image\/(jpeg|png|gif|webp)$/ }),
+        ],
       }),
     )
     file: Express.Multer.File,
@@ -229,6 +243,7 @@ export class CommunityWidgetController {
         community.id,
         widgetId,
         file,
+        community.organizationId || undefined,
       );
 
     return {

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { OpenGraphService } from "./opengraph.service";
 import { CacheService } from "../cache/cache.service";
+import { UrlSafetyService } from "../common/services/url-safety.service";
 
 // Mock CacheService
 const mockCacheService = {
@@ -12,9 +13,13 @@ describe("OpenGraphService", () => {
   let service: OpenGraphService;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockCacheService.get.mockResolvedValue(null);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OpenGraphService,
+        UrlSafetyService,
         { provide: CacheService, useValue: mockCacheService },
       ],
     }).compile();
@@ -24,6 +29,10 @@ describe("OpenGraphService", () => {
 
   it("should be defined", () => {
     expect(service).toBeDefined();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe("SSRF Protection", () => {
@@ -52,24 +61,35 @@ describe("OpenGraphService", () => {
       expect(result.error).toMatch(/클라우드 메타데이터|접근이 제한된/);
     });
 
-    it("should allow public domains (e.g., example.com)", async () => {
-      // Mock fetchHtml to avoid actual network call if possible, or just rely on validateUrl passing
-      // Since we can't easily mock private method, we assume validateUrl passes and it fails at fetchHtml or returns success
-      // We just check that it does NOT return "Access restricted" error.
+    it("should allow a public IP and parse its metadata", async () => {
+      const html = `
+        <html>
+          <head>
+            <meta property="og:title" content="Public page" />
+          </head>
+        </html>
+      `;
+      const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({
+        ok: true,
+        headers: {
+          get: jest.fn((name: string) =>
+            name.toLowerCase() === "content-type" ? "text/html" : null,
+          ),
+        },
+        text: jest.fn().mockResolvedValue(html),
+      } as unknown as Response);
 
-      // However, actual network call might fail in test env.
-      // Let's just create a spy if needed, but for now we focus on BLOCKING logic which happens BEFORE fetch.
+      const result = await service.fetchOpenGraph("https://93.184.216.34");
 
-      // If validateUrl passes, it proceeds to fetchHtml.
-      // If fetchHtml fails (network), it returns error "request to ... failed" etc.
-      // It should NOT be "Access restricted".
-
-      try {
-        const result = await service.fetchOpenGraph("http://example.com");
-        expect(result.error).not.toContain("접근이 제한된");
-      } catch (e) {
-        // Ignore network errors
-      }
+      expect(result).toMatchObject({
+        success: true,
+        domain: "93.184.216.34",
+        title: "Public page",
+      });
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://93.184.216.34",
+        expect.any(Object),
+      );
     });
   });
 });

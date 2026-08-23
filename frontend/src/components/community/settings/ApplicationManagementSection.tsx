@@ -11,6 +11,7 @@ import {
 import type { PendingApplication } from '@/types/community';
 import { cn } from '@/lib/utils';
 import { DESTRUCTIVE_ACTION_CLASS, DESTRUCTIVE_BORDER_CLASS } from '@/constants/accessibility';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface ApplicationManagementSectionProps {
   slug: string;
@@ -175,7 +176,7 @@ function ApplicationItem({
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={application.user.profileImage}
+              src={normalizeImageUrl(application.user.profileImage)}
               alt={application.user.username}
               className="w-full h-full object-cover"
             />

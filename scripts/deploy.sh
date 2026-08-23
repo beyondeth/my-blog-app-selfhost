@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================
-# Codebase 블로그 플랫폼 - 자동 배포 스크립트
+# Aigory 블로그 플랫폼 - 자동 배포 스크립트
 # ============================================
 # 오라클 프리티어 ARM64 환경 최적화
 # 타임아웃 및 리소스 오류 방지
@@ -49,7 +49,7 @@ cd "$PROJECT_DIR"
 # 환경 설정
 COMPOSE_FILE="docker-compose.prod.oracle.yml"
 ENV_FILE=".env.production"
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-codebase-prod}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-aigory-blog-prod}"
 
 # 헬스 체크 함수
 check_health() {
@@ -293,7 +293,7 @@ main() {
     local command=${1:-deploy}
 
     log "=========================================="
-    log "Codebase 블로그 플랫폼 배포 시작"
+    log "Aigory 블로그 플랫폼 배포 시작"
     log "Mode: $command"
     log "Time: $(date)"
     log "=========================================="

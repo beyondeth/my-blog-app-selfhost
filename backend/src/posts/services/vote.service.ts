@@ -8,6 +8,8 @@ import { VoteType } from "../enums/vote-type.enum";
 import { RedisLockService } from "../../redis/redis-lock.service";
 import { CacheService, CacheKeys } from "../../cache/cache.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
+import { OutboxService } from "../../common/services/outbox.service";
+import { PostInteractionEvents } from "../events/post-interaction.events";
 
 /**
  * 투표 결과 인터페이스
@@ -61,6 +63,7 @@ export class VoteService {
     private readonly redisLockService: RedisLockService,
     private readonly cacheService: CacheService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly outboxService: OutboxService,
   ) {}
 
   /**
@@ -142,6 +145,25 @@ export class VoteService {
             likeCount: upvoteCount,
           };
 
+          const post = await manager.findOne(Post, {
+            where: { id: postId },
+            relations: ["blog"],
+          });
+
+          await this.outboxService.enqueue(manager, {
+            eventType: PostInteractionEvents.LIKE_TOGGLED,
+            aggregateType: "post",
+            aggregateId: postId,
+            organizationId: post?.blog?.organizationId || null,
+            payload: {
+              postId,
+              userId,
+              liked: userVote === VoteType.UPVOTE,
+              likeCount: upvoteCount,
+              timestamp: new Date(),
+            },
+          });
+
           // 캐시 무효화 (디바이스 간 stale 최소화)
           void this.invalidateCache(postId).catch((err) => {
             this.logger.warn("Vote cache invalidation failed:", err.message);
@@ -155,16 +177,6 @@ export class VoteService {
             voteType: userVote,
             upvoteCount,
             downvoteCount,
-            timestamp: new Date(),
-          });
-
-          // 평판 시스템용 이벤트 발행 (LIKE_TOGGLED)
-          // upvote가 새로 추가된 경우에만 liked=true
-          this.eventEmitter.emit("post.like.toggled", {
-            postId,
-            userId,
-            liked: action === "added" && voteType === VoteType.UPVOTE,
-            likeCount: upvoteCount,
             timestamp: new Date(),
           });
 
@@ -308,9 +320,9 @@ export class VoteService {
 
       // 피드 관련 캐시 패턴 무효화 (범위 축소 + Debounce로 부하 완화)
       const patterns = [
-        "feed:unified:all:*:limit:20:cursor:first",
-        "feed:unified:blog:*:limit:20:cursor:first",
-        "feed:unified:community:*:limit:20:cursor:first",
+        "feed:unified:v2:all:*:limit:20:cursor:first",
+        "feed:unified:v2:blog:*:limit:20:cursor:first",
+        "feed:unified:v2:community:*:limit:20:cursor:first",
         "feed:home:*",
         "feed:popular:*",
       ];

@@ -14,6 +14,7 @@ import type {
   PaginatedResponse,
   Post,
   PostForm,
+  CreatePostRequest,
   Comment,
   CommentForm,
   FileUpload,
@@ -58,6 +59,18 @@ export interface RefreshTokenResponse {
   accessToken?: string;
   /** 갱신 성공 여부 */
   success: boolean;
+}
+
+export interface RefreshSession {
+  id: string;
+  familyId: string;
+  deviceName: string | null;
+  userAgent: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string;
+  revokedAt: string | null;
 }
 
 /**
@@ -131,6 +144,7 @@ export type {
   PaginatedResponse,
   Post,
   PostForm,
+  CreatePostRequest,
   Comment,
   CommentForm,
   FileUpload,
@@ -140,4 +154,3 @@ export type {
   FileStats,
   Blog
 };
-

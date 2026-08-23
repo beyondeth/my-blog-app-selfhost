@@ -1,14 +1,23 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Between, FindOptionsWhere } from "typeorm";
+import {
+  Repository,
+  Between,
+  FindOptionsWhere,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+} from "typeorm";
 import { AuditLog, AuditAction } from "./entities/audit-log.entity";
 import { DateUtils } from "../common/utils/date.utils";
+import { RequestContextService } from "../common/services/request-context.service";
 
 export interface AuditContext {
-  userId: string;
+  userId?: string;
+  organizationId?: string;
   ipAddress?: string;
   userAgent?: string;
   sessionId?: string;
+  requestId?: string;
 }
 
 export interface AuditLogEntry {
@@ -25,21 +34,40 @@ export class AuditService {
   constructor(
     @InjectRepository(AuditLog)
     private auditLogRepository: Repository<AuditLog>,
+    private readonly requestContextService: RequestContextService,
   ) {}
 
   /**
    * Create an audit log entry
    */
   async log(entry: AuditLogEntry, context: AuditContext): Promise<AuditLog> {
+    const requestContext = this.requestContextService.get();
     const auditLog = this.auditLogRepository.create({
       ...entry,
-      performedById: context.userId,
+      performedById: context.userId || null,
+      organizationId: context.organizationId || requestContext.organizationId,
       ipAddress: context.ipAddress,
       userAgent: context.userAgent,
       sessionId: context.sessionId,
+      requestId: context.requestId || requestContext.requestId,
     });
 
     return await this.auditLogRepository.save(auditLog);
+  }
+
+  async logSecurityEvent(
+    action: AuditAction,
+    metadata: Record<string, any>,
+    context: AuditContext = {},
+  ): Promise<AuditLog> {
+    return this.log(
+      {
+        action,
+        entityType: "security",
+        metadata,
+      },
+      context,
+    );
   }
 
   /**
@@ -132,6 +160,8 @@ export class AuditService {
       entityType?: string;
       entityId?: string;
       performedById?: string;
+      organizationId?: string;
+      requestId?: string;
       startDate?: Date;
       endDate?: Date;
     },
@@ -144,25 +174,77 @@ export class AuditService {
     if (filters.entityType) where.entityType = filters.entityType;
     if (filters.entityId) where.entityId = filters.entityId;
     if (filters.performedById) where.performedById = filters.performedById;
+    if (filters.organizationId) where.organizationId = filters.organizationId;
+    if (filters.requestId) where.requestId = filters.requestId;
 
     if (filters.startDate && filters.endDate) {
       where.createdAt = Between(filters.startDate, filters.endDate);
+    } else if (filters.startDate) {
+      where.createdAt = MoreThanOrEqual(filters.startDate);
+    } else if (filters.endDate) {
+      where.createdAt = LessThanOrEqual(filters.endDate);
     }
+
+    const safePage = Math.max(Math.trunc(page) || 1, 1);
+    const safeLimit = Math.min(Math.max(Math.trunc(limit) || 50, 1), 100);
 
     const [logs, total] = await this.auditLogRepository.findAndCount({
       where,
       relations: ["performedBy"],
       order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
     });
 
     return {
       data: logs,
       total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
+    };
+  }
+
+  /**
+   * Get tenant-scoped audit logs for an operator-facing API.
+   * The performed user is intentionally projected to non-sensitive fields.
+   */
+  async findOrganizationLogs(
+    filters: {
+      action?: AuditAction;
+      entityType?: string;
+      entityId?: string;
+      performedById?: string;
+      organizationId: string;
+      requestId?: string;
+      startDate?: Date;
+      endDate?: Date;
+    },
+    page = 1,
+    limit = 50,
+  ) {
+    const result = await this.findAll(filters, page, limit);
+
+    return {
+      ...result,
+      data: result.data.map((log) => ({
+        id: log.id,
+        action: log.action,
+        entityType: log.entityType,
+        entityId: log.entityId,
+        previousData: log.previousData,
+        newData: log.newData,
+        metadata: log.metadata,
+        organizationId: log.organizationId,
+        requestId: log.requestId,
+        createdAt: log.createdAt,
+        performedBy: log.performedBy
+          ? {
+              id: log.performedBy.id,
+              username: log.performedBy.username,
+            }
+          : null,
+      })),
     };
   }
 

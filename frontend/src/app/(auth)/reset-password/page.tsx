@@ -79,8 +79,8 @@ function ResetPasswordPageContent() {
       special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
     };
     setPasswordStrength(strength);
-    if (error) setError(null); // Clear error on input change
-  }, [password, error]);
+    setError((currentError) => (currentError ? null : currentError)); // Clear error on input change
+  }, [password]);
 
   const validatePassword = () => {
     setError(null);

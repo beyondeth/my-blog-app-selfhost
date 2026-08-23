@@ -42,9 +42,10 @@ export class CommunityRecoveryService {
     createdById: string | null,
     reason: string,
     metadata?: SnapshotMetadata,
+    organizationId?: string,
   ): Promise<CommunityRecoverySnapshot> {
     const community = await this.communityRepository.findOne({
-      where: { id: communityId },
+      where: { id: communityId, ...(organizationId ? { organizationId } : {}) },
     });
 
     if (!community) {
@@ -118,12 +119,20 @@ export class CommunityRecoveryService {
   /**
    * 스냅샷을 기반으로 커뮤니티 상태 복원
    */
-  async restoreSnapshot(snapshotId: string, operatorId: string): Promise<void> {
+  async restoreSnapshot(
+    snapshotId: string,
+    operatorId: string,
+    organizationId?: string,
+  ): Promise<void> {
     const snapshot = await this.snapshotRepository.findOne({
       where: { id: snapshotId },
+      relations: ["community"],
     });
 
-    if (!snapshot) {
+    if (
+      !snapshot ||
+      (organizationId && snapshot.community?.organizationId !== organizationId)
+    ) {
       throw new NotFoundException("스냅샷을 찾을 수 없습니다");
     }
 
@@ -245,7 +254,19 @@ export class CommunityRecoveryService {
     );
   }
 
-  async listSnapshots(communityId: string, limit = 20) {
+  async listSnapshots(
+    communityId: string,
+    limit = 20,
+    organizationId?: string,
+  ) {
+    const community = await this.communityRepository.findOne({
+      where: { id: communityId, ...(organizationId ? { organizationId } : {}) },
+      select: ["id"],
+    });
+    if (!community) {
+      throw new NotFoundException("커뮤니티를 찾을 수 없습니다");
+    }
+
     return this.snapshotRepository.find({
       where: { communityId },
       order: { createdAt: "DESC" },

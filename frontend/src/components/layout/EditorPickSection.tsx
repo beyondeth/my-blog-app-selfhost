@@ -10,6 +10,7 @@ import { useEditorPicks } from '@/hooks/useEditorPicks';
 import { useVote } from '@/hooks/useVote';
 import { VoteButton } from '@/components/ui/VoteButton';
 import type { VoteType } from '@/types';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 /**
  * Editor's Pick 섹션 컴포넌트
@@ -140,7 +141,7 @@ const EditorPickSection = React.memo(function EditorPickSection() {
                     {/* 모바일 버전 */}
                     <div className="block sm:hidden" style={{ width: '100px', height: '94px' }}>
                       <Image
-                        src={post.thumbnail}
+                        src={normalizeImageUrl(post.thumbnail)}
                         alt={post.title}
                         width={100}
                         height={94}
@@ -153,7 +154,7 @@ const EditorPickSection = React.memo(function EditorPickSection() {
                     {/* 데스크톱 버전 */}
                     <div className="hidden sm:block" style={{ width: '210px', height: '197px' }}>
                       <Image
-                        src={post.thumbnail}
+                        src={normalizeImageUrl(post.thumbnail)}
                         alt={post.title}
                         width={210}
                         height={197}

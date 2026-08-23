@@ -1,5 +1,5 @@
 # ============================================
-# Codebase Frontend - Next.js Standalone Production Dockerfile
+# Aigory Frontend - Next.js Standalone Production Dockerfile
 # ============================================
 # 🎯 목표: 메모리 최적화 (1.5GB → 768MB)
 # 🔧 전략:
@@ -8,13 +8,13 @@
 #   - 최종 이미지 크기 최소화 (500MB → 150MB)
 #
 # 📝 사용법:
-#   docker build -f Dockerfile.prod -t codebase-frontend:latest .
+#   docker build -f Dockerfile.prod -t aigory-blog-frontend:latest .
 # ============================================
 
 # ============================================
 # Stage 1: Dependencies (의존성 설치 - 최적화)
 # ============================================
-FROM node:22-slim AS deps
+FROM node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS deps
 
 # 작업 디렉토리
 WORKDIR /app
@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # pnpm 설치 및 환경 설정
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@9.0.0
 ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
@@ -46,7 +46,7 @@ RUN --mount=type=cache,target=/root/.npm \
 # ============================================
 # Stage 2: Builder (Next.js 빌드 - 최적화)
 # ============================================
-FROM node:22-slim AS builder
+FROM node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS builder
 
 WORKDIR /app
 
@@ -60,7 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # pnpm 설치 (빌드 명령어용)
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@9.0.0
 
 # 의존성 복사를 먼저 수행 (캐시 효율성)
 COPY --from=deps /app/node_modules ./node_modules
@@ -82,12 +82,6 @@ ENV NEXT_TURBOPACK=0
 ENV NODE_OPTIONS="--max-old-space-size=3072"
 ENV NEXT_BUILD_WORKERS=4
 ENV npm_config_build_from_source=false
-ENV npm_config_platform=linux
-ENV npm_config_platform_linux=linux
-ENV npm_config_arch=arm64
-ENV npm_config_target_arch=arm64
-ENV npm_config_target_platform=linux
-ENV npm_config_target_libc=glibc
 ENV npm_config_sharp_binary_host="https://github.com/lovell/sharp/releases"
 ENV npm_config_sharp_libvips_binary_host="https://github.com/lovell/sharp-libvips/releases"
 ENV SKIP_NATIVE_COMPILATION=1
@@ -96,6 +90,10 @@ ENV SKIP_NATIVE_COMPILATION=1
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_BACKEND_URL
 ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_CDN_BASE_URL
+ARG NEXT_PUBLIC_STORAGE_PUBLIC_URL
+ARG NEXT_PUBLIC_MCP_BASE_URL
+ARG BACKEND_INTERNAL_URL
 ARG NEXT_PUBLIC_MIXPANEL_TOKEN
 ARG NEXT_PUBLIC_GA_MEASUREMENT_ID
 
@@ -103,6 +101,10 @@ ARG NEXT_PUBLIC_GA_MEASUREMENT_ID
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_CDN_BASE_URL=$NEXT_PUBLIC_CDN_BASE_URL
+ENV NEXT_PUBLIC_STORAGE_PUBLIC_URL=$NEXT_PUBLIC_STORAGE_PUBLIC_URL
+ENV NEXT_PUBLIC_MCP_BASE_URL=$NEXT_PUBLIC_MCP_BASE_URL
+ENV BACKEND_INTERNAL_URL=$BACKEND_INTERNAL_URL
 ENV NEXT_PUBLIC_MIXPANEL_TOKEN=$NEXT_PUBLIC_MIXPANEL_TOKEN
 ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
 
@@ -112,7 +114,10 @@ RUN npm run build
 # ============================================
 # Stage 3: Runner (최종 런타임)
 # ============================================
-FROM node:22-slim AS runner
+FROM node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS runner
+
+LABEL org.opencontainers.image.licenses="LicenseRef-Proprietary" \
+      org.opencontainers.image.source="https://github.com/beyondeth/my-blog-app"
 
 # 보안: 비-루트 사용자 생성
 RUN groupadd --system --gid 1001 nodejs && \
@@ -130,7 +135,6 @@ ENV PORT=3000
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
 # Sharp 복사 (이미지 최적화용)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
 

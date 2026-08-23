@@ -177,7 +177,7 @@ export const YOUTUBE_CONFIG = {
 export const IMAGE_UPLOAD_CONFIG = {
   MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
   MAX_TOTAL_SIZE: 30 * 1024 * 1024, // 30MB
-  ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+  ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/webp'],
 }
 ```
 

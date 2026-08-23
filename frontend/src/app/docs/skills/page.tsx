@@ -27,7 +27,7 @@ const toc = [
 const skillsGlobalInstallCommand = getSkillsInstallSnippet(false, true);
 const skillsPerAgentInstallCommands = getSkillsPerAgentInstallSnippet(false, false)
   .split('\n')
-  .map((line) => line.trim())
+  .map((line: string) => line.trim())
   .filter(Boolean);
 const skillsVerifyGlobalByAgentsCommand =
   'npx -y skills list -g -a codex -a claude-code -a gemini-cli -a antigravity';

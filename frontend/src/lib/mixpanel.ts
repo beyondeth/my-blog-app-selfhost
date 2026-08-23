@@ -52,6 +52,12 @@ function initMixpanelInstance() {
   }
 }
 
+// Legacy layout callers may request initialization before consent is known.
+// Keep that call harmless; actual initialization remains consent-gated.
+export async function initMixpanel(): Promise<void> {
+  initMixpanelInstance();
+}
+
 export function setMixpanelConsent(granted: boolean) {
   consentGranted = granted;
 

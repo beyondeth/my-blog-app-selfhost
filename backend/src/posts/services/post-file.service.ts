@@ -82,13 +82,19 @@ export class PostFileService {
     postId: string,
     userId: string,
     setThumbnailDto: { thumbnailFileId?: string },
+    organizationId?: string,
   ) {
     try {
       const { thumbnailFileId } = setThumbnailDto;
 
       // 게시글 소유권 확인
       const post = await this.postsRepository.findOne({
-        where: { id: postId, authorId: userId },
+        where: {
+          id: postId,
+          authorId: userId,
+          ...(organizationId ? { blog: { organizationId } } : {}),
+        },
+        relations: ["blog"],
       });
 
       if (!post) {
@@ -101,13 +107,23 @@ export class PostFileService {
       if (thumbnailFileId) {
         // 파일 소유권 확인
         const thumbnailFile = await this.filesRepository.findOne({
-          where: { id: thumbnailFileId, userId },
+          where: {
+            id: thumbnailFileId,
+            userId,
+            ...(organizationId ? { organizationId } : {}),
+          },
         });
 
         if (!thumbnailFile) {
           throw new NotFoundException(
             "썸네일 파일을 찾을 수 없거나 권한이 없습니다.",
           );
+        }
+
+        // 임시 업로드가 썸네일로 채택되면 정리 대상에서 제외한다.
+        if (thumbnailFile.expiresAt) {
+          thumbnailFile.expiresAt = null;
+          await this.filesRepository.save(thumbnailFile);
         }
 
         thumbnailImageId = thumbnailFileId;

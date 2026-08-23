@@ -10,24 +10,24 @@ import { Metadata } from 'next';
  * - 구조화된 데이터 (JSON-LD) 포함
  */
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://aigory.com';
 
 export const metadata: Metadata = {
-  title: 'Pricing - Codebase',
-  description: 'Codebase 구독 요금제를 확인하세요. Free, Starter, Pro 플랜을 제공하며, 개발자를 위한 다양한 기능을 이용할 수 있습니다.',
-  keywords: ['구독 요금제', 'pricing', '블로그 플랜', 'subscription', 'Codebase pricing'],
+  title: 'Pricing - Aigory',
+  description: 'Aigory 구독 요금제를 확인하세요. Free, Starter, Pro 플랜을 제공하며, 개발자를 위한 다양한 기능을 이용할 수 있습니다.',
+  keywords: ['구독 요금제', 'pricing', '블로그 플랜', 'subscription', 'Aigory pricing'],
 
   openGraph: {
-    title: 'Pricing - Codebase',
-    description: 'Codebase 구독 요금제를 확인하세요. Free, Starter, Pro 플랜을 제공합니다.',
+    title: 'Pricing - Aigory',
+    description: 'Aigory 구독 요금제를 확인하세요. Free, Starter, Pro 플랜을 제공합니다.',
     url: `${siteUrl}/pricing`,
-    siteName: 'Codebase',
+    siteName: 'Aigory',
     images: [
       {
-        url: `${siteUrl}/og-image-v2.png`,
+        url: `${siteUrl}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: 'Codebase Pricing',
+        alt: 'Aigory Pricing',
       },
     ],
     locale: 'ko_KR',
@@ -36,9 +36,9 @@ export const metadata: Metadata = {
 
   twitter: {
     card: 'summary_large_image',
-    title: 'Pricing - Codebase',
-    description: 'Codebase 구독 요금제를 확인하세요. Free, Starter, Pro 플랜을 제공합니다.',
-    images: [`${siteUrl}/og-image-v2.png`],
+    title: 'Pricing - Aigory',
+    description: 'Aigory 구독 요금제를 확인하세요. Free, Starter, Pro 플랜을 제공합니다.',
+    images: [`${siteUrl}/og-image.png`],
   },
 
   alternates: {
@@ -46,8 +46,8 @@ export const metadata: Metadata = {
   },
 
   robots: {
-    index: false,
-    follow: false,
+    index: true,
+    follow: true,
   },
 };
 

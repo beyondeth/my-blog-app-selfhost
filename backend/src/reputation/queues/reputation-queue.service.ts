@@ -69,9 +69,14 @@ export class ReputationQueueService {
       `큐에 이벤트 추가: action=${data.action}, userId=${data.userId}`,
     );
 
+    const outboxEventId =
+      typeof data.metadata?.outboxEventId === "string"
+        ? data.metadata.outboxEventId
+        : null;
+
     return this.queue.add(ReputationJobName.REPUTATION_EVENT, data, {
       // 중복 방지: 같은 이벤트가 단시간 내 여러 번 들어오는 것 방지
-      jobId: `${data.action}:${data.userId}:${data.targetId || "no-target"}:${Date.now()}`,
+      jobId: `${data.action}:${data.userId}:${data.targetId || "no-target"}:${outboxEventId || Date.now()}`,
     });
   }
 

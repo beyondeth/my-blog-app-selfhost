@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
+function renderTemplate(content: string): string {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
+  const version =
+    process.env.LEGAL_DOCUMENT_VERSION || '20260823-v1.0';
+  const replacements: Record<string, string> = {
+    OPERATOR_NAME: process.env.OPERATOR_NAME || 'Aigory',
+    OPERATOR_CONTACT_EMAIL:
+      process.env.OPERATOR_CONTACT_EMAIL || 'support@aigory.com',
+    LEGAL_TERMS_URL: process.env.LEGAL_TERMS_URL || `${siteUrl}/legal/terms`,
+    LEGAL_PRIVACY_URL:
+      process.env.LEGAL_PRIVACY_URL || `${siteUrl}/legal/privacy`,
+    LEGAL_DOCUMENT_VERSION: version,
+    PUBLIC_SITE_URL: siteUrl,
+  };
+
+  return content.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match, key) => {
+    return replacements[key] ?? '';
+  });
+}
+
 /**
  * Legal 문서 API Route
  *
@@ -35,7 +55,7 @@ export async function GET(
     const absolutePath = join(publicDir, 'legal', filePath);
 
     // 파일 읽기
-    const content = await readFile(absolutePath, 'utf-8');
+    const content = renderTemplate(await readFile(absolutePath, 'utf-8'));
 
     // text/plain으로 응답 (마크다운 원본)
     return new NextResponse(content, {

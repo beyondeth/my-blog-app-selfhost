@@ -26,10 +26,11 @@ import { User } from "../../users/entities/user.entity";
 import { UserDeletionDebugService } from "../../users/services/user-deletion-debug.service";
 import { UserDeletionService } from "../../users/services/user-deletion.service";
 import { Public } from "../../common/decorators/public.decorator";
+import { CsrfGuard } from "../../common/guards/csrf.guard";
 
 @ApiTags("Admin - Debug")
 @Controller("admin/debug")
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, CsrfGuard)
 @Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class AdminDebugController {

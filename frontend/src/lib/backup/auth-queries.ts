@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { User, LoginForm, RegisterForm } from '@/types';
 import { authEvents, emitLogin, emitLogout, emitTokenRefreshed, emitAuthError } from './auth-events';
+import { getCsrfHeaders } from '@/lib/api/csrf';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -27,6 +28,7 @@ async function refreshAccessToken(): Promise<void> {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(await getCsrfHeaders()),
     },
   });
 
@@ -51,11 +53,16 @@ async function apiRequest<T>(
   options?: RequestInit,
   retry = true
 ): Promise<T> {
+  const method = options?.method?.toUpperCase();
+  const csrfHeaders = method && !['GET', 'HEAD', 'OPTIONS'].includes(method)
+    ? await getCsrfHeaders()
+    : {};
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...csrfHeaders,
       ...options?.headers,
     },
   });

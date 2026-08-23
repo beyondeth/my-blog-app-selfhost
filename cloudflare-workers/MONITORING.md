@@ -142,13 +142,13 @@ if (contentType.startsWith('image/')) {
 
 ```bash
 # 첫 요청 (MISS 예상)
-curl -I https://cdn.codebase.blog/uploads/test.webp
+curl -I https://cdn.aigory.com/uploads/test.webp
 
 # 응답 헤더:
 # cf-cache-status: MISS
 
 # 두 번째 요청 (HIT 예상)
-curl -I https://cdn.codebase.blog/uploads/test.webp
+curl -I https://cdn.aigory.com/uploads/test.webp
 
 # 응답 헤더:
 # cf-cache-status: HIT
@@ -270,7 +270,7 @@ console.log('Cache-Control:', cacheControl);
 
 **Cloudflare Cache Rules 확인**:
 - Dashboard → Caching → Cache Rules
-- `cdn.codebase.blog/uploads/*` 규칙이 활성화되어 있는지 확인
+- `cdn.aigory.com/uploads/*` 규칙이 활성화되어 있는지 확인
 
 ---
 
@@ -389,6 +389,6 @@ function fetchWorkersMetrics() {
 ---
 
 **작성일**: 2025-01-21
-**프로젝트**: Codebase Blog Platform
+**프로젝트**: Aigory Platform
 **버전**: 1.0
 **유지보수**: 매월 업데이트 권장

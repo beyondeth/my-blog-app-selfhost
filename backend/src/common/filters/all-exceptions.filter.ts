@@ -105,6 +105,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const errorResponse = {
       statusCode: status,
       timestamp: new Date().toISOString(),
+      requestId: (request as any).requestId,
       path: request.url,
       method: request.method,
       message: this.sanitizeMessage(message),
@@ -141,6 +142,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
    */
   private logError(exception: unknown, request: Request): void {
     const { method, url, ip } = request;
+    const requestId = (request as any).requestId;
     const userAgent = request.get("user-agent") || "";
     const userId = (request as any).user?.id || "anonymous";
 
@@ -164,6 +166,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // 구조화된 로깅
     this.logger.error(`[${method}] ${sanitizedUrl} - ${sanitizedMessage}`, {
       userId: this.maskUserId(userId),
+      requestId,
       ip: this.maskIp(ip),
       userAgent: sanitizedUserAgent,
       timestamp: new Date().toISOString(),

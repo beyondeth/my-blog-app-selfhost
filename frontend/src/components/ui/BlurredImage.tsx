@@ -42,6 +42,8 @@ interface BlurredImageProps {
   priority?: boolean;
   /** Next.js Image unoptimized 옵션 */
   unoptimized?: boolean;
+  /** 최적화된 이미지가 로드된 뒤 호출 */
+  onLoad?: React.ReactEventHandler<HTMLImageElement>;
 }
 
 /**
@@ -76,6 +78,7 @@ export default function BlurredImage({
   style,
   priority,
   unoptimized,
+  onLoad,
 }: BlurredImageProps) {
   // 로컬 상태로 블러 해제 관리 (세션 내에서만 유지)
   const [revealed, setRevealed] = useState(false);
@@ -116,6 +119,7 @@ export default function BlurredImage({
         style={style}
         priority={priority}
         unoptimized={unoptimized}
+        onLoad={onLoad}
         className={cn(
           className,
           // 블러 효과 적용

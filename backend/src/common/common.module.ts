@@ -9,6 +9,14 @@ import { IpSecurityService } from "./services/ip-security.service";
 import { IpRetentionService } from "./services/ip-retention.service";
 import { IpAuditService } from "./services/ip-audit.service";
 import { CacheModule } from "../cache/cache.module";
+import { InternalMcpGuard } from "./guards/internal-mcp.guard";
+import { CsrfGuard } from "./guards/csrf.guard";
+import { OutboxEvent } from "./entities/outbox-event.entity";
+import { IdempotencyRecord } from "./entities/idempotency-record.entity";
+import { OutboxService } from "./services/outbox.service";
+import { IdempotencyService } from "./services/idempotency.service";
+import { RequestContextService } from "./services/request-context.service";
+import { SecurityMetricsService } from "./services/security-metrics.service";
 
 /**
  * 공통 서비스 모듈
@@ -27,7 +35,7 @@ import { CacheModule } from "../cache/cache.module";
 @Module({
   imports: [
     ScheduleModule.forRoot(), // Cron job을 위한 ScheduleModule
-    TypeOrmModule.forFeature([Blog, OldAlias]),
+    TypeOrmModule.forFeature([Blog, OldAlias, OutboxEvent, IdempotencyRecord]),
     CacheModule,
   ],
   providers: [
@@ -36,6 +44,12 @@ import { CacheModule } from "../cache/cache.module";
     IpSecurityService,
     IpRetentionService,
     IpAuditService,
+    InternalMcpGuard,
+    CsrfGuard,
+    OutboxService,
+    IdempotencyService,
+    RequestContextService,
+    SecurityMetricsService,
   ],
   exports: [
     BlogResolverService,
@@ -43,6 +57,12 @@ import { CacheModule } from "../cache/cache.module";
     IpSecurityService,
     IpRetentionService,
     IpAuditService,
+    InternalMcpGuard,
+    CsrfGuard,
+    OutboxService,
+    IdempotencyService,
+    RequestContextService,
+    SecurityMetricsService,
   ],
 })
 export class CommonModule {}

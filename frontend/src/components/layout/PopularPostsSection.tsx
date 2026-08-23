@@ -15,13 +15,11 @@ const AuthorAvatar = ({
   src?: string | null;
   label?: string | null;
 }) => {
-  const normalizedSrc = src ? normalizeImageUrl(src) : "";
-
-  if (normalizedSrc) {
+  if (src) {
     return (
       <Image
-        src={normalizedSrc}
-        alt={label ?? "Author"}
+        src={normalizeImageUrl(src)}
+        alt={label ?? "작성자"}
         width={32}
         height={32}
         className="h-8 w-8 rounded-full object-cover"
@@ -40,15 +38,6 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const { data, isLoading, error } = usePopularPosts(period);
   const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
-  const copy = {
-    title: 'Popular blog posts',
-    daily: 'Daily',
-    weekly: 'Weekly',
-    monthly: 'Monthly',
-    loadError: 'Could not load popular posts.',
-    empty: 'No popular posts yet.',
-    unknownAuthor: 'Unknown',
-  };
 
   return (
     <SidebarSection
@@ -56,7 +45,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <FiBarChart2 className="w-4 h-4 text-[#264653] dark:text-[#6CC3B2]" />
-            <span>{copy.title}</span>
+            <span>인기 블로그 포스트</span>
           </div>
           <div className="flex gap-2">
             {['daily', 'weekly', 'monthly'].map((value) => (
@@ -69,7 +58,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
                     : 'text-[#4B5563] border-[#D9E0EA] hover:text-[#1B2430] hover:bg-[#EEF3F8] dark:text-[#C7D1DD] dark:border-[#2A3645] dark:hover:text-[#E6EDF3] dark:hover:bg-[#1A232E]'
                 }`}
               >
-                {value === 'daily' ? copy.daily : value === 'weekly' ? copy.weekly : copy.monthly}
+                {value === 'daily' ? '일일' : value === 'weekly' ? '주간' : '월간'}
               </button>
             ))}
           </div>
@@ -93,11 +82,11 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
         </div>
       ) : error ? (
         <div className="text-center py-4 text-[#4B5563] dark:text-[#C7D1DD]">
-          <p className="text-sm">{copy.loadError}</p>
+          <p className="text-sm">인기 포스트를 불러올 수 없습니다.</p>
         </div>
       ) : posts.length === 0 ? (
         <div className="text-center py-4 text-[#4B5563] dark:text-[#C7D1DD]">
-          <p className="text-sm">{copy.empty}</p>
+          <p className="text-sm">아직 인기 포스트가 없습니다.</p>
         </div>
       ) : (
         <div className="-mx-5 divide-y divide-[#E5E7EB] dark:divide-[#4B5563]">
@@ -112,7 +101,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
                 label={post.author?.username ?? post.author?.email ?? ""}
               />
               <div className="min-w-0 flex-1">
-                <p className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">{post.author?.username ?? copy.unknownAuthor}</p>
+                <p className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">{post.author?.username ?? "알 수 없음"}</p>
                 <p className="text-sm font-medium text-[#1B2430] dark:text-[#E6EDF3] line-clamp-2">{post.title}</p>
               </div>
             </Link>

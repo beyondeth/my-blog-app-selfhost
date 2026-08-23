@@ -4,31 +4,25 @@ import { PassportModule } from "@nestjs/passport";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthService } from "./auth.service";
-import { AuthQueryService } from "./services/auth-query.service";
-import { AuthCommandService } from "./services/auth-command.service";
 import { AuthController } from "./auth.controller";
-import { MobileAuthController } from "./mobile-auth.controller";
 import { UsersModule } from "../users/users.module";
 import { BlogsModule } from "../blogs/blogs.module";
 import { EmailModule } from "../email/email.module";
 import { RedisModule } from "../redis/redis.module";
-import { AuditModule } from "../audit/audit.module";
 import { PasswordResetToken } from "./entities/password-reset-token.entity";
+import { RefreshSession } from "./entities/refresh-session.entity";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { GoogleStrategy } from "./strategies/google.strategy";
 import { KakaoStrategy } from "./strategies/kakao.strategy";
 import { GitHubStrategy } from "./strategies/github.strategy";
-import { MobileOAuthCodeService } from "./services/mobile-oauth-code.service";
+import { AuditModule } from "../audit/audit.module";
 
 const providers: any[] = [
-  AuthQueryService,
-  AuthCommandService,
   AuthService,
   JwtStrategy,
   GoogleStrategy,
   KakaoStrategy,
   GitHubStrategy,
-  MobileOAuthCodeService,
 ];
 
 @Module({
@@ -37,9 +31,9 @@ const providers: any[] = [
     BlogsModule,
     EmailModule,
     RedisModule,
-    AuditModule,
     PassportModule,
-    TypeOrmModule.forFeature([PasswordResetToken]),
+    TypeOrmModule.forFeature([PasswordResetToken, RefreshSession]),
+    AuditModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -50,7 +44,7 @@ const providers: any[] = [
     }),
   ],
   providers,
-  controllers: [AuthController, MobileAuthController],
-  exports: [AuthQueryService, AuthCommandService, AuthService],
+  controllers: [AuthController],
+  exports: [AuthService],
 })
 export class AuthModule {}

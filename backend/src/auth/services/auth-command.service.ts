@@ -21,6 +21,7 @@ import { LoginDto } from "../dto/login.dto";
 import { RegisterDto } from "../dto/register.dto";
 import { JwtPayload } from "../interfaces/jwt-payload.interface";
 import { AuthResponse } from "../interfaces/auth-response.interface";
+import { parseJwtExpiresIn } from "../../config/jwt.config";
 import { AuditContext, AuditService } from "../../audit/audit.service";
 import { AuditAction } from "../../audit/entities/audit-log.entity";
 import * as crypto from "crypto";
@@ -651,7 +652,9 @@ export class AuthCommandService {
     };
 
     return this.jwtService.sign(payload, {
-      expiresIn: this.configService.get<string>("JWT_SESSION_EXPIRES_IN", "2h"),
+      expiresIn: parseJwtExpiresIn(
+        this.configService.get<string>("JWT_SESSION_EXPIRES_IN", "2h"),
+      ),
       issuer: this.getJwtIssuer(),
       audience: this.getJwtAudience(),
     });
@@ -677,7 +680,9 @@ export class AuthCommandService {
     };
 
     const accessToken = this.jwtService.sign(accessPayload, {
-      expiresIn: this.configService.get<string>("JWT_ACCESS_EXPIRES_IN", "1d"),
+      expiresIn: parseJwtExpiresIn(
+        this.configService.get<string>("JWT_ACCESS_EXPIRES_IN", "1d"),
+      ),
       issuer: this.getJwtIssuer(),
       audience: this.getJwtAudience(),
     });
@@ -693,7 +698,9 @@ export class AuthCommandService {
 
     const refreshToken = this.jwtService.sign(refreshPayload, {
       secret: this.configService.get<string>("JWT_REFRESH_SECRET"),
-      expiresIn: this.configService.get<string>("JWT_REFRESH_EXPIRES_IN", "7d"),
+      expiresIn: parseJwtExpiresIn(
+        this.configService.get<string>("JWT_REFRESH_EXPIRES_IN", "7d"),
+      ),
       issuer: this.getJwtIssuer(),
       audience: this.getJwtAudience(),
     });

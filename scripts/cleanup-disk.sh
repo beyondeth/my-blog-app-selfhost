@@ -54,9 +54,9 @@ fi
 
 # 3. PM2 로그 정리 (컨테이너 내부)
 log_info "PM2 로그 정리 중..."
-if docker ps | grep -q "codebase-prod-backend"; then
+if docker ps | grep -q "aigory-blog-prod-backend"; then
     # PM2 로그 플러시 및 회전
-    docker exec codebase-prod-backend pm2 flush all 2>/dev/null || true
+    docker exec aigory-blog-prod-backend pm2 flush all 2>/dev/null || true
     log_info "PM2 로그 플러시 완료"
 fi
 

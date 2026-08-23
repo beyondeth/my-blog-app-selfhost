@@ -16,13 +16,13 @@ import { logger } from '../utils/logger.js';
 import { config } from '../config/env.validation.js';
 import { OAuthStorage } from './storage.js';
 import { OAuthErrorCodes } from './types.js';
-import { normalizeLegacyScope } from './scope-normalization.js';
 import type {
   AuthorizationCode,
   AccessToken,
   RefreshToken,
   OAuthSession,
   TokenResponse,
+  McpOAuthGrantClaims,
 } from './types.js';
 
 // 토큰 수명 설정
@@ -36,7 +36,118 @@ const TOKEN_LIFETIME = {
  * 서버 기본 URL
  */
 function getServerUrl(): string {
-  return config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
+  return normalizePublicBaseUrl(
+    config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`
+  );
+}
+
+function normalizePublicBaseUrl(value: string): string {
+  const url = new URL(value);
+  url.username = '';
+  url.password = '';
+  url.search = '';
+  url.hash = '';
+  url.pathname = url.pathname.replace(/\/$/, '');
+  return url.toString().replace(/\/$/, '');
+}
+
+function getBackendGrantIssuer(): string {
+  return `${normalizePublicBaseUrl(config.BACKEND_PUBLIC_URL)}/api/v1/auth/oauth/mcp`;
+}
+
+function getGrantCallbackUrl(): string {
+  return `${getServerUrl()}/oauth/callback`;
+}
+
+function decodeGrantPart<T>(part: string): T {
+  if (!part || part.length > 4096 || !/^[A-Za-z0-9_-]+$/.test(part)) {
+    throw new Error('Malformed authorization grant');
+  }
+
+  return JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as T;
+}
+
+/**
+ * Verify the Backend's compact HS256 authorization grant before any OAuth
+ * session or authorization code is consumed.
+ */
+export function verifyMcpOAuthGrant(
+  grant: string,
+  secret: string | undefined,
+  expected: {
+    issuer: string;
+    audience: string;
+    callback: string;
+    state: string;
+    now?: number;
+  }
+): McpOAuthGrantClaims {
+  if (!secret || secret.length < 16) {
+    throw new Error('Authorization grant verification is not configured');
+  }
+
+  const parts = grant?.split('.') || [];
+  if (parts.length !== 3) {
+    throw new Error('Malformed authorization grant');
+  }
+
+  const [encodedHeader, encodedPayload, encodedSignature] = parts;
+  const header = decodeGrantPart<{ alg?: string; typ?: string }>(encodedHeader);
+  if (header.alg !== 'HS256' || header.typ !== 'JWT') {
+    throw new Error('Unsupported authorization grant algorithm');
+  }
+
+  const providedSignature = Buffer.from(encodedSignature, 'base64url');
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest();
+
+  if (
+    providedSignature.length !== expectedSignature.length ||
+    !crypto.timingSafeEqual(providedSignature, expectedSignature)
+  ) {
+    throw new Error('Invalid authorization grant signature');
+  }
+
+  const claims = decodeGrantPart<McpOAuthGrantClaims>(encodedPayload);
+  const now = expected.now ?? Math.floor(Date.now() / 1000);
+  const stringClaims = [
+    claims.iss,
+    claims.aud,
+    claims.sub,
+    claims.state,
+    claims.callback,
+    claims.jti,
+  ];
+
+  if (
+    stringClaims.some((value) => typeof value !== 'string' || value.length === 0) ||
+    !Number.isInteger(claims.iat) ||
+    !Number.isInteger(claims.exp)
+  ) {
+    throw new Error('Invalid authorization grant claims');
+  }
+
+  if (
+    claims.iss !== expected.issuer ||
+    claims.aud !== expected.audience ||
+    claims.callback !== expected.callback ||
+    claims.state !== expected.state
+  ) {
+    throw new Error('Authorization grant binding mismatch');
+  }
+
+  if (
+    claims.iat > now + 5 ||
+    claims.exp <= now ||
+    claims.exp <= claims.iat ||
+    claims.exp - claims.iat > 60
+  ) {
+    throw new Error('Authorization grant expired or has invalid lifetime');
+  }
+
+  return claims;
 }
 
 /**
@@ -51,6 +162,13 @@ function verifyCodeChallenge(codeVerifier: string, codeChallenge: string): boole
     .digest('base64url');
 
   return hash === codeChallenge;
+}
+
+export function isValidPkceRequest(
+  codeChallenge: string | undefined,
+  codeChallengeMethod: string | undefined
+): boolean {
+  return Boolean(codeChallenge) && codeChallengeMethod === 'S256';
 }
 
 /**
@@ -86,7 +204,6 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
         code_challenge,
         code_challenge_method,
         resource,
-        prompt,
       } = req.query as Record<string, string>;
 
       logger.debug({
@@ -94,7 +211,6 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
         redirect_uri,
         scope,
         state: state?.substring(0, 8),
-        prompt,
       }, '🔐 Authorization request');
 
       // 1. response_type 검증
@@ -123,7 +239,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
       }
 
       // 4. PKCE 검증 (필수)
-      if (!code_challenge || code_challenge_method !== 'S256') {
+      if (!isValidPkceRequest(code_challenge, code_challenge_method)) {
         logger.warn({ client_id }, '⚠️ PKCE required');
         return res.redirect(
           `${redirect_uri}?error=${OAuthErrorCodes.INVALID_REQUEST}&error_description=PKCE%20required&state=${state || ''}`
@@ -134,13 +250,11 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
       const resourceUri = resource || getServerUrl();
 
       // 6. 세션 저장 (state 검증용)
-      const normalizedScope = normalizeLegacyScope(scope || client.scope);
-
       const session: OAuthSession = {
         state: state || crypto.randomBytes(16).toString('hex'),
         clientId: client_id,
         redirectUri: redirect_uri,
-        scope: normalizedScope,
+        scope: scope || client.scope,
         codeChallenge: code_challenge,
         codeChallengeMethod: 'S256',
         resource: resourceUri,
@@ -156,16 +270,6 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
       backendAuthUrl.searchParams.set('state', session.state);
       backendAuthUrl.searchParams.set('client_name', client.clientName || 'MCP Client');
       backendAuthUrl.searchParams.set('scope', session.scope);
-      backendAuthUrl.searchParams.set('callback_url', `${getServerUrl()}/oauth/callback`);
-      // prompt=login 요청이 들어오면 브라우저 기존 세션을 무시하고 재로그인을 강제한다.
-      // OpenAI/기타 OAuth 클라이언트에서 계정 전환 UX를 구현할 때 사용한다.
-      const forceLogin = prompt
-        ?.split(' ')
-        .map((value) => value.trim().toLowerCase())
-        .includes('login');
-      if (forceLogin) {
-        backendAuthUrl.searchParams.set('force_login', '1');
-      }
 
       logger.debug({ backendAuthUrl: backendAuthUrl.toString() }, '➡️ Redirecting to backend login');
       res.redirect(backendAuthUrl.toString());
@@ -186,38 +290,74 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
    *
    * 쿼리 파라미터:
    * - state: 세션 식별자
-   * - user_id: 인증된 사용자 ID (Backend에서 전달)
+   * - grant: Backend가 서명한 60초 일회성 인증 결과
    * - error: 에러 코드 (실패 시)
    */
   router.get('/callback', async (req: Request, res: Response) => {
     try {
-      const { state, user_id, error: authError } = req.query as Record<string, string>;
+      const { state, grant, error: authError } = req.query as Record<string, string>;
 
-      logger.debug({ state: state?.substring(0, 8), user_id: user_id?.substring(0, 8) }, '🔙 OAuth callback');
+      logger.debug({ state: state?.substring(0, 8) }, '🔙 OAuth callback');
 
-      // 1. 세션 조회 및 삭제 (일회성)
-      const session = await storage.consumeSession(state);
-      if (!session) {
-        logger.warn({ state: state?.substring(0, 8) }, '⚠️ Invalid or expired session');
+      if (!state) {
         return res.status(400).json({
           error: OAuthErrorCodes.INVALID_REQUEST,
-          error_description: 'Invalid or expired session',
+          error_description: 'Missing state',
         });
       }
 
-      // 2. 인증 에러 처리
+      // Backend가 명시적으로 거절한 경우에만 세션을 소비하여 client로 전달
       if (authError) {
+        const session = await storage.consumeSession(state);
+        if (!session) {
+          return res.status(400).json({
+            error: OAuthErrorCodes.INVALID_REQUEST,
+            error_description: 'Invalid or expired session',
+          });
+        }
         return res.redirect(
           `${session.redirectUri}?error=${authError}&state=${state}`
         );
       }
 
-      // 3. 사용자 ID 필수
-      if (!user_id) {
-        logger.warn('⚠️ Missing user_id in callback');
-        return res.redirect(
-          `${session.redirectUri}?error=${OAuthErrorCodes.ACCESS_DENIED}&state=${state}`
-        );
+      if (!grant) {
+        return res.status(400).json({
+          error: OAuthErrorCodes.ACCESS_DENIED,
+          error_description: 'Missing signed authorization grant',
+        });
+      }
+
+      let claims: McpOAuthGrantClaims;
+      try {
+        claims = verifyMcpOAuthGrant(grant, config.MCP_SHARED_SECRET, {
+          issuer: getBackendGrantIssuer(),
+          audience: getServerUrl(),
+          callback: getGrantCallbackUrl(),
+          state,
+        });
+      } catch (error: any) {
+        logger.warn({ reason: error.message }, '⚠️ Invalid MCP OAuth grant');
+        return res.status(400).json({
+          error: OAuthErrorCodes.ACCESS_DENIED,
+          error_description: 'Invalid or expired authorization grant',
+        });
+      }
+
+      // jti와 state 모두 일회성으로 소비한다.
+      if (!(await storage.consumeGrantJti(claims.jti, claims.exp))) {
+        return res.status(400).json({
+          error: OAuthErrorCodes.ACCESS_DENIED,
+          error_description: 'Authorization grant already used',
+        });
+      }
+
+      const session = await storage.consumeSession(state);
+      if (!session) {
+        logger.warn({ state: state.substring(0, 8) }, '⚠️ Invalid or expired session');
+        return res.status(400).json({
+          error: OAuthErrorCodes.INVALID_REQUEST,
+          error_description: 'Invalid or expired session',
+        });
       }
 
       // 4. 인증 코드 생성
@@ -225,7 +365,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
       const authCode: AuthorizationCode = {
         code,
         clientId: session.clientId,
-        userId: user_id,
+        userId: claims.sub,
         redirectUri: session.redirectUri,
         scope: session.scope,
         codeChallenge: session.codeChallenge,
@@ -244,7 +384,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
 
       logger.info({
         clientId: session.clientId,
-        userId: user_id.substring(0, 8),
+        userId: claims.sub.substring(0, 8),
       }, '✅ Authorization code issued');
 
       res.redirect(callbackUrl.toString());
@@ -354,13 +494,11 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
 
         // 액세스 토큰 생성
         const accessTokenValue = storage.generateToken('mcp_at', 32);
-        const normalizedScope = normalizeLegacyScope(authCode.scope);
-
         const accessToken: AccessToken = {
           token: accessTokenValue,
           clientId: authCode.clientId,
           userId: authCode.userId,
-          scope: normalizedScope,
+          scope: authCode.scope,
           resource: requestedResource,
           expiresAt: new Date(Date.now() + TOKEN_LIFETIME.ACCESS_TOKEN * 1000),
           createdAt: new Date(),
@@ -373,7 +511,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
           token: refreshTokenValue,
           clientId: authCode.clientId,
           userId: authCode.userId,
-          scope: normalizedScope,
+          scope: authCode.scope,
           resource: requestedResource,
           accessToken: accessTokenValue,
           expiresAt: new Date(Date.now() + TOKEN_LIFETIME.REFRESH_TOKEN * 1000),
@@ -386,7 +524,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
           token_type: 'Bearer',
           expires_in: TOKEN_LIFETIME.ACCESS_TOKEN,
           refresh_token: refreshTokenValue,
-          scope: normalizedScope,
+          scope: authCode.scope,
         };
 
         logger.info({
@@ -425,13 +563,11 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
 
         // 새 액세스 토큰 생성
         const newAccessTokenValue = storage.generateToken('mcp_at', 32);
-        const normalizedScope = normalizeLegacyScope(storedRefreshToken.scope);
-
         const newAccessToken: AccessToken = {
           token: newAccessTokenValue,
           clientId: storedRefreshToken.clientId,
           userId: storedRefreshToken.userId,
-          scope: normalizedScope,
+          scope: storedRefreshToken.scope,
           resource: storedRefreshToken.resource,
           expiresAt: new Date(Date.now() + TOKEN_LIFETIME.ACCESS_TOKEN * 1000),
           createdAt: new Date(),
@@ -444,7 +580,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
           token: newRefreshTokenValue,
           clientId: storedRefreshToken.clientId,
           userId: storedRefreshToken.userId,
-          scope: normalizedScope,
+          scope: storedRefreshToken.scope,
           resource: storedRefreshToken.resource,
           accessToken: newAccessTokenValue,
           expiresAt: new Date(Date.now() + TOKEN_LIFETIME.REFRESH_TOKEN * 1000),
@@ -457,7 +593,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
           token_type: 'Bearer',
           expires_in: TOKEN_LIFETIME.ACCESS_TOKEN,
           refresh_token: newRefreshTokenValue,
-          scope: normalizedScope,
+          scope: storedRefreshToken.scope,
         };
 
         logger.info({

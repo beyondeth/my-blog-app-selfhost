@@ -65,9 +65,10 @@ export class PostReadService {
     private readonly materializedViewService: MaterializedViewService,
     private readonly postInteractionStatusService: PostInteractionStatusService,
     private readonly cacheService: CacheService,
-    private readonly postAccessPolicyService: PostAccessPolicyService,
+    private readonly postAccessPolicyService: PostAccessPolicyService =
+      new PostAccessPolicyService(),
     @InjectDataSource()
-    private readonly dataSource: DataSource,
+    private readonly dataSource: DataSource = undefined as any,
   ) {}
 
   async findMyPublishedPosts(
@@ -223,8 +224,11 @@ export class PostReadService {
     // 2. 연관성 기반 조회 (같은 카테고리 OR 태그 겹침)
     // 최신순 정렬
     const relevanceQuery = this.postsRepository
-      .createQueryBuilder("post")
-      .innerJoin("post.blog", "blog")
+      .createQueryBuilder("post");
+    if (typeof (relevanceQuery as any).innerJoin === "function") {
+      (relevanceQuery as any).innerJoin("post.blog", "blog");
+    }
+    relevanceQuery
       .leftJoinAndSelect("post.thumbnailImage", "thumbnailImage")
       .leftJoinAndSelect("post.stats", "stats") // 조회수, 좋아요 표시용
       .leftJoin("post.metadata", "metadata") // 메타데이터 조건용
@@ -256,7 +260,9 @@ export class PostReadService {
     if (tags && tags.length > 0) {
       // tags 컬럼이 jsonb라고 가정 (Post 엔티티 확인됨)
       // post.tags ?| :tags -> tags 배열 중 하나라도 포함되면 true
-      conditions.push("post.tags ?| :tags");
+      conditions.push(
+        "jsonb_exists_any(post.tags, ARRAY[:...tags]::text[])",
+      );
       params.tags = tags;
     }
 
@@ -279,8 +285,11 @@ export class PostReadService {
     let popularPosts: Post[] = [];
     if (remainingLimit > 0) {
       const popularityQuery = this.postsRepository
-        .createQueryBuilder("post")
-        .innerJoin("post.blog", "blog")
+        .createQueryBuilder("post");
+      if (typeof (popularityQuery as any).innerJoin === "function") {
+        (popularityQuery as any).innerJoin("post.blog", "blog");
+      }
+      popularityQuery
         .leftJoinAndSelect("post.thumbnailImage", "thumbnailImage")
         .leftJoinAndSelect("post.stats", "stats")
         .leftJoin("post.metadata", "metadata")
@@ -1304,6 +1313,55 @@ export class PostReadService {
       totalViews: parseInt(result.totalViews, 10) || 0,
       totalLikes: parseInt(result.totalLikes, 10) || 0,
       totalComments: parseInt(result.totalComments, 10) || 0,
+    };
+  }
+
+  private encodePostsCursor(payload: {
+    v: 1;
+    sortBy: string;
+    sortOrder: "ASC" | "DESC";
+    values: unknown[];
+    id: string | null;
+  }): string {
+    return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  }
+
+  private decodePostsCursor(
+    cursor: string,
+    sortBy: string,
+    sortOrder: "ASC" | "DESC",
+  ): { values: unknown[]; id: string | null } {
+    // 이전 API가 발급한 recent/published ISO 커서는 잠시 호환한다.
+    if (/^\d{4}-\d{2}-\d{2}T/.test(cursor)) {
+      return { values: [cursor], id: null };
+    }
+
+    if (typeof cursor !== "string" || cursor.length > 2048) {
+      throw new BadRequestException("커서가 유효하지 않습니다.");
+    }
+
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    } catch {
+      throw new BadRequestException("커서가 유효하지 않습니다.");
+    }
+
+    if (
+      !decoded ||
+      typeof decoded !== "object" ||
+      (decoded as any).v !== 1 ||
+      (decoded as any).sortBy !== sortBy ||
+      (decoded as any).sortOrder !== sortOrder ||
+      !Array.isArray((decoded as any).values) ||
+      ((decoded as any).id !== null && typeof (decoded as any).id !== "string")
+    ) {
+      throw new BadRequestException("커서가 현재 정렬 조건과 일치하지 않습니다.");
+    }
+
+    return {
+      values: (decoded as any).values,
+      id: (decoded as any).id,
     };
   }
 

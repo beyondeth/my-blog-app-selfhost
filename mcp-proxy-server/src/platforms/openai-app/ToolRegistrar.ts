@@ -102,7 +102,7 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
     description:
       'List posts published by the connected account with optional page, tag, category, and date filters.',
     inputSchema: toObjectInputSchema(
-      TOOL_CATALOG.find((tool) => tool.name === 'list_my_published_posts')?.inputSchema
+      TOOL_CATALOG.find((tool) => (tool.name as string) === 'list_my_published_posts')?.inputSchema
     ),
   },
   search_my_published_posts: {
@@ -110,7 +110,7 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
     description:
       'Search published posts from the connected account using a keyword plus optional metadata filters.',
     inputSchema: toObjectInputSchema(
-      TOOL_CATALOG.find((tool) => tool.name === 'search_my_published_posts')?.inputSchema
+      TOOL_CATALOG.find((tool) => (tool.name as string) === 'search_my_published_posts')?.inputSchema
     ),
   },
   read_my_published_post: {
@@ -118,7 +118,7 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
     description:
       'Read the full body and metadata of a single published post from the connected account.',
     inputSchema: toObjectInputSchema(
-      TOOL_CATALOG.find((tool) => tool.name === 'read_my_published_post')?.inputSchema
+      TOOL_CATALOG.find((tool) => (tool.name as string) === 'read_my_published_post')?.inputSchema
     ),
   },
   render_style_picker: {

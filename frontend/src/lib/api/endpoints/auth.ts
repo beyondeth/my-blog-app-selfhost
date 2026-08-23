@@ -8,6 +8,7 @@ import type {
   AuthResponse,
   LoginForm,
   RegisterForm,
+  RefreshSession,
   User
 } from '../types';
 
@@ -76,6 +77,18 @@ export class AuthAPI {
   async refreshToken(): Promise<void> {
     await this.client.post('/auth/refresh');
     // 쿠키가 자동으로 업데이트됨
+  }
+
+  async listSessions(): Promise<RefreshSession[]> {
+    return this.client.get<RefreshSession[]>('/auth/sessions');
+  }
+
+  async revokeSession(sessionId: string): Promise<void> {
+    await this.client.delete(`/auth/sessions/${sessionId}`);
+  }
+
+  async revokeAllSessions(): Promise<void> {
+    await this.client.post('/auth/sessions/revoke-all');
   }
 
   /**

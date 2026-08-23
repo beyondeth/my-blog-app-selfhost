@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource, In, SelectQueryBuilder } from "typeorm";
@@ -33,6 +34,7 @@ import { RedisLockService } from "../../redis/redis-lock.service";
 import { CursorPaginationHelper } from "../../common/dto/pagination.dto";
 import { CommunityPostViewService } from "./community-post-view.service";
 import { PostContentService } from "../../posts/services/post-content.service";
+import { HtmlSanitizerService } from "../../content-processing/services/html-sanitizer.service";
 
 /**
  * 게시물 캐시 키 상수
@@ -91,7 +93,8 @@ export class CommunityPostService {
     private readonly cacheService: CacheService,
     private readonly redisLockService: RedisLockService,
     private readonly communityPostViewService: CommunityPostViewService,
-    private readonly postContentService: PostContentService,
+    private readonly htmlSanitizer: HtmlSanitizerService,
+    @Optional() private readonly postContentService?: PostContentService,
   ) {}
 
   // =========================================================================
@@ -161,9 +164,9 @@ export class CommunityPostService {
     const post = this.postRepository.create({
       communityId,
       authorId,
-      title: dto.title,
-      slug: generateSlug(dto.title), // SEO 친화적 URL
-      content: canonicalContent.html,
+      title: this.sanitizeTitleForWrite(dto.title),
+      slug: generateSlug(this.sanitizeTitleForWrite(dto.title)), // SEO 친화적 URL
+      content: this.sanitizeContent(canonicalContent.html),
       content_markdown: canonicalContent.markdown,
       flairId: dto.flairId,
       thumbnailImageId: dto.thumbnailImageId,
@@ -797,7 +800,7 @@ export class CommunityPostService {
 
     // 작성자만 수정 가능한 필드
     if (isAuthor) {
-      if (dto.title) post.title = dto.title;
+      if (dto.title) post.title = this.sanitizeTitleForWrite(dto.title);
       const hasMarkdownUpdate = dto.contentMarkdown !== undefined;
       const hasHtmlUpdate = dto.content !== undefined;
       if (hasMarkdownUpdate || hasHtmlUpdate) {
@@ -805,7 +808,7 @@ export class CommunityPostService {
           dto.content,
           dto.contentMarkdown,
         );
-        post.content = canonicalContent.html;
+        post.content = this.sanitizeContent(canonicalContent.html);
         post.content_markdown = canonicalContent.markdown;
       }
       if (dto.flairId !== undefined) post.flairId = dto.flairId;
@@ -937,7 +940,7 @@ export class CommunityPostService {
     markdownContent?: string,
   ): Promise<{ html: string; markdown: string | null }> {
     if (markdownContent !== undefined) {
-      const processedContent = await this.postContentService.processContent(
+      const processedContent = await this.postContentService!.processContent(
         markdownContent,
         {
           sanitize: true,
@@ -1614,6 +1617,9 @@ export class CommunityPostService {
   private enrichPostMetadata(post?: CommunityPost) {
     if (!post) return;
 
+    post.title = this.sanitizeTitle(post.title);
+    post.content = this.sanitizeContent(post.content);
+
     if (post.author) {
       const author: any = post.author;
       author.profileImage =
@@ -1625,5 +1631,27 @@ export class CommunityPostService {
     if (!(post as any).thumbnailUrl) {
       (post as any).thumbnailUrl = thumbnailUrl;
     }
+  }
+
+  private sanitizeTitleForWrite(title: string): string {
+    const sanitized = this.sanitizeTitle(title);
+    if (sanitized.length < 2) {
+      throw new BadRequestException(
+        "제목은 안전한 텍스트를 2자 이상 포함해야 합니다",
+      );
+    }
+    return sanitized;
+  }
+
+  private sanitizeTitle(title: string): string {
+    return this.htmlSanitizer.extractText(title).trim();
+  }
+
+  private sanitizeContent(content: string): string {
+    return this.htmlSanitizer.sanitize(content, {
+      allowIframes: false,
+      allowComments: false,
+      preserveMermaid: true,
+    });
   }
 }

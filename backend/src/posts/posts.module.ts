@@ -39,29 +39,19 @@ import { PostProcessingProcessor } from "./processors/post-processing.processor"
 
 // Service Layer
 import { PostMapperService } from "./services/post-mapper.service";
-import { PostsReadRepository } from "./repositories/posts-read.repository";
 import { PostCacheService } from "./services/post-cache.service";
 import { PostFileService } from "./services/post-file.service";
 import { PostContentService } from "./services/post-content.service";
 import { PostReadService } from "./services/post-read.service";
 import { PostInteractionService } from "./services/post-interaction.service";
 import { PostCreationService } from "./services/post-creation.service";
-import { PostCreator } from "./services/post-creator";
-import { PostUpdater } from "./services/post-updater";
-import { PostDeleter } from "./services/post-deleter";
 import { PostLikeStatusService } from "./services/post-like-status.service";
 import { PostInteractionStatusService } from "./services/post-interaction-status.service";
 import { LikeService } from "./services/like.service";
 import { VoteService } from "./services/vote.service";
 import { ThumbnailService } from "./services/thumbnail.service";
+import { PostOutboxHandler } from "./services/post-outbox.handler";
 import { CloudflareModule } from "../cloudflare/cloudflare.module";
-import { MobilePostsController } from "./mobile-posts.controller";
-import { PostLifecycleListener } from "./listeners/post-lifecycle.listener";
-import { PopularPostsModule } from "../popular-posts/popular-posts.module";
-import { PostAccessPolicyService } from "./services/post-access-policy.service";
-import { PostMetadataSyncService } from "./services/post-metadata-sync.service";
-import { PostSearchVectorService } from "./services/post-search-vector.service";
-import { KnowledgeModule } from "../knowledge/knowledge.module";
 
 @Module({
   imports: [
@@ -110,27 +100,18 @@ import { KnowledgeModule } from "../knowledge/knowledge.module";
     RedisModule, // Redis 모듈 추가 (Queue용)
     MetricsModule, // Prometheus 메트릭 모듈 추가
     CloudflareModule, // Cloudflare 캐시 관리 모듈
-    PopularPostsModule, // 인기글 전용 read path (배치 스냅샷 + 캐시)
-    KnowledgeModule,
   ],
   providers: [
     PostsService,
-    PostsReadRepository, // 조회 전용 레포지토리 (V4)
     PostMapperService, // DTO 변환 서비스
     PostCacheService, // 캐시 관리 서비스
     PostFileService, // 파일 관리 서비스
     PostContentService, // 콘텐츠 처리 서비스
     PostReadService, // 조회 및 검색 서비스
     PostInteractionService, // 상호작용 관리 서비스
-    PostCreationService, // Facade (위임 전용)
-    PostCreator, // 포스트 생성 전담
-    PostUpdater, // 포스트 수정 전담
-    PostDeleter, // 포스트 삭제/복원 전담
+    PostCreationService, // 생성, 수정, 삭제 서비스
     PostLikeStatusService, // 좋아요 상태 조회 서비스
     PostInteractionStatusService, // 상호작용 상태 통합 서비스
-    PostAccessPolicyService, // 포스트 접근 정책(공개/비공개/권한)
-    PostMetadataSyncService, // posts -> post_metadata shadow sync
-    PostSearchVectorService, // search_vector 단일 정책
     VoteService, // Reddit 스타일 업보트/다운보트 서비스
     LikeService, // 레거시 좋아요 서비스 (VoteService로 위임)
     MarkdownRendererService,
@@ -140,21 +121,17 @@ import { KnowledgeModule } from "../knowledge/knowledge.module";
     BlogStatsService, // 블로그 통계 서비스 (PostsModule로 이동)
     BlogStatsHandler, // 블로그 통계 이벤트 핸들러 (PostsModule로 이동)
     ThumbnailService, // 썸네일 관리 서비스
-    PostLifecycleListener, // 포스트 라이프사이클 이벤트 리스너 (after-commit)
+    PostOutboxHandler,
   ],
-  controllers: [PostsController, MobilePostsController],
+  controllers: [PostsController],
   exports: [
     PostsService,
     ViewCountService,
     SearchIndexingService,
     BlogStatsService,
-    PostContentService,
     PostReadService,
     PostInteractionService,
     PostCreationService,
-    PostAccessPolicyService,
-    PostMetadataSyncService,
-    PostSearchVectorService,
     VoteService,
   ],
 })

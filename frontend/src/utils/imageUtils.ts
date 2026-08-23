@@ -7,12 +7,83 @@ import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 // 환경변수에서 설정값 가져오기
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-const CDN_BASE_URL = (process.env.NEXT_PUBLIC_CDN_BASE_URL || 'https://cdn.codebase.blog').replace(/\/$/, '');
+const CDN_BASE_URL = (process.env.NEXT_PUBLIC_CDN_BASE_URL || '').replace(/\/$/, '');
+const STORAGE_PUBLIC_URL = (process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL || '').replace(/\/$/, '');
 const USE_UUID_FILENAMES = process.env.NEXT_PUBLIC_USE_UUID_FILENAMES === 'true';
 // 디버그 로그 비활성화 (필요 시 true로 변경)
 const DEBUG_MODE = false;
+
+const FILE_API_PATH_PREFIX = '/api/v1/files/';
+const FILE_PROXY_PATH_PREFIX = `${FILE_API_PATH_PREFIX}proxy/`;
+
+/**
+ * 백엔드 파일 URL을 프론트엔드의 same-origin API 경로로 변환합니다.
+ *
+ * self-host 환경에서는 백엔드가 localhost:13000으로 노출되지만 브라우저는
+ * 프론트엔드(13001)를 통해 접근하는 편이 안전하고 Next Image 설정에도
+ * 외부 호스트를 추가할 필요가 없습니다.
+ */
+function toSameOriginFilePath(url: string): string | null {
+  let pathname: string;
+  let suffix = '';
+
+  try {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      const parsed = new URL(url);
+      pathname = parsed.pathname;
+      suffix = `${parsed.search}${parsed.hash}`;
+    } else if (url.startsWith('/')) {
+      const parsed = new URL(url, 'http://localhost');
+      pathname = parsed.pathname;
+      suffix = `${parsed.search}${parsed.hash}`;
+    } else {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
+  if (!pathname.startsWith(FILE_API_PATH_PREFIX)) {
+    return null;
+  }
+
+  // 정적 캐릭터 이미지는 Object Storage 파일이 아니므로 프록시 경로를
+  // 만들지 않고 프론트엔드 public 폴더에서 직접 제공합니다.
+  if (pathname.startsWith(`${FILE_PROXY_PATH_PREFIX}character/`)) {
+    return `/character/${pathname.slice(`${FILE_PROXY_PATH_PREFIX}character/`.length)}${suffix}`;
+  }
+
+  return `${pathname}${suffix}`;
+}
+
+/**
+ * 설정된 public storage URL에서 uploads/v2 객체 키를 추출합니다.
+ * MinIO의 path-style URL(예: /blog/uploads/...)과 외부 S3 호환 URL을
+ * 모두 처리해 오래된 직접 저장소 URL도 백엔드 프록시로 통일합니다.
+ */
+function extractConfiguredStorageKey(url: string): string | null {
+  if (!STORAGE_PUBLIC_URL) {
+    return null;
+  }
+
+  try {
+    const configured = new URL(STORAGE_PUBLIC_URL);
+    const parsed = new URL(url);
+    if (configured.origin !== parsed.origin) {
+      return null;
+    }
+
+    const path = decodeURIComponent(parsed.pathname).replace(/^\/+/, '');
+    const keyStart = ['uploads/', 'v2/']
+      .map((prefix) => path.indexOf(prefix))
+      .filter((index) => index >= 0)
+      .sort((a, b) => a - b)[0];
+
+    return keyStart === undefined ? null : path.slice(keyStart);
+  } catch {
+    return null;
+  }
+}
 
 
 /**
@@ -24,21 +95,25 @@ export function getProxyImageUrl(s3Key: string): string {
     return '';
   }
 
-  // 이미 완전한 프록시 URL인 경우 그대로 반환
+  // 이미 완전한 파일 URL인 경우 same-origin 경로로 통일
   if (s3Key.startsWith('http') && s3Key.includes('/api/v1/files/proxy/')) {
+    const sameOriginPath = toSameOriginFilePath(s3Key);
     if (DEBUG_MODE) console.log('[imageUtils] Already complete proxy URL:', s3Key);
-    return s3Key;
+    return sameOriginPath || s3Key;
   }
 
-  // 상대 경로 프록시 URL인 경우 절대 URL로 변환
+  // 상대 경로 파일 URL은 그대로 사용
   if (s3Key.includes('/api/v1/files/proxy/')) {
-    const absoluteUrl = `${BACKEND_URL}${s3Key.startsWith('/') ? s3Key : '/' + s3Key}`;
-    if (DEBUG_MODE) console.log('[imageUtils] Converting relative to absolute proxy URL:', s3Key, '->', absoluteUrl);
-    return absoluteUrl;
+    const relativePath = s3Key.slice(s3Key.indexOf('/api/v1/files/proxy/'));
+    const sameOriginPath = toSameOriginFilePath(relativePath);
+    if (DEBUG_MODE) console.log('[imageUtils] Keeping relative proxy URL:', relativePath);
+    return sameOriginPath || relativePath;
   }
+
+  const configuredStorageKey = extractConfiguredStorageKey(s3Key);
 
   // S3 키에서 'uploads/' 처리
-  let cleanKey = s3Key;
+  let cleanKey = configuredStorageKey || s3Key;
   
   // S3 직접 URL인 경우 키 추출
   if (s3Key.includes('.s3.') && s3Key.includes('amazonaws.com')) {
@@ -53,8 +128,8 @@ export function getProxyImageUrl(s3Key: string): string {
     cleanKey = `uploads/${cleanKey}`;
   }
   
-  // API_URL 사용 - /api/v1 이미 포함되어 있음
-  const proxyUrl = `${API_URL}/files/proxy/${cleanKey}`;
+  // same-origin API rewrite를 통해 백엔드 프록시로 연결
+  const proxyUrl = `${FILE_PROXY_PATH_PREFIX}${encodeURI(cleanKey)}`;
   
   if (DEBUG_MODE) {
     console.log('[imageUtils] Generated proxy URL:', {
@@ -76,11 +151,23 @@ export function normalizeImageUrl(url: string): string {
     return '';
   }
 
-  // 이미 완전한 HTTP/HTTPS URL인 경우, 추가 처리 없이 즉시 반환합니다.
-  // 이 가드 코드는 'http://localhost...' 같은 로컬 개발 URL이 잘못 처리되는 것을 방지합니다.
+  if (url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+
+  // 백엔드 파일 URL은 저장소 호스트 대신 프론트엔드 same-origin 경로를 사용
   if (url.startsWith('http://') || url.startsWith('https://')) {
-    // 단, 일반적인 AWS S3 URL(서명되지 않은)은 프록시를 타도록 예외 처리할 수 있습니다.
-    // 하지만 현재 로직에서는 대부분의 외부 URL을 그대로 반환하는 것이 더 안전합니다.
+    const sameOriginPath = toSameOriginFilePath(url);
+    if (sameOriginPath) {
+      return sameOriginPath;
+    }
+
+    const configuredStorageKey = extractConfiguredStorageKey(url);
+    if (configuredStorageKey) {
+      return getProxyImageUrl(configuredStorageKey);
+    }
+
+    // 일반 외부 이미지는 원본 URL을 유지
     if (DEBUG_MODE) console.log('[normalizeImageUrl] Absolute URL detected, returning directly:', url);
     return url;
   }
@@ -89,8 +176,8 @@ export function normalizeImageUrl(url: string): string {
     // 디버깅을 위한 입력 로그
     if (DEBUG_MODE) console.log('[normalizeImageUrl] Input:', url);
 
-    // CDN URL은 그대로 사용 (프록시 불필요)
-    if (url.includes('cdn.codebase.blog')) {
+    // Configured CDN URL은 그대로 사용 (프록시 불필요)
+    if (CDN_BASE_URL && url.startsWith(CDN_BASE_URL)) {
       if (DEBUG_MODE) console.log('[normalizeImageUrl] CDN URL, using directly');
       return url;
     }
@@ -171,30 +258,18 @@ export function normalizeImageUrl(url: string): string {
       return url;
     }
 
-    // /api/v1/files/{uuid}/download 형식인 경우 그대로 사용
+    // /api/v1/files/{uuid}/download 형식은 same-origin 경로로 사용
     if (url.includes('/api/v1/files/') && url.includes('/download')) {
-      // 이미 절대 URL인 경우
-      if (url.startsWith('http')) {
-        if (DEBUG_MODE) console.log('[normalizeImageUrl] Download URL (absolute), using directly');
-        return url;
-      }
-      // 상대 경로인 경우 절대 경로로 변환
-      const absoluteUrl = `${BACKEND_URL}${url.startsWith('/') ? url : '/' + url}`;
-      if (DEBUG_MODE) console.log('[normalizeImageUrl] Download URL (relative):', absoluteUrl);
-      return absoluteUrl;
+      const sameOriginPath = toSameOriginFilePath(url);
+      if (sameOriginPath) return sameOriginPath;
+      return url.startsWith('/') ? url : `/${url}`;
     }
 
     // 이미 완전한 프록시 URL인 경우
     if (url.includes('/api/v1/files/proxy/')) {
-      // 이미 정확한 형식이면 그대로 반환
-      if (url.startsWith('http')) {
-        if (DEBUG_MODE) console.log('[normalizeImageUrl] Proxy URL (absolute), using directly');
-        return url;
-      }
-      // 상대 경로인 경우 절대 경로로 변환
-      const absoluteUrl = `${API_URL.replace('/api/v1', '')}${url}`;
-      if (DEBUG_MODE) console.log('[normalizeImageUrl] Proxy URL (relative):', absoluteUrl);
-      return absoluteUrl;
+      const sameOriginPath = toSameOriginFilePath(url);
+      if (sameOriginPath) return sameOriginPath;
+      return url.startsWith('/') ? url : `/${url}`;
     }
 
     // S3 직접 URL인 경우
@@ -212,9 +287,15 @@ export function normalizeImageUrl(url: string): string {
 
     // 이미 S3 키인 경우 (uploads/로 시작)
     if (url.startsWith('uploads/') || url.startsWith('v2/')) {
-      const cdnUrl = `${CDN_BASE_URL}/${url}`;
-      if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 key → CDN:', cdnUrl);
-      return cdnUrl;
+      if (CDN_BASE_URL) {
+        const cdnUrl = `${CDN_BASE_URL}/${url}`;
+        if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 key → CDN:', cdnUrl);
+        return cdnUrl;
+      }
+
+      const proxyUrl = getProxyImageUrl(url);
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 key → Proxy:', proxyUrl);
+      return proxyUrl;
     }
 
     // Bare 파일명 감지 (경로 구분자가 없고 확장자만 있는 경우)
@@ -330,7 +411,7 @@ export function validateFileSize(size: number): boolean {
  */
 export function validateImageFile(file: File): { valid: boolean; error?: string } {
   const maxSize = 10 * 1024 * 1024; // 10MB
-  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
   if (file.size > maxSize) {
     return { valid: false, error: '파일 크기가 10MB를 초과합니다.' };
   }
@@ -664,11 +745,19 @@ export function shouldOptimizeImage(url: string): boolean {
   if (isGeminiImageUrl(url)) return false;
 
   // 최적화 가능한 도메인 목록 (next.config.js remotePatterns에 등록된 도메인)
+  let configuredCdnHost: string | null = null;
+  if (CDN_BASE_URL) {
+    try {
+      configuredCdnHost = new URL(CDN_BASE_URL).hostname;
+    } catch {
+      configuredCdnHost = null;
+    }
+  }
+
   const optimizedDomains = [
-    'cdn.codebase.blog',
     'lh3.googleusercontent.com',
     '/api/v1/files/proxy/',
-    'axricjc5utqz.compat.objectstorage.ap-singapore-1.oraclecloud.com'
+    ...(configuredCdnHost ? [configuredCdnHost] : []),
   ];
 
   // 알려진 도메인인 경우만 최적화

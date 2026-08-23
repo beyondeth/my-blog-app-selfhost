@@ -13,13 +13,14 @@ import { fadeUp, defaultViewport } from '@/lib/animations/landing-animations';
  */
 export default function HowItWorksSection() {
   const [copiedStep, setCopiedStep] = useState<number | null>(null);
+  const mcpBaseUrl = (process.env.NEXT_PUBLIC_MCP_BASE_URL || 'http://localhost:3002').replace(/\/$/, '');
 
   // MCP 설정 코드
   const mcpConfigCode = `{
   "mcpServers": {
-    "codebase-blog-mcp": {
+    "aigory-blog-mcp": {
       "type": "http",
-      "url": "https://mcp.codebase.blog/mcp",
+      "url": "${mcpBaseUrl}/mcp",
       "headers": {
         "Authorization": "Bearer Your [API-KEY]"
       }

@@ -19,6 +19,10 @@ export class UnifiedRedisService {
   // Cache Redis only: evictable data (no sessions/locks/queues).
   constructor(@InjectRedis("cache") private readonly redis: Redis) {}
 
+  async ping(): Promise<string> {
+    return this.redis.ping();
+  }
+
   /**
    * 캐시 키 생성 헬퍼
    * 네임스페이스를 명확하게 구분하여 충돌 방지

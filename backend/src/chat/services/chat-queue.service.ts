@@ -432,7 +432,9 @@ export class ChatQueueService {
       (sum, size) => sum + size,
       0,
     );
-    const healthy = warnings.length === 0 && totalSize < 1000 && dlqSize < 100;
+    // 경고 임계값은 관찰 신호일 뿐 장애 상태가 아니다. 총 큐 크기나
+    // DLQ가 critical 한도를 넘을 때만 unhealthy로 판정한다.
+    const healthy = totalSize < 1000 && dlqSize < 100;
 
     return {
       healthy,

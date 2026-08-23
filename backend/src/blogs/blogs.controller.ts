@@ -14,6 +14,7 @@ import {
   UseInterceptors,
   ClassSerializerInterceptor,
   Query,
+  Optional,
 } from "@nestjs/common";
 import { BlogsService } from "./blogs.service";
 import { CreateBlogDto } from "./dto/create-blog.dto";
@@ -40,7 +41,8 @@ export class BlogsController {
     private readonly blogsService: BlogsService,
     private readonly blogStatsService: BlogStatsService,
     private readonly blogResolverService: BlogResolverService,
-    private readonly knowledgePublicReadService: KnowledgePublicReadService,
+    @Optional()
+    private readonly knowledgePublicReadService?: KnowledgePublicReadService,
   ) {}
 
   @Post()
@@ -255,6 +257,9 @@ export class BlogsController {
       };
     }
 
+    if (!this.knowledgePublicReadService) {
+      throw new NotFoundException("Knowledge 서비스를 사용할 수 없습니다.");
+    }
     return this.knowledgePublicReadService.getBlogKnowledgeTree(blog, user);
   }
 
@@ -295,6 +300,9 @@ export class BlogsController {
     }
 
     const parsedLimit = Number.isFinite(Number(limit)) ? Number(limit) : 12;
+    if (!this.knowledgePublicReadService) {
+      throw new NotFoundException("Knowledge 서비스를 사용할 수 없습니다.");
+    }
     return this.knowledgePublicReadService.getBlogKnowledgeMap(
       blog,
       user,
@@ -364,6 +372,9 @@ export class BlogsController {
     }
 
     const parsedLimit = Number.isFinite(Number(limit)) ? Number(limit) : 36;
+    if (!this.knowledgePublicReadService) {
+      throw new NotFoundException("Knowledge 서비스를 사용할 수 없습니다.");
+    }
     return this.knowledgePublicReadService.getBlogKnowledgeCanvas(
       blog,
       user,
@@ -425,6 +436,9 @@ export class BlogsController {
     }
 
     const parsedLimit = Number.isFinite(Number(limit)) ? Number(limit) : 24;
+    if (!this.knowledgePublicReadService) {
+      throw new NotFoundException("Knowledge 서비스를 사용할 수 없습니다.");
+    }
     return this.knowledgePublicReadService.getBlogKnowledgeFlowBoard(
       blog,
       user,
@@ -454,6 +468,9 @@ export class BlogsController {
       throw new NotFoundException("블로그를 조회할 수 없습니다.");
     }
 
+    if (!this.knowledgePublicReadService) {
+      throw new NotFoundException("Knowledge 서비스를 사용할 수 없습니다.");
+    }
     return this.knowledgePublicReadService.readBlogNodeDetail(
       blog,
       nodeSlug,

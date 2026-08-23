@@ -6,6 +6,7 @@
 import { validate as isUUID } from 'uuid';
 import type { ApiClient } from '../client';
 import type {
+  CreatePostRequest,
   Post,
   PostForm,
   PaginatedResponse
@@ -107,7 +108,7 @@ export class PostsAPI {
    * @returns 생성된 포스트
    * @description 로그인한 사용자의 블로그에 포스트 생성
    */
-  async createPost(data: PostForm): Promise<Post> {
+  async createPost(data: CreatePostRequest): Promise<Post> {
     return this.client.post<Post>('/posts', data, {
       headers: {
         'Content-Type': 'application/json',

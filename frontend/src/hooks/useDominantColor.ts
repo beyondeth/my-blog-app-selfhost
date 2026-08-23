@@ -18,6 +18,51 @@ const DEFAULT_COLOR: DominantColor = {
   isNearWhite: false,
 }
 
+function sampleDominantColor(img: HTMLImageElement): DominantColor {
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (!context) return DEFAULT_COLOR
+
+  const sampleSize = 12
+  canvas.width = sampleSize
+  canvas.height = sampleSize
+  context.drawImage(img, 0, 0, sampleSize, sampleSize)
+  const { data } = context.getImageData(0, 0, sampleSize, sampleSize)
+
+  let r = 0
+  let g = 0
+  let b = 0
+  let count = 0
+
+  for (let index = 0; index < data.length; index += 4) {
+    const alpha = data[index + 3]
+    if (alpha < 10) continue
+    r += data[index]
+    g += data[index + 1]
+    b += data[index + 2]
+    count += 1
+  }
+
+  if (!count) return DEFAULT_COLOR
+
+  const avgR = Math.round(r / count)
+  const avgG = Math.round(g / count)
+  const avgB = Math.round(b / count)
+  const baseColor = `rgb(${avgR}, ${avgG}, ${avgB})`
+  const borderColor = `rgba(${avgR}, ${avgG}, ${avgB}, 0.55)`
+  const glowColor = `rgba(${avgR}, ${avgG}, ${avgB}, 0.35)`
+  const luminance = 0.2126 * (avgR / 255) + 0.7152 * (avgG / 255) + 0.0722 * (avgB / 255)
+
+  return {
+    baseColor,
+    borderColor,
+    glowColor,
+    isDark: luminance < 0.55,
+    isNearBlack: luminance < 0.15,
+    isNearWhite: luminance > 0.9,
+  }
+}
+
 export function useDominantColor(imageUrl?: string | null): DominantColor {
   const [color, setColor] = useState<DominantColor>(DEFAULT_COLOR)
 
@@ -35,51 +80,7 @@ export function useDominantColor(imageUrl?: string | null): DominantColor {
     const handleLoad = () => {
       if (isCancelled) return
       try {
-        const canvas = document.createElement('canvas')
-        const context = canvas.getContext('2d', { willReadFrequently: true })
-        if (!context) {
-          setColor(DEFAULT_COLOR)
-          return
-        }
-
-        const sampleSize = 12
-        canvas.width = sampleSize
-        canvas.height = sampleSize
-        context.drawImage(img, 0, 0, sampleSize, sampleSize)
-        const imageData = context.getImageData(0, 0, sampleSize, sampleSize)
-        const { data } = imageData
-
-        let r = 0
-        let g = 0
-        let b = 0
-        let count = 0
-
-        for (let index = 0; index < data.length; index += 4) {
-          const alpha = data[index + 3]
-          if (alpha < 10) continue
-          r += data[index]
-          g += data[index + 1]
-          b += data[index + 2]
-          count += 1
-        }
-
-        if (!count) {
-          setColor(DEFAULT_COLOR)
-          return
-        }
-
-        const avgR = Math.round(r / count)
-        const avgG = Math.round(g / count)
-        const avgB = Math.round(b / count)
-        const baseColor = `rgb(${avgR}, ${avgG}, ${avgB})`
-        const borderColor = `rgba(${avgR}, ${avgG}, ${avgB}, 0.55)`
-        const glowColor = `rgba(${avgR}, ${avgG}, ${avgB}, 0.35)`
-        const luminance = 0.2126 * (avgR / 255) + 0.7152 * (avgG / 255) + 0.0722 * (avgB / 255)
-        const isDark = luminance < 0.55
-        const isNearBlack = luminance < 0.15
-        const isNearWhite = luminance > 0.9
-
-        setColor({ baseColor, borderColor, glowColor, isDark, isNearBlack, isNearWhite })
+        setColor(sampleDominantColor(img))
       } catch {
         setColor(DEFAULT_COLOR)
       }
@@ -100,6 +101,27 @@ export function useDominantColor(imageUrl?: string | null): DominantColor {
       img.removeEventListener('error', handleError)
     }
   }, [imageUrl])
+
+  return useMemo(() => color, [color])
+}
+
+export function useDominantColorFromImage(
+  imageElement: HTMLImageElement | null,
+): DominantColor {
+  const [color, setColor] = useState<DominantColor>(DEFAULT_COLOR)
+
+  useEffect(() => {
+    if (!imageElement) {
+      setColor(DEFAULT_COLOR)
+      return
+    }
+
+    try {
+      setColor(sampleDominantColor(imageElement))
+    } catch {
+      setColor(DEFAULT_COLOR)
+    }
+  }, [imageElement])
 
   return useMemo(() => color, [color])
 }

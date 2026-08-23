@@ -1,31 +1,81 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { getRepositoryToken } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { CommentsService } from "./comments.service";
-import { CommentsQueryService } from "./services/comments-query.service";
-import { CommentsCommandService } from "./services/comments-command.service";
+import { Comment } from "./entities/comment.entity";
+import { CommentLike } from "./entities/comment-like.entity";
+import { PostsService } from "../posts/posts.service";
+import { BlogResolverService } from "../common/services/blog-resolver.service";
+import { CacheService } from "../cache/cache.service";
+import { CacheMetricsService } from "../metrics/cache-metrics.service";
+import { CdnService } from "../files/services/cdn.service";
+import { IpSecurityService } from "../common/services/ip-security.service";
+import { OutboxService } from "../common/services/outbox.service";
 import { User } from "../users/entities/user.entity";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { Role } from "../common/enums/role.enum";
 
-describe("CommentsService (Facade)", () => {
+// Fix for ESM module 'marked' causing Jest syntax error
+jest.mock("marked", () => ({
+  marked: { parse: jest.fn() },
+}));
+
+describe("CommentsService", () => {
   let service: CommentsService;
-  let queryService: CommentsQueryService;
-  let commandService: CommentsCommandService;
+  let commentsRepository: Repository<Comment>;
+  let postsService: PostsService;
+  let blogResolverService: BlogResolverService;
 
-  const mockQueryService = {
-    findAllByPost: jest.fn(),
-    findOne: jest.fn(),
-    findAllComments: jest.fn(),
-    getParentCommentsPaginated: jest.fn(),
-    getRepliesPaginated: jest.fn(),
-  };
+  const mockComment = {
+    id: "comment-uuid",
+    author: { id: "user-uuid" },
+    post: { id: "post-uuid" },
+    postId: "post-uuid",
+    isDeleted: false,
+    parentCommentId: null,
+  } as unknown as Comment;
 
-  const mockCommandService = {
+  const mockCommentsRepository = {
     create: jest.fn(),
-    update: jest.fn(),
-    remove: jest.fn(),
-    toggleLike: jest.fn(),
-    toggleDislike: jest.fn(),
-    incrementRepliesCount: jest.fn(),
-    decrementRepliesCount: jest.fn(),
+    save: jest.fn(),
+    findOne: jest.fn(),
+    manager: {
+      transaction: jest.fn(async (callback: any) =>
+        callback({
+          getRepository: jest.fn().mockReturnValue(mockCommentsRepository),
+        }),
+      ),
+    },
+  };
+  const mockCommentLikesRepository = {};
+  const mockPostsService = {
+    findOne: jest.fn(),
+    incrementCommentCount: jest.fn(),
+    decrementCommentCount: jest.fn(),
+  };
+  const mockBlogResolverService = {
+    findBlogById: jest.fn(),
+  };
+  const mockCacheService = {
+    get: jest.fn(),
+    del: jest.fn(),
+    deletePattern: jest.fn(),
+  };
+  const mockCacheMetricsService = {
+    recordCacheMiss: jest.fn(),
+    recordCacheHit: jest.fn(),
+  };
+  const mockEventEmitter = {
+    emit: jest.fn(),
+  };
+  const mockCdnService = {};
+  const mockIpSecurityService = {
+    checkIpStatus: jest.fn().mockResolvedValue(true),
+    encrypt: jest.fn().mockReturnValue("encrypted-ip"),
+  };
+  const mockOutboxService = {
+    enqueue: jest.fn().mockResolvedValue({ id: "outbox-event-uuid" }),
   };
 
   beforeEach(async () => {
@@ -33,73 +83,163 @@ describe("CommentsService (Facade)", () => {
       providers: [
         CommentsService,
         {
-          provide: CommentsQueryService,
-          useValue: mockQueryService,
+          provide: getRepositoryToken(Comment),
+          useValue: mockCommentsRepository,
         },
         {
-          provide: CommentsCommandService,
-          useValue: mockCommandService,
+          provide: getRepositoryToken(CommentLike),
+          useValue: mockCommentLikesRepository,
         },
+        { provide: PostsService, useValue: mockPostsService },
+        { provide: BlogResolverService, useValue: mockBlogResolverService },
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: CacheMetricsService, useValue: mockCacheMetricsService },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: CdnService, useValue: mockCdnService },
+        { provide: IpSecurityService, useValue: mockIpSecurityService },
+        { provide: OutboxService, useValue: mockOutboxService },
       ],
     }).compile();
 
     service = module.get<CommentsService>(CommentsService);
-    queryService = module.get<CommentsQueryService>(CommentsQueryService);
-    commandService = module.get<CommentsCommandService>(CommentsCommandService);
+    commentsRepository = module.get(getRepositoryToken(Comment));
+    postsService = module.get(PostsService);
+    blogResolverService = module.get(BlogResolverService);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  describe("Facade delegation", () => {
-    const mockUser = { id: "user-uuid", role: Role.USER } as User;
+  describe("create", () => {
+    const createCommentDto = {
+      content: "Test comment",
+      postId: "post-uuid",
+      parentCommentId: undefined,
+    };
 
-    it("should delegate create to CommentsCommandService", async () => {
-      const dto = { content: "test", postId: "post-1" };
-      await service.create(dto, mockUser, "127.0.0.1");
-      expect(commandService.create).toHaveBeenCalledWith(
-        dto,
-        mockUser,
-        "127.0.0.1",
+    const mockUser = {
+      id: "user-uuid",
+      username: "testuser",
+      role: Role.USER,
+    } as unknown as User;
+    const blogId = "blog-uuid";
+
+    it("should create a comment with populated blogId", async () => {
+      // Arrange
+      const mockPost = {
+        id: createCommentDto.postId,
+        blogId: blogId,
+      };
+      const mockBlog = {
+        id: blogId,
+        allowComments: true,
+        organizationId: "organization-uuid",
+      };
+
+      mockPostsService.findOne.mockResolvedValue(mockPost);
+      mockBlogResolverService.findBlogById.mockResolvedValue(mockBlog);
+      mockCommentsRepository.create.mockImplementation((data) => data);
+
+      const savedComment = {
+        id: "comment-uuid",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...createCommentDto,
+        blogId,
+        author: mockUser,
+      };
+
+      mockCommentsRepository.save.mockResolvedValue(savedComment);
+      mockCommentsRepository.findOne.mockResolvedValue(savedComment); // Return saved comment for re-fetch
+
+      // Act
+      const result = await service.create(createCommentDto, mockUser);
+
+      // Assert
+      expect(mockPostsService.findOne).toHaveBeenCalledWith(
+        createCommentDto.postId,
+      );
+      expect(mockBlogResolverService.findBlogById).toHaveBeenCalledWith(blogId);
+
+      expect(mockCommentsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: createCommentDto.content,
+          post: { id: createCommentDto.postId },
+          blogId: blogId, // Critical assertion: blogId must be populated
+          author: mockUser,
+        }),
+      );
+      expect(mockCommentsRepository.findOne).toHaveBeenCalledWith({
+        where: { id: savedComment.id },
+        relations: ["author", "author.profile"],
+      });
+      expect(mockOutboxService.enqueue).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          eventType: "post.comment.added",
+          aggregateType: "comment",
+          aggregateId: savedComment.id,
+          organizationId: "organization-uuid",
+        }),
       );
     });
 
-    it("should delegate findOne to CommentsQueryService", async () => {
-      await service.findOne("comment-1");
-      expect(queryService.findOne).toHaveBeenCalledWith("comment-1");
-    });
+    it("should throw NotFoundException if post not found", async () => {
+      mockPostsService.findOne.mockResolvedValue(null);
 
-    it("should delegate update to CommentsCommandService", async () => {
-      const dto = { content: "updated" };
-      await service.update("comment-1", dto, mockUser);
-      expect(commandService.update).toHaveBeenCalledWith(
-        "comment-1",
-        dto,
-        mockUser,
+      await expect(service.create(createCommentDto, mockUser)).rejects.toThrow(
+        NotFoundException,
       );
     });
 
-    it("should delegate remove to CommentsCommandService", async () => {
-      await service.remove("comment-1", mockUser);
-      expect(commandService.remove).toHaveBeenCalledWith("comment-1", mockUser);
-    });
+    it("should throw ForbiddenException if blog does not allow comments", async () => {
+      const mockPost = {
+        id: createCommentDto.postId,
+        blogId: blogId,
+      };
+      const mockBlog = {
+        id: blogId,
+        allowComments: false,
+      };
 
-    it("should delegate toggleLike to CommentsCommandService", async () => {
-      await service.toggleLike("comment-1", mockUser);
-      expect(commandService.toggleLike).toHaveBeenCalledWith(
-        "comment-1",
-        mockUser,
+      mockPostsService.findOne.mockResolvedValue(mockPost);
+      mockBlogResolverService.findBlogById.mockResolvedValue(mockBlog);
+
+      await expect(service.create(createCommentDto, mockUser)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+  describe("remove", () => {
+    it("should remove a comment and decrement counts", async () => {
+      const commentId = "comment-uuid";
+      const user = { id: "user-uuid" } as User;
+
+      mockCommentsRepository.findOne.mockResolvedValue(mockComment);
+
+      await service.remove(commentId, user);
+
+      expect(mockCommentsRepository.findOne).toHaveBeenCalledWith({
+        where: { id: commentId },
+        relations: ["author"],
+      });
+      expect(mockCommentsRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isDeleted: true }),
+      );
+      expect(mockPostsService.decrementCommentCount).toHaveBeenCalledWith(
+        mockComment.postId,
       );
     });
 
-    it("should delegate getParentCommentsPaginated to CommentsQueryService", async () => {
-      const queryDto = { limit: 10 };
-      await service.getParentCommentsPaginated("post-1", queryDto, mockUser);
-      expect(queryService.getParentCommentsPaginated).toHaveBeenCalledWith(
-        "post-1",
-        queryDto,
-        mockUser,
+    it("should throw ForbiddenException if user is not author", async () => {
+      const commentId = "comment-uuid";
+      const user = { id: "other-user-uuid" } as User;
+
+      mockCommentsRepository.findOne.mockResolvedValue(mockComment);
+
+      await expect(service.remove(commentId, user)).rejects.toThrow(
+        ForbiddenException,
       );
     });
   });

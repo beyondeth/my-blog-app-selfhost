@@ -20,7 +20,7 @@
 set -e
 
 # 로그 디렉토리 생성
-LOG_DIR="/var/log/codebase"
+LOG_DIR="/var/log/aigory-blog"
 mkdir -p $LOG_DIR
 LOG_FILE="$LOG_DIR/auto-scale.log"
 
@@ -30,7 +30,7 @@ log() {
 }
 
 # Docker 컨테이너 이름
-CONTAINER_NAME="codebase-prod-backend"
+CONTAINER_NAME="aigory-blog-prod-backend"
 
 # 컨테이너 실행 여부 확인
 if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
@@ -104,7 +104,7 @@ if [ "$NEW_WORKERS" != "$CURRENT_WORKERS" ]; then
     log "🔄 PM2 스케일링 실행: ${CURRENT_WORKERS}개 → ${NEW_WORKERS}개"
 
     # PM2 scale 명령어 실행
-    if docker exec $CONTAINER_NAME pm2 scale codebase-backend $NEW_WORKERS 2>&1 | tee -a $LOG_FILE; then
+    if docker exec $CONTAINER_NAME pm2 scale aigory-blog-backend $NEW_WORKERS 2>&1 | tee -a $LOG_FILE; then
         log "✓ PM2 스케일링 성공"
 
         # 스케일링 후 상태 확인

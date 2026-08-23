@@ -37,7 +37,7 @@ echo ""
 
 # 2. Docker 이미지 생성 시간 확인
 echo "2. Docker 이미지 빌드 시간:"
-IMAGES=("codebase-prod-frontend" "codebase-prod-backend" "codebase-prod-mcp-proxy")
+IMAGES=("aigory-blog-prod-frontend" "aigory-blog-prod-backend" "aigory-blog-prod-mcp-proxy")
 ALL_RECENT=true
 
 for IMAGE in "${IMAGES[@]}"; do
@@ -66,7 +66,7 @@ echo ""
 
 # 3. 컨테이너 시작 시간 확인
 echo "3. 컨테이너 시작 시간:"
-CONTAINERS=("codebase-prod-backend" "codebase-prod-frontend" "codebase-prod-mcp-proxy")
+CONTAINERS=("aigory-blog-prod-backend" "aigory-blog-prod-frontend" "aigory-blog-prod-mcp-proxy")
 
 for CONTAINER in "${CONTAINERS[@]}"; do
     STARTED=$(docker inspect $CONTAINER --format='{{.State.StartedAt}}' 2>/dev/null | cut -d'T' -f1,2 | tr 'T' ' ' | cut -d'.' -f1)
@@ -94,21 +94,21 @@ echo ""
 # 4. 헬스체크 상태
 echo "4. 헬스체크 상태:"
 # Backend 헬스체크
-if docker exec codebase-prod-backend node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" 2>/dev/null; then
+if docker exec aigory-blog-prod-backend node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" 2>/dev/null; then
     echo -e "   ${GREEN}✅ Backend: 정상${NC}"
 else
     echo -e "   ${RED}❌ Backend: 실패${NC}"
 fi
 
 # Frontend 헬스체크
-if docker exec codebase-prod-frontend node -e "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" 2>/dev/null; then
+if docker exec aigory-blog-prod-frontend node -e "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" 2>/dev/null; then
     echo -e "   ${GREEN}✅ Frontend: 정상${NC}"
 else
     echo -e "   ${RED}❌ Frontend: 실패${NC}"
 fi
 
 # MCP Proxy 헬스체크
-if docker exec codebase-prod-mcp-proxy node -e "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" 2>/dev/null; then
+if docker exec aigory-blog-prod-mcp-proxy node -e "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" 2>/dev/null; then
     echo -e "   ${GREEN}✅ MCP Proxy: 정상${NC}"
 else
     echo -e "   ${RED}❌ MCP Proxy: 실패${NC}"
@@ -118,13 +118,13 @@ echo ""
 # 5. 컨테이너 내부 코드 버전 확인 (선택사항)
 echo "5. 컨테이너 내부 Git 정보 (가능한 경우):"
 # Frontend package.json 버전 확인
-FRONTEND_VERSION=$(docker exec codebase-prod-frontend cat package.json 2>/dev/null | grep '"version"' | head -1 | cut -d'"' -f4)
+FRONTEND_VERSION=$(docker exec aigory-blog-prod-frontend cat package.json 2>/dev/null | grep '"version"' | head -1 | cut -d'"' -f4)
 if [ -n "$FRONTEND_VERSION" ]; then
     echo -e "   Frontend 버전: ${CYAN}$FRONTEND_VERSION${NC}"
 fi
 
 # Backend package.json 버전 확인
-BACKEND_VERSION=$(docker exec codebase-prod-backend cat package.json 2>/dev/null | grep '"version"' | head -1 | cut -d'"' -f4)
+BACKEND_VERSION=$(docker exec aigory-blog-prod-backend cat package.json 2>/dev/null | grep '"version"' | head -1 | cut -d'"' -f4)
 if [ -n "$BACKEND_VERSION" ]; then
     echo -e "   Backend 버전: ${CYAN}$BACKEND_VERSION${NC}"
 fi
@@ -132,11 +132,11 @@ echo ""
 
 # 6. PM2 상태 확인
 echo "6. PM2 워커 상태:"
-PM2_WORKERS=$(docker exec codebase-prod-backend pm2 jlist 2>/dev/null | grep -o '"pm_id":[0-9]*' | wc -l | tr -d ' ')
+PM2_WORKERS=$(docker exec aigory-blog-prod-backend pm2 jlist 2>/dev/null | grep -o '"pm_id":[0-9]*' | wc -l | tr -d ' ')
 if [ -n "$PM2_WORKERS" ] && [ "$PM2_WORKERS" -gt 0 ]; then
     echo -e "   ${GREEN}✅ PM2 워커 수: $PM2_WORKERS 개${NC}"
     # PM2 메모리 사용량
-    docker exec codebase-prod-backend pm2 status 2>/dev/null | grep "codebase-backend" | head -5
+    docker exec aigory-blog-prod-backend pm2 status 2>/dev/null | grep "aigory-blog-backend" | head -5
 else
     echo -e "   ${RED}❌ PM2 상태를 확인할 수 없음${NC}"
 fi

@@ -19,6 +19,9 @@ import { CommunityRolesGuard } from "../guards/community-roles.guard";
 import { CommunityRoles } from "../decorators/community-roles.decorator";
 import { CommunityRole } from "../enums";
 import { CommunityStatsService } from "../services/community-stats.service";
+import { CommunityOrganizationGuard } from "../guards/community-organization.guard";
+import { OrganizationContextGuard } from "../../organizations/guards/organization-context.guard";
+import { RequireOrganizationContext } from "../../organizations/decorators/organization-context.decorator";
 
 // Request 확장 타입
 interface RequestWithCommunity extends Request {
@@ -34,7 +37,13 @@ interface RequestWithCommunity extends Request {
  */
 @ApiTags("Community Stats")
 @Controller("communities/:slug/stats")
-@UseGuards(JwtAuthGuard, CommunityRolesGuard)
+@UseGuards(
+  JwtAuthGuard,
+  OrganizationContextGuard,
+  CommunityOrganizationGuard,
+  CommunityRolesGuard,
+)
+@RequireOrganizationContext()
 @ApiBearerAuth()
 export class CommunityStatsController {
   private readonly logger = new Logger(CommunityStatsController.name);

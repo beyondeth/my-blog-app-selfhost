@@ -84,14 +84,29 @@ export class CommunityPermissionsGuard implements CanActivate {
         communityIdentifier,
       );
 
-    const community = await this.communityRepository.findOne({
-      where: isUuid
-        ? { id: communityIdentifier }
-        : { slug: communityIdentifier },
-      select: ["id", "creatorId", "slug", "name"],
-    });
+    const organizationId = request.organizationContext?.organizationId;
+    let community = request.community;
 
     if (!community) {
+      community = await this.communityRepository.findOne({
+        where: isUuid
+          ? {
+              id: communityIdentifier,
+              ...(organizationId ? { organizationId } : {}),
+            }
+          : {
+              slug: communityIdentifier,
+              ...(organizationId ? { organizationId } : {}),
+            },
+        select: ["id", "creatorId", "slug", "name", "organizationId"],
+      });
+    }
+
+    if (!community) {
+      throw new NotFoundException("커뮤니티를 찾을 수 없습니다");
+    }
+
+    if (organizationId && community.organizationId !== organizationId) {
       throw new NotFoundException("커뮤니티를 찾을 수 없습니다");
     }
 

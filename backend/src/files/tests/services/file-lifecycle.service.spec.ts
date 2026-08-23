@@ -70,6 +70,22 @@ describe("FileLifecycleService", () => {
   });
 
   describe("deleteExpiredTemporaryFiles", () => {
+    it("should keep an expired file when a post still references it", async () => {
+      const referencedFile = MockFactory.createMockFile({
+        expiresAt: new Date(Date.now() - 1000),
+      });
+      fileRepository.find.mockResolvedValueOnce([referencedFile]);
+      fileRepository.query.mockResolvedValueOnce([{ id: referencedFile.id }]);
+
+      const deletedCount = await service.deleteExpiredTemporaryFiles();
+
+      expect(deletedCount).toBe(0);
+      expect(s3Service.deleteFile).not.toHaveBeenCalled();
+      expect(fileRepository.update).toHaveBeenCalledWith(expect.any(Object), {
+        expiresAt: null,
+      });
+    });
+
     it("should delete files with expired timestamps", async () => {
       // Arrange
       const expiredFile1 = MockFactory.createMockFile({
@@ -83,9 +99,9 @@ describe("FileLifecycleService", () => {
       });
 
       fileRepository.setData([expiredFile1, expiredFile2, validFile]);
-      s3Service.uploadFile(null as any, expiredFile1.fileKey);
-      s3Service.uploadFile(null as any, expiredFile2.fileKey);
-      s3Service.uploadFile(null as any, validFile.fileKey);
+      fileRepository.find.mockResolvedValueOnce([expiredFile1, expiredFile2]);
+      fileRepository.query.mockResolvedValueOnce([]);
+      s3Service.deleteFile.mockResolvedValue(undefined);
 
       // Act
       const deletedCount = await service.deleteExpiredTemporaryFiles();
@@ -109,6 +125,9 @@ describe("FileLifecycleService", () => {
         expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
       });
       fileRepository.setData([expiredFile]);
+      fileRepository.find.mockResolvedValueOnce([expiredFile]);
+      fileRepository.query.mockResolvedValueOnce([]);
+      s3Service.deleteFile.mockResolvedValue(undefined);
 
       // Simulate S3 error
       s3Service.deleteFile.mockRejectedValueOnce(new Error("S3 error"));
@@ -132,6 +151,9 @@ describe("FileLifecycleService", () => {
         },
       });
       fileRepository.setData([expiredFile]);
+      fileRepository.find.mockResolvedValueOnce([expiredFile]);
+      fileRepository.query.mockResolvedValueOnce([]);
+      s3Service.deleteFile.mockResolvedValue(undefined);
 
       // Act
       const deletedCount = await service.deleteExpiredTemporaryFiles();
@@ -257,7 +279,7 @@ describe("FileLifecycleService", () => {
       });
 
       fileRepository.setData([oldFile, recentFile]);
-      s3Service.uploadFile(null as any, oldFile.fileKey);
+      s3Service.seedFile(oldFile.fileKey);
 
       // Act
       const archivedCount = await service.archiveOldFiles();
@@ -416,11 +438,14 @@ describe("FileLifecycleService", () => {
       const oldFile = MockFactory.createMockFile({
         createdAt: new Date(Date.now() - 7 * 30 * 24 * 60 * 60 * 1000),
         isOptimized: false,
+        contextId: "context-old",
       });
 
       fileRepository.setData([expiredFile, orphanedFile, oldFile]);
-      s3Service.uploadFile(null as any, expiredFile.fileKey);
-      s3Service.uploadFile(null as any, oldFile.fileKey);
+      fileRepository.find.mockResolvedValueOnce([expiredFile]);
+      fileRepository.query.mockResolvedValueOnce([]);
+      s3Service.seedFile(expiredFile.fileKey);
+      s3Service.seedFile(oldFile.fileKey);
 
       // Act
       const result = await service.performDailyCleanup();
@@ -467,7 +492,10 @@ describe("FileLifecycleService", () => {
       // Assert
       // Old file should be scheduled for deletion
       expect(fileRepository.update).toHaveBeenCalledWith(
-        { contextId, expiresAt: null },
+        expect.objectContaining({
+          contextId,
+          expiresAt: expect.objectContaining({ type: "isNull" }),
+        }),
         expect.objectContaining({
           expiresAt: expect.any(Date),
         }),
@@ -489,6 +517,11 @@ describe("FileLifecycleService", () => {
         f.expiresAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
       });
       fileRepository.setData(files);
+      fileRepository.find
+        .mockResolvedValueOnce(files)
+        .mockResolvedValueOnce([]);
+      fileRepository.query.mockResolvedValueOnce([]);
+      s3Service.deleteFile.mockResolvedValue(undefined);
 
       // Act - Simulate concurrent cleanups
       const cleanups = await Promise.all([
@@ -508,6 +541,9 @@ describe("FileLifecycleService", () => {
         expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
       });
       fileRepository.setData([fileWithoutMetadata]);
+      fileRepository.find.mockResolvedValueOnce([fileWithoutMetadata]);
+      fileRepository.query.mockResolvedValueOnce([]);
+      s3Service.deleteFile.mockResolvedValue(undefined);
 
       // Act & Assert - Should not throw
       await expect(service.deleteExpiredTemporaryFiles()).resolves.toBe(1);

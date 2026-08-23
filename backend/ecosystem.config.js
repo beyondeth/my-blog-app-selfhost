@@ -8,9 +8,9 @@
 // 사용법:
 //   시작: pm2 start ecosystem.config.js --env production
 //   재시작: pm2 reload all --update-env
-//   스케일: pm2 scale codebase-backend 2
+//   스케일: pm2 scale aigory-blog-backend 2
 //   상태: pm2 status
-//   로그: pm2 logs codebase-backend
+//   로그: pm2 logs aigory-blog-backend
 //   모니터: pm2 monit
 // ============================================
 
@@ -18,7 +18,7 @@ module.exports = {
   apps: [
     {
       // 앱 이름 (pm2 list에 표시)
-      name: 'codebase-backend',
+      name: 'aigory-blog-backend',
 
       // 실행할 스크립트 (NestJS 빌드 결과물)
       script: 'dist/src/main.js',

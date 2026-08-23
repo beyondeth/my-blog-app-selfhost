@@ -69,6 +69,13 @@ export class CreateBatchUploadUrlDto {
 }
 
 export class BatchUploadCompleteDto {
+  @ApiProperty({
+    description: "배치 업로드 URL 발급 시 서버가 반환한 서명된 배치 intent",
+  })
+  @IsString()
+  @MaxLength(2048)
+  batchId: string;
+
   @ApiProperty({ description: "업로드된 파일들의 S3 키", type: [String] })
   @IsArray()
   @IsString({ each: true })

@@ -142,6 +142,25 @@ export class MockS3Service {
   });
 
   // Test utilities
+  seedFile(
+    key: string,
+    overrides: Partial<{
+      buffer: Buffer;
+      mimetype: string;
+      size: number;
+      uploadedAt: Date;
+      storageClass: string;
+    }> = {},
+  ): void {
+    this.files.set(key, {
+      buffer: Buffer.from("mock-file"),
+      mimetype: "application/octet-stream",
+      size: 9,
+      uploadedAt: new Date(),
+      ...overrides,
+    });
+  }
+
   hasFile(key: string): boolean {
     return this.files.has(key);
   }

@@ -1,10 +1,11 @@
 /**
- * MCP Proxy Server - Dual Auth (API Key + OAuth 2.1)
+ * MCP Proxy Server - API Key 인증 (Context7 스타일)
  *
- * 인증 경로:
- * - /mcp: API Key Bearer 인증 (stateless)
- * - /mcp-remote: OAuth 2.1 Bearer 인증 (Skills/MCPorter, Claude, 기타 OAuth 클라이언트)
- * - /mcp-openai: OAuth 2.1 + ChatGPT App 전용 MCP
+ * 변경 사항:
+ * - OAuth2 완전 제거 (SessionService, TransportManager 제거)
+ * - Stateless 함수 기반 (요청마다 새 서버 생성)
+ * - API Key Bearer 인증 (Backend 검증)
+ * - 깔끔한 구조 (200줄, 기존 640줄)
  */
 
 import express from 'express';
@@ -19,7 +20,6 @@ import { getDiscoveryTools } from './tools/catalog.js';
 import { RedisCacheService } from './services/RedisCacheService.js';
 import { MetricsService } from './services/MetricsService.js';
 import { createOAuthRouter } from './oauth/index.js';
-import { createOpenAiAppRouter } from './platforms/openai-app/index.js';
 import axios from 'axios';
 
 // Express 앱 초기화
@@ -29,42 +29,81 @@ const port = config.MCP_PROXY_PORT;
 // Prometheus 메트릭 서비스 초기화 (먼저 생성)
 const metricsService = new MetricsService();
 
-// Redis Core: OAuth/session storage (noeviction).
-const redisCore = new Redis({
-  host: config.REDIS_CORE_HOST,
-  port: config.REDIS_CORE_PORT,
+// Redis 인스턴스 생성 (OAuth + 캐시 공유)
+const redis = new Redis({
+  host: config.REDIS_HOST,
+  port: config.REDIS_PORT,
   password: config.REDIS_PASSWORD,
   maxRetriesPerRequest: 3,
   retryStrategy: (times) => Math.min(times * 100, 3000),
 });
 
-// Redis Cache: API key caching (evictable).
+// Redis 캐시 서비스 초기화 (메트릭 서비스 주입)
 const redisCache = new RedisCacheService(
   {
-    host: config.REDIS_CACHE_HOST,
-    port: config.REDIS_CACHE_PORT,
+    host: config.REDIS_HOST,
+    port: config.REDIS_PORT,
     password: config.REDIS_PASSWORD,
     ttl: config.API_KEY_CACHE_TTL,
   },
   metricsService
 );
 
-// OAuth 라우터 초기화 (Core Redis 사용)
-const { wellKnownRouter, oauthRouter, mcpRemoteRouter, storage } = createOAuthRouter(
-  redisCore,
-  metricsService
-);
+// OAuth 라우터 초기화 (Redis 인스턴스 공유)
+const { wellKnownRouter, oauthRouter, mcpRemoteRouter } = createOAuthRouter(redis, metricsService);
+
+function isPrivatePeer(address: string | undefined): boolean {
+  if (!address) return false;
+  const normalized = address.replace(/^::ffff:/, '').replace(/^\[|\]$/g, '');
+  if (normalized === '127.0.0.1' || normalized === '::1') return true;
+  if (/^10\./.test(normalized) || /^192\.168\./.test(normalized)) return true;
+  const ipv4Parts = normalized.split('.').map(Number);
+  if (
+    ipv4Parts.length === 4 &&
+    ipv4Parts.every(Number.isInteger) &&
+    ipv4Parts[0] === 172 &&
+    ipv4Parts[1] >= 16 &&
+    ipv4Parts[1] <= 31
+  ) {
+    return true;
+  }
+  return /^fc|^fd|^fe80:/i.test(normalized);
+}
+
+function hasMetricsAccess(req: express.Request): boolean {
+  const token = config.METRICS_AUTH_TOKEN;
+  if (token) {
+    const authorization = req.header('authorization') || '';
+    const supplied = authorization.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length)
+      : '';
+    const expected = Buffer.from(token);
+    const actual = Buffer.from(supplied);
+    return (
+      expected.length === actual.length &&
+      crypto.timingSafeEqual(expected, actual)
+    );
+  }
+  return isPrivatePeer(req.socket.remoteAddress || req.ip);
+}
+
+function requireMetricsAccess(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  if (hasMetricsAccess(req)) return next();
+  return res.status(404).json({ error: 'Not found' });
+}
 
 // Redis 연결 상태 모니터링 (10초마다)
 setInterval(() => {
-  const isCoreConnected = redisCore.status === 'ready';
-  const isCacheConnected = redisCache.getConnectionStatus();
-  metricsService.updateRedisConnection(isCoreConnected && isCacheConnected);
+  const isConnected = redisCache.getConnectionStatus();
+  metricsService.updateRedisConnection(isConnected);
 }, 10000);
 
-// StreamableHTTPServerTransport가 raw stream을 직접 읽는 MCP 엔드포인트
-// ⚠️ 새 MCP 엔드포인트 추가 시 반드시 이 목록에도 추가할 것
-const skipBodyParsing = ['/mcp', '/mcp-remote', '/mcp-openai'];
+// 미들웨어 (⚠️ MCP 경로는 제외 - StreamableHTTPServerTransport가 raw stream 필요)
+const skipBodyParsing = ['/mcp', '/mcp-remote'];
 app.use((req, res, next) => {
   if (skipBodyParsing.includes(req.path)) {
     // MCP 경로는 body parsing 건너뛰기 (StreamableHTTPServerTransport가 직접 처리)
@@ -84,11 +123,6 @@ if (config.NODE_ENV === 'development' || config.LOG_LEVEL === 'debug') {
   app.use(httpLogger);
 }
 
-// 정적 파일 서빙 (Local Image Generation -> URL 변환용)
-// generated 폴더의 이미지를 http://localhost:3002/generated/... 로 접근 가능하게 함
-import path from 'path';
-app.use('/generated', express.static(path.join(process.cwd(), 'public/generated')));
-
 // CORS 설정
 // MCP/OAuth 엔드포인트는 Bearer 토큰으로 보호되므로 모든 origin 허용
 // Claude 커스텀 커넥터 등 다양한 클라이언트 지원을 위해 필요
@@ -96,9 +130,8 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = config.CORS_ORIGINS.split(',').map(o => o.trim());
 
-  // Bearer 토큰으로 보호되는 MCP/OAuth 엔드포인트는 모든 origin 허용
-  // ⚠️ 새 MCP 엔드포인트 추가 시 반드시 이 목록에도 추가할 것
-  const mcpPaths = ['/mcp', '/mcp-remote', '/mcp-openai', '/oauth', '/.well-known'];
+  // MCP/OAuth 엔드포인트는 모든 origin 허용 (Bearer 토큰으로 보안)
+  const mcpPaths = ['/mcp', '/mcp-remote', '/oauth', '/.well-known'];
   const isMcpEndpoint = mcpPaths.some(p => req.path.startsWith(p));
 
   // Origin 검증
@@ -109,16 +142,9 @@ app.use((req, res, next) => {
     if (isMcpEndpoint) {
       isAllowed = true;
     } else {
-      // 다른 엔드포인트는 whitelist 검증
-      for (const allowed of allowedOrigins) {
-        const pattern = allowed.replace(/\*/g, '.*');
-        const regex = new RegExp(`^${pattern}$`);
-
-        if (regex.test(origin)) {
-          isAllowed = true;
-          break;
-        }
-      }
+      // 다른 엔드포인트는 명시된 origin의 정확한 일치만 허용한다.
+      // 정규식/와일드카드 비교는 credentialed CORS에서 우회 위험이 있다.
+      isAllowed = allowedOrigins.includes(origin);
     }
 
     if (isAllowed) {
@@ -128,7 +154,10 @@ app.use((req, res, next) => {
   }
 
   res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-API-Key, Mcp-Session-Id',
+  );
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(isAllowed ? 204 : 403);
@@ -157,19 +186,19 @@ async function validateApiKey(apiKey: string): Promise<{
   userId: string;
   blogId: string;
   user: { id: string; username: string; email: string };
-  blog: { id: string; name: string; slug: string; isPublic?: boolean };
+  blog: { id: string; name: string; slug: string };
 } | null> {
   const startTime = Date.now();
-  const parts = apiKey.split('_');
-  const keyHint = parts.length === 4 ? parts[2] : 'unknown';
 
   try {
     // 1. API Key hint 추출 (blog_sk_{hint}_{secret})
+    const parts = apiKey.split('_');
     if (parts.length !== 4) {
-      logger.warn({ keyHint }, '⚠️ Invalid API key format');
+      logger.warn('⚠️ Invalid API key format');
       metricsService.recordError('invalid_format', 400);
       return null;
     }
+    const keyHint = parts[2]; // hint (8자)
 
     // 2. Redis 캐시 확인 (1-3ms)
     const cached = await redisCache.getApiKeyValidation(keyHint);
@@ -206,29 +235,18 @@ async function validateApiKey(apiKey: string): Promise<{
       await redisCache.setApiKeyValidation(keyHint, userData);
 
       metricsService.recordValidationDuration(duration, false);
-      logger.info({ keyHint, userId: userData.userId?.substring(0, 8) }, '✅ API key validated');
       return userData;
     }
 
     metricsService.recordError('validation_failed', 401);
-    logger.warn({ keyHint }, '⚠️ API key validation returned invalid response');
     return null;
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    logger.warn({ error: error.message, keyHint }, '⚠️ API Key validation failed');
+    logger.warn({ error: error.message }, '⚠️ API Key validation failed');
     metricsService.recordValidationDuration(duration, false);
     metricsService.recordError('backend_error', 500);
     return null;
   }
-}
-
-function isApiKeyTransportGetRequest(req: express.Request): boolean {
-  const acceptHeader = (req.headers.accept || '').toLowerCase();
-  return (
-    acceptHeader.includes('text/event-stream') ||
-    typeof req.headers['mcp-session-id'] === 'string' ||
-    typeof req.headers['mcp-protocol-version'] === 'string'
-  );
 }
 
 /**
@@ -247,7 +265,7 @@ async function createMcpServer(userData: {
 }): Promise<McpServer> {
   const server = new McpServer(
     {
-      name: 'codebase-blog-mcp',
+      name: 'aigory-blog-mcp',
       version: '8.0.0',  // API Key 버전
     },
     {
@@ -263,12 +281,11 @@ async function createMcpServer(userData: {
     userData,
     apiKey: userData.apiKey, // API Key 추가 (create_post에서 사용)
     metricsService, // 메트릭 서비스 추가 (도구 호출 추적용)
-    route: 'mcp',
     config: {
       MCP_BASE_URL: config.MCP_BASE_URL,
       BACKEND_BASE_URL: config.BACKEND_BASE_URL,
       BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
-      FRONTEND_URL: config.FRONTEND_URL,
+      PUBLIC_SITE_URL: config.PUBLIC_SITE_URL,
       MCP_SHARED_SECRET: config.MCP_SHARED_SECRET,
     },
   });
@@ -276,53 +293,16 @@ async function createMcpServer(userData: {
   return server;
 }
 
-// ===== OAuth 라우터 마운트 (공유 OAuth 경로) =====
+// ===== OAuth 라우터 마운트 (Claude 커스텀 커넥터용) =====
 
 // RFC 9728, 8414 메타데이터 엔드포인트
 app.use('/.well-known', wellKnownRouter);
 
-// 일부 호스트/클라이언트는 제공한 MCP base path 하위에서 .well-known 메타데이터를 조회한다.
-// 퍼플렉시티 등에서 /mcp/.well-known/* 형태로 probe하는 경우를 위해 alias를 제공한다.
-app.use('/mcp/.well-known', wellKnownRouter);
-app.use('/mcp-remote/.well-known', wellKnownRouter);
-app.use('/mcp-openai/.well-known', wellKnownRouter);
-
-// OAuth 인증 엔드포인트 (DCR, authorize, token, revoke) — 모든 OAuth 클라이언트 공유
+// OAuth 인증 엔드포인트 (DCR, authorize, token, revoke)
 app.use('/oauth', oauthRouter);
 
-// OAuth 인증된 MCP 엔드포인트 (Skills/MCPorter, Claude, 기타 OAuth 클라이언트 공유)
+// OAuth 인증된 MCP 엔드포인트
 app.use('/mcp-remote', mcpRemoteRouter);
-
-// OpenAI ChatGPT App 전용 MCP 엔드포인트
-if (config.OPENAI_APP_ENABLED) {
-  app.use('/mcp-openai', createOpenAiAppRouter(storage, metricsService, redisCore));
-  logger.info('🤖 OpenAI ChatGPT App endpoint enabled at /mcp-openai');
-}
-
-// 내부 연동용 OAuth 토큰 무효화 엔드포인트 (Backend logout → MCP OAuth revoke)
-// - 외부 공개용이 아니므로 X-Internal-Secret이 일치할 때만 허용한다.
-app.post('/internal/oauth/revoke-user', async (req, res) => {
-  try {
-    const providedSecret = req.headers['x-internal-secret'];
-    const expectedSecret = config.MCP_SHARED_SECRET;
-
-    if (!expectedSecret || providedSecret !== expectedSecret) {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-
-    const userId = req.body?.userId;
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ message: 'userId is required' });
-    }
-
-    await storage.revokeAllUserTokens(userId);
-    logger.info({ userId: userId.substring(0, 8) }, '✅ Internal OAuth revoke completed');
-    return res.json({ success: true });
-  } catch (error: any) {
-    logger.error({ error: error?.message }, '❌ Internal OAuth revoke failed');
-    return res.status(500).json({ message: 'Internal error' });
-  }
-});
 
 // ===== 기존 라우트 (API Key 인증) =====
 
@@ -330,31 +310,17 @@ app.post('/internal/oauth/revoke-user', async (req, res) => {
  * 헬스 체크
  */
 app.get('/health', (req, res) => {
-  const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
   res.json({
     status: 'healthy',
-    service: 'MCP Proxy Server',
-    version: '8.0.0',
-    pattern: 'Stateless API Key + OAuth 2.1',
+    service: 'mcp-proxy',
     timestamp: new Date().toISOString(),
-    environment: config.NODE_ENV,
-    redis: redisCache.getConnectionStatus() ? 'connected' : 'disconnected',
-    endpoints: {
-      apiKey: '/mcp',
-      oauth: '/mcp-remote',
-      ...(config.OPENAI_APP_ENABLED ? { openai: '/mcp-openai' } : {}),
-      metadata: {
-        resource: `${serverUrl}/.well-known/oauth-protected-resource`,
-        authServer: `${serverUrl}/.well-known/oauth-authorization-server`,
-      },
-    },
   });
 });
 
 /**
  * Prometheus 메트릭 (Grafana 수집용)
  */
-app.get('/metrics', async (req, res) => {
+app.get('/metrics', requireMetricsAccess, async (req, res) => {
   try {
     const metrics = await metricsService.getMetrics();
     res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
@@ -368,7 +334,7 @@ app.get('/metrics', async (req, res) => {
 /**
  * 메트릭 통계 (디버그용)
  */
-app.get('/metrics/stats', async (req, res) => {
+app.get('/metrics/stats', requireMetricsAccess, async (req, res) => {
   try {
     const stats = await metricsService.getStats();
     const redisStats = await redisCache.getStats();
@@ -394,7 +360,7 @@ app.get('/metrics/stats', async (req, res) => {
  * 5. 요청 처리
  * 6. 자동 cleanup (GC)
  */
-async function handleApiKeyMcpRequest(req: express.Request, res: express.Response) {
+app.post('/mcp', async (req, res) => {
   try {
     // 1. Authorization 헤더 검증
     const authHeader = req.headers.authorization;
@@ -458,8 +424,8 @@ async function handleApiKeyMcpRequest(req: express.Request, res: express.Respons
 
     // 8. 메트릭 기록
     const duration = Date.now() - startTime;
-    metricsService.recordRequest('success', undefined, 'mcp');
-    metricsService.recordRequestDuration(duration, undefined, 'mcp');
+    metricsService.recordRequest('success');
+    metricsService.recordRequestDuration(duration);
 
     // 9. 자동 cleanup (함수 종료 시 GC가 처리)
     logger.debug({
@@ -469,7 +435,7 @@ async function handleApiKeyMcpRequest(req: express.Request, res: express.Respons
 
   } catch (error: any) {
     // 메트릭 기록 (에러)
-    metricsService.recordRequest('error', undefined, 'mcp');
+    metricsService.recordRequest('error');
 
     logger.error({
       error: error.message,
@@ -487,10 +453,6 @@ async function handleApiKeyMcpRequest(req: express.Request, res: express.Respons
       });
     }
   }
-}
-
-app.post('/mcp', async (req, res) => {
-  await handleApiKeyMcpRequest(req, res);
 });
 
 /**
@@ -500,16 +462,11 @@ app.post('/mcp', async (req, res) => {
  * 클라이언트는 이 정보를 통해 서버와의 통신 방식을 결정합니다.
  */
 app.get('/mcp', (req, res) => {
-  if (isApiKeyTransportGetRequest(req)) {
-    void handleApiKeyMcpRequest(req, res);
-    return;
-  }
-
   // MCP 서버 Discovery 응답
   res.json({
-    name: 'codebase-blog-mcp',
+    name: 'aigory-blog-mcp',
     version: '8.0.0',
-    description: 'Codebase.blog Auto-posting MCP Server',
+    description: 'Aigory Auto-posting MCP Server',
     capabilities: {
       tools: true,
       prompts: false,
@@ -566,9 +523,8 @@ const server = app.listen(port, '0.0.0.0', () => {
     port,
     host: '0.0.0.0',
     environment: config.NODE_ENV,
-    pattern: 'Dual Route: /mcp (API Key) + /mcp-remote (OAuth 2.1)',
-    ...(config.OPENAI_APP_ENABLED ? { openaiRoute: '/mcp-openai' } : {}),
-    auth: 'Bearer token (blog_sk_... or OAuth access token)',
+    pattern: 'Stateless API Key (Context7 style)',
+    auth: 'Bearer token (blog_sk_...)',
     backendUrl: config.BACKEND_BASE_URL,
   }, '🚀 MCP Proxy Server started');
 });
@@ -591,7 +547,7 @@ const shutdown = async (signal: string) => {
 
   // Redis 연결 종료 (캐시 + OAuth 공유 인스턴스)
   await redisCache.disconnect();
-  await redisCore.quit();
+  await redis.quit();
 
   server.close(() => {
     logger.info('✅ Server closed');

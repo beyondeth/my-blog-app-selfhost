@@ -1,0 +1,152 @@
+name: Aigory production quality
+
+on:
+  pull_request:
+  push:
+    branches: [main, feature/shared/aigory-production-hardening-clean]
+    tags: ['aigory-prod-*']
+  workflow_dispatch:
+
+concurrency:
+  group: aigory-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22
+  PNPM_VERSION: 9.0.0
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: node scripts/check-tracked-secrets.mjs
+      - run: bash -n scripts/deploy-aigory-production.sh scripts/remove-material-ledger.sh scripts/backup-aigory-postgres.sh scripts/configure-aigory-dns.sh
+      - run: node --test cloudflare-workers/cdn-proxy.test.mjs scripts/render-aigory-production-env.test.mjs
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - run: pnpm --dir backend install --frozen-lockfile
+      - run: pnpm --dir backend build
+      - run: pnpm --dir backend migration:check
+      - run: pnpm --dir backend test -- --runInBand --forceExit
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm --dir frontend install --frozen-lockfile
+      - run: pnpm --dir frontend type-check
+      - run: pnpm --dir frontend test:security
+      - run: pnpm --dir frontend lint
+      - name: Production build
+        env:
+          NEXT_PUBLIC_API_URL: https://aigory.com/api/v1
+          NEXT_PUBLIC_BACKEND_URL: https://aigory.com
+          NEXT_PUBLIC_SITE_URL: https://aigory.com
+          NEXT_PUBLIC_CDN_BASE_URL: https://cdn.aigory.com
+          NEXT_PUBLIC_STORAGE_PUBLIC_URL: https://cdn.aigory.com
+          NEXT_PUBLIC_MCP_BASE_URL: https://mcp.aigory.com
+          BACKEND_INTERNAL_URL: http://127.0.0.1:3000
+        run: pnpm --dir frontend build
+
+  mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: mcp-proxy-server/pnpm-lock.yaml
+      - run: pnpm --dir mcp-proxy-server install --frozen-lockfile
+      - run: pnpm --dir mcp-proxy-server build
+      - run: pnpm --dir mcp-proxy-server test:oauth
+      - run: pnpm --dir mcp-proxy-server verify:tool-parity
+
+  migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ github.run_id }}
+          POSTGRES_DB: aigory_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres -d aigory_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - run: pnpm --dir backend install --frozen-lockfile
+      - name: Apply the complete migration chain twice
+        env: &migration-env
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: ${{ github.run_id }}
+          DB_DATABASE: aigory_test
+          DB_SSL_ENABLED: 'false'
+        run: |
+          pnpm --dir backend migration:run
+          pnpm --dir backend migration:run
+      - name: Reject organization orphans
+        env: *migration-env
+        run: pnpm --dir backend tenant:orphan-check -- --strict
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir backend install --frozen-lockfile
+      - run: pnpm --dir frontend install --frozen-lockfile
+      - run: pnpm --dir mcp-proxy-server install --frozen-lockfile
+      - run: pnpm audit:production

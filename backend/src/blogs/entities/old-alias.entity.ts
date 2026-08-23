@@ -23,7 +23,7 @@ import { Blog } from "./blog.entity";
  * **시나리오:**
  * 1. 사용자가 @park → @coder로 alias 변경
  * 2. old_aliases 테이블에 { oldAlias: 'park', blogId, changedAt } 저장
- * 3. 이후 codebase.blog/@park 접속 시:
+ * 3. 이후 aigory.com/@park 접속 시:
  *    - OldAlias 테이블 조회
  *    - 현재 alias 'coder' 확인
  *    - 301 리다이렉트: /blog/@coder

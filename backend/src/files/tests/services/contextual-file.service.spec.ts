@@ -14,13 +14,10 @@ import {
   FilePurpose,
 } from "../../entities/file-context.entity";
 import { S3Service } from "../../services/s3.service";
+import { CdnService } from "../../services/cdn.service";
 import { MockRepository } from "../test-utils/repository.mock";
 import { MockS3Service } from "../test-utils/s3.mock";
 import { MockFactory } from "../test-utils/mock.factory";
-import * as sharp from "sharp";
-
-// Mock sharp module
-jest.mock("sharp");
 
 describe("ContextualFileService", () => {
   let service: ContextualFileService;
@@ -28,25 +25,19 @@ describe("ContextualFileService", () => {
   let contextRepository: MockRepository<FileContext>;
   let s3Service: MockS3Service;
 
+  const mockCdnService = {
+    generateCdnUrl: jest.fn((file: File) => ({
+      url: `https://cdn.example.test/${file.fileKey}`,
+      cached: true,
+    })),
+  };
+
   beforeEach(async () => {
     MockFactory.resetIdCounter();
 
     fileRepository = new MockRepository<File>();
     contextRepository = new MockRepository<FileContext>();
     s3Service = new MockS3Service();
-
-    // Setup sharp mock
-    const sharpMock = {
-      resize: jest.fn().mockReturnThis(),
-      jpeg: jest.fn().mockReturnThis(),
-      toBuffer: jest.fn().mockResolvedValue(Buffer.from("optimized-image")),
-      metadata: jest.fn().mockResolvedValue({
-        width: 1920,
-        height: 1080,
-        format: "jpeg",
-      }),
-    };
-    (sharp as any).mockReturnValue(sharpMock);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -62,6 +53,10 @@ describe("ContextualFileService", () => {
         {
           provide: S3Service,
           useValue: s3Service,
+        },
+        {
+          provide: CdnService,
+          useValue: mockCdnService,
         },
       ],
     }).compile();
@@ -125,7 +120,7 @@ describe("ContextualFileService", () => {
 
       // Assert
       expect(postContext.maxFiles).toBe(10);
-      expect(postContext.maxFileSize).toBe(10 * 1024 * 1024); // 10MB
+      expect(postContext.maxFileSize).toBe(5 * 1024 * 1024); // 5MB
     });
   });
 
@@ -302,7 +297,7 @@ describe("ContextualFileService", () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it("should optimize images if context requires it", async () => {
+    it("should mark images as optimized when the context requires it", async () => {
       // Arrange
       const context = MockFactory.createMockFileContext({
         id: "context-123",
@@ -332,7 +327,10 @@ describe("ContextualFileService", () => {
       );
 
       // Assert
-      expect(sharp).toHaveBeenCalledWith(mockFile.buffer);
+      expect(s3Service.uploadFile).toHaveBeenCalledWith(
+        mockFile,
+        expect.any(String),
+      );
       expect(file.isOptimized).toBe(true);
       expect(file.metadata?.optimized).toBe(true);
     });
@@ -349,12 +347,13 @@ describe("ContextualFileService", () => {
       const file = MockFactory.createMockFile({
         id: "file-123",
         contextId: "context-123",
+        context,
         fileSize: 1024,
       });
 
       contextRepository.setData([context]);
       fileRepository.setData([file]);
-      s3Service.uploadFile(null as any, file.fileKey);
+      s3Service.seedFile(file.fileKey);
 
       // Act
       await service.removeFileFromContext("file-123");
@@ -394,6 +393,9 @@ describe("ContextualFileService", () => {
       const context = MockFactory.createMockFileContext({ id: "context-123" });
       fileRepository.setData([file]);
       contextRepository.setData([context]);
+      s3Service.seedFile(file.fileKey);
+      s3Service.seedFile("thumb-1.jpg");
+      s3Service.seedFile("thumb-2.jpg");
 
       // Act
       await service.removeFileFromContext("file-123");
@@ -497,7 +499,7 @@ describe("ContextualFileService", () => {
   });
 
   describe("generateThumbnails", () => {
-    it("should generate thumbnails for image files", async () => {
+    it("should generate thumbnail keys for image files", async () => {
       // Arrange
       const file = MockFactory.createMockFile({
         id: "file-123",
@@ -516,8 +518,10 @@ describe("ContextualFileService", () => {
 
       // Assert
       expect(thumbnails).toHaveLength(2);
-      expect(sharp).toHaveBeenCalledTimes(2);
-      expect(s3Service.uploadFile).toHaveBeenCalledTimes(2);
+      expect(thumbnails).toEqual([
+        "v2/users/user-123/post/content/image_thumb.jpg",
+        "v2/users/user-123/post/content/image_small.jpg",
+      ]);
 
       // File metadata should be updated
       expect(fileRepository.save).toHaveBeenCalled();
@@ -538,7 +542,7 @@ describe("ContextualFileService", () => {
 
       // Assert
       expect(thumbnails).toHaveLength(0);
-      expect(sharp).not.toHaveBeenCalled();
+      expect(fileRepository.save).not.toHaveBeenCalled();
     });
   });
 

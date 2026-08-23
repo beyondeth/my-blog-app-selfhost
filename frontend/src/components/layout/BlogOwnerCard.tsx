@@ -12,6 +12,7 @@ import { SocialIcon } from '@/components/ui/SocialIcon';
 import { FiEdit, FiLink } from 'react-icons/fi';
 import { LevelBadge } from '@/components/ui/LevelBadge';
 import type { SocialLink } from '@/types';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface BlogOwnerCardProps {
   name?: string;
@@ -119,9 +120,10 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
 
   // isOwner일 경우 AuthProvider의 최신 user.profileImage를 우선 사용하고,
   // 없으면 브랜드 이미지라도 사용해서 비어있는 상태를 방지
+  const normalizedBrandImage = brandImage ? normalizeImageUrl(brandImage) : '';
   const displayProfileImage = isOwner
-    ? user?.profileImage || profileImage || brandImage || undefined
-    : profileImage || brandImage || undefined;
+    ? user?.profileImage || profileImage || normalizedBrandImage || undefined
+    : profileImage || normalizedBrandImage || undefined;
 
   // 팔로워 수 포맷팅 (예: 17.4K)
   const formatFollowerCount = (count: number) => {
@@ -136,9 +138,9 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
     return count.toString();
   };
 
-  const bannerBackgroundStyle: React.CSSProperties = brandImage
+  const bannerBackgroundStyle: React.CSSProperties = normalizedBrandImage
     ? {
-        backgroundImage: `url(${brandImage})`,
+        backgroundImage: `url(${normalizedBrandImage})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }
@@ -160,13 +162,13 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
       <div
         className={cn(
           "h-48 w-full relative group/banner",
-          !brandImage && "bg-gray-100 dark:bg-gray-800"
+          !normalizedBrandImage && "bg-gray-100 dark:bg-gray-800"
         )}
         style={bannerBackgroundStyle}
         aria-label="Blog brand background"
       >
         {/* Visibility Gradient for Icons/Text on Image */}
-        {brandImage && (
+        {normalizedBrandImage && (
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
         )}
         
@@ -205,7 +207,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
                   aria-label={`${link.platform} link`}
                   className={cn(
                     "flex h-5 w-5 items-center justify-center transition-all hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 pointer-events-auto",
-                    brandImage 
+                    normalizedBrandImage
                       ? "text-white/80 hover:text-white focus-visible:ring-white/50" 
                       : "text-black/40 hover:text-black dark:text-white/40 dark:hover:text-white focus-visible:ring-gray-400"
                   )}
@@ -214,7 +216,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
                     platform={platformKey} 
                     className={cn(
                       "h-[16px] w-[16px]",
-                      brandImage ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" : "drop-shadow-sm"
+                      normalizedBrandImage ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" : "drop-shadow-sm"
                     )} 
                   />
                 </a>

@@ -95,9 +95,11 @@ export default function EditorPicksAdminPage() {
     data: editorPickData,
     isLoading: isEditorPicksLoading,
     refetch: refetchEditorPicks,
-    isFetching: isEditorPicksFetching,  // ⬅️ 추가
   } = useAdminEditorPicks(10);
-  const editorPickPosts = useMemo(() => editorPickData?.posts ?? [], [editorPickData?.posts]);
+  const editorPickPosts = useMemo(
+    () => editorPickData?.posts ?? [],
+    [editorPickData?.posts],
+  );
   const pickLimitReached = editorPickPosts.length >= 5;
   const reorderMutation = useReorderEditorPicks(() => refetchEditorPicks());
   const reorderIsPending =
@@ -112,7 +114,6 @@ export default function EditorPicksAdminPage() {
     isFetchingNextPage,
     isLoading: isSearchLoading,
     refetch: refetchSearch,
-    isFetching: isSearchFetching,  // ⬅️ 추가
   } = useInfiniteCursorPosts({
     search: searchTerm || undefined,
     limit: 10,
@@ -123,9 +124,6 @@ export default function EditorPicksAdminPage() {
     () => searchData?.pages.flatMap((page) => page.posts) ?? [],
     [searchData?.pages],
   );
-
-  // ⬇️ 추가: 통합 리프레시 상태
-  const isRefreshing = isEditorPicksFetching || isSearchFetching;
 
   const editorPickIds = useMemo(
     () => editorPickPosts.map((post) => post.id!),
@@ -220,11 +218,10 @@ export default function EditorPicksAdminPage() {
             refetchEditorPicks();
             refetchSearch();
           }}
-          disabled={isRefreshing}  // ⬅️ 추가
           className="gap-2"
         >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />  {/* ⬅️ 회전 애니메이션 */}
-          {isRefreshing ? '새로고침 중...' : '새로고침'}
+          <RefreshCw className="h-4 w-4" />
+          새로고침
         </Button>
       </div>
 

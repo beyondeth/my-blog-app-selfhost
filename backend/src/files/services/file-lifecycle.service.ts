@@ -1,14 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan, IsNull } from "typeorm";
+import { Repository, LessThan, IsNull, In } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { File } from "../entities/file.entity";
+import { FileContext, FileContextType } from "../entities/file-context.entity";
 import { Post } from "../../posts/entities/post.entity";
-import {
-  FileContext,
-  FileContextType,
-  FilePurpose,
-} from "../entities/file-context.entity";
 import { S3Service } from "./s3.service";
 
 export const FileLifecycleEvent = {
@@ -90,14 +86,20 @@ export class FileLifecycleService {
    * 24시간 이상 된 임시 파일 삭제
    */
   async deleteExpiredTemporaryFiles(): Promise<number> {
-    const expiredFiles = await this.fileRepository.find({
-      where: {
-        expiresAt: LessThan(new Date()),
-      },
-    });
+    const { deletable, referenced } = await this.classifyExpiredFiles();
+
+    if (referenced.length > 0) {
+      await this.fileRepository.update(
+        { id: In(referenced.map((file) => file.id)) },
+        { expiresAt: null },
+      );
+      this.logger.warn(
+        `Protected ${referenced.length} expired files because they are still referenced`,
+      );
+    }
 
     let deleted = 0;
-    for (const file of expiredFiles) {
+    for (const file of deletable) {
       try {
         await this.deleteFile(file);
         deleted++;
@@ -111,33 +113,16 @@ export class FileLifecycleService {
 
   /**
    * 참조되지 않는 파일 찾기 및 정리
-   * - legacy orphan: contextId IS NULL
-   * - upload orphan: system/content context 이지만 post_files 연결이 없는 파일
    */
   async cleanupOrphanedFiles(): Promise<number> {
-    // 24시간 이상 경과 + 아직 삭제 예약이 되지 않은 파일
+    // 24시간 이상 컨텍스트가 없는 파일 중 아직 처리되지 않은 파일만
     const orphanedFiles = await this.fileRepository
       .createQueryBuilder("file")
-      .leftJoin("file.context", "context")
-      .leftJoin("post_files", "pf", 'pf."fileId" = file.id')
-      .where(
-        `
-        file.contextId IS NULL
-        OR (
-          context.contextType = :systemType
-          AND context.purpose = :contentPurpose
-          AND pf."postId" IS NULL
-        )
-      `,
-        {
-          systemType: FileContextType.SYSTEM,
-          contentPurpose: FilePurpose.CONTENT,
-        },
-      )
+      .where("file.contextId IS NULL")
       .andWhere("file.createdAt < :date", {
         date: new Date(Date.now() - 24 * 60 * 60 * 1000),
       })
-      .andWhere("file.expiresAt IS NULL") // 이미 처리된 파일 제외
+      .andWhere("file.expiresAt IS NULL") // 이미 처리된 파일은 제외
       .getMany();
 
     let cleaned = 0;
@@ -168,6 +153,32 @@ export class FileLifecycleService {
     }
 
     return cleaned;
+  }
+
+  private async isFileStillReferenced(file: File): Promise<boolean> {
+    const escapedKey = this.escapeLike(file.fileKey);
+    const keyPattern = `%${escapedKey}%`;
+    const count = await this.postsRepository
+      .createQueryBuilder("post")
+      .where('post."isDeleted" = false')
+      .andWhere(
+        `(
+          post.thumbnail_image_id = :fileId
+          OR post.content LIKE :keyPattern ESCAPE '\\'
+          OR post.content_markdown LIKE :keyPattern ESCAPE '\\'
+        )`,
+        {
+          fileId: file.id,
+          keyPattern,
+        },
+      )
+      .getCount();
+
+    return count > 0;
+  }
+
+  private escapeLike(value: string): string {
+    return value.replace(/[\\%_]/g, "\\$&");
   }
 
   /**
@@ -222,14 +233,17 @@ export class FileLifecycleService {
    * 삭제 예약된 파일 처리
    */
   async processScheduledDeletions(): Promise<number> {
-    const scheduledFiles = await this.fileRepository.find({
-      where: {
-        expiresAt: LessThan(new Date()),
-      },
-    });
+    const { deletable, referenced } = await this.classifyExpiredFiles();
+
+    if (referenced.length > 0) {
+      await this.fileRepository.update(
+        { id: In(referenced.map((file) => file.id)) },
+        { expiresAt: null },
+      );
+    }
 
     let deleted = 0;
-    for (const file of scheduledFiles) {
+    for (const file of deletable) {
       try {
         await this.deleteFile(file);
         deleted++;
@@ -241,31 +255,61 @@ export class FileLifecycleService {
     return deleted;
   }
 
-  private async isFileStillReferenced(file: File): Promise<boolean> {
-    const escapedKey = this.escapeLike(file.fileKey);
-    const keyPattern = `%${escapedKey}%`;
-
-    const count = await this.postsRepository
-      .createQueryBuilder("post")
-      .where('post."isDeleted" = false')
-      .andWhere(
-        `(
-          post.thumbnail_image_id = :fileId
-          OR post.content LIKE :keyPattern ESCAPE '\\'
-          OR post.content_markdown LIKE :keyPattern ESCAPE '\\'
-        )`,
-        {
-          fileId: file.id,
-          keyPattern,
-        },
-      )
-      .getCount();
-
-    return count > 0;
+  async previewExpiredCleanup(): Promise<{
+    candidateCount: number;
+    protectedCount: number;
+    candidateIds: string[];
+    protectedIds: string[];
+  }> {
+    const { deletable, referenced } = await this.classifyExpiredFiles();
+    return {
+      candidateCount: deletable.length,
+      protectedCount: referenced.length,
+      candidateIds: deletable.map((file) => file.id),
+      protectedIds: referenced.map((file) => file.id),
+    };
   }
 
-  private escapeLike(value: string): string {
-    return value.replace(/[\\%_]/g, "\\$&");
+  private async classifyExpiredFiles(): Promise<{
+    deletable: File[];
+    referenced: File[];
+  }> {
+    const expiredFiles = await this.fileRepository.find({
+      where: {
+        expiresAt: LessThan(new Date()),
+      },
+    });
+
+    if (expiredFiles.length === 0) {
+      return { deletable: [], referenced: [] };
+    }
+
+    const referencedRows: Array<{ id: string }> =
+      await this.fileRepository.query(
+        `SELECT f.id
+         FROM files f
+         WHERE f.id = ANY($1::uuid[])
+           AND (
+             EXISTS (
+               SELECT 1 FROM post_files pf WHERE pf."fileId" = f.id
+             )
+             OR EXISTS (
+               SELECT 1 FROM posts p WHERE p.thumbnail_image_id = f.id
+             )
+             OR EXISTS (
+               SELECT 1
+               FROM community_posts cp
+               WHERE cp."thumbnailImageId" = f.id
+             )
+           )`,
+        [expiredFiles.map((file) => file.id)],
+      );
+    const referencedIds = new Set(referencedRows.map(({ id }) => id));
+
+    return {
+      deletable: expiredFiles.filter((file) => !referencedIds.has(file.id)),
+      referenced: expiredFiles.filter((file) => referencedIds.has(file.id)),
+    };
   }
 
   /**

@@ -50,10 +50,17 @@ import { Public } from "../common/decorators/public.decorator";
 import { Response, Request } from "express";
 import { Logger } from "@nestjs/common";
 import { PaginationHelper } from "../common/dto/pagination.dto";
+import {
+  OrganizationId,
+  RequireOrganizationContext,
+} from "../organizations/decorators/organization-context.decorator";
+import { OrganizationContextGuard } from "../organizations/guards/organization-context.guard";
+import { normalizeProxyFileKey } from "./utils/file-proxy.util";
 
 @ApiTags("Files")
 @Controller("files")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrganizationContextGuard)
+@RequireOrganizationContext()
 @ApiBearerAuth()
 export class FilesController {
   private readonly logger = new Logger(FilesController.name);
@@ -87,8 +94,13 @@ export class FilesController {
   async createUploadUrl(
     @CurrentUser("id") userId: string,
     @Body() createUploadUrlDto: CreateUploadUrlDto,
+    @OrganizationId() organizationId: string,
   ) {
-    return this.filesService.createUploadUrl(userId as any, createUploadUrlDto);
+    return this.filesService.createUploadUrl(
+      userId as any,
+      createUploadUrlDto,
+      organizationId,
+    );
   }
 
   @Post("upload-complete")
@@ -98,8 +110,13 @@ export class FilesController {
   async uploadComplete(
     @CurrentUser("id") userId: string,
     @Body() uploadCompleteDto: UploadCompleteDto,
+    @OrganizationId() organizationId: string,
   ) {
-    return this.filesService.uploadComplete(userId as any, uploadCompleteDto);
+    return this.filesService.uploadComplete(
+      userId as any,
+      uploadCompleteDto,
+      organizationId,
+    );
   }
 
   @Post("batch-upload-url")
@@ -131,10 +148,12 @@ export class FilesController {
   async createBatchUploadUrl(
     @CurrentUser("id") userId: string,
     @Body() createBatchUploadUrlDto: CreateBatchUploadUrlDto,
+    @OrganizationId() organizationId: string,
   ) {
     return this.filesService.createBatchUploadUrl(
       userId as any,
       createBatchUploadUrlDto,
+      organizationId,
     );
   }
 
@@ -145,10 +164,12 @@ export class FilesController {
   async batchUploadComplete(
     @CurrentUser("id") userId: string,
     @Body() batchUploadCompleteDto: BatchUploadCompleteDto,
+    @OrganizationId() organizationId: string,
   ) {
     return this.filesService.batchUploadComplete(
       userId as any,
       batchUploadCompleteDto,
+      organizationId,
     );
   }
 
@@ -173,6 +194,7 @@ export class FilesController {
   async createVideoUploadUrl(
     @CurrentUser("id") userId: string,
     @Body() dto: CreateVideoUploadUrlDto,
+    @OrganizationId() organizationId: string,
   ) {
     // R2 설정 확인
     if (!this.r2Service.isEnabled()) {
@@ -202,6 +224,7 @@ export class FilesController {
     const video = this.videoRepository.create({
       id: videoId,
       userId,
+      organizationId,
       originalName: dto.fileName,
       mimeType: dto.mimeType,
       sizeRaw: dto.fileSize,
@@ -242,12 +265,14 @@ export class FilesController {
   async videoUploadComplete(
     @CurrentUser("id") userId: string,
     @Body() dto: VideoUploadCompleteDto,
+    @OrganizationId() organizationId: string,
   ) {
     // 비디오 조회
     const video = await this.videoRepository.findOne({
       where: {
         storageKeyRaw: dto.fileKey,
         userId,
+        organizationId,
         status: VideoStatus.UPLOADING,
       },
     });
@@ -329,11 +354,12 @@ export class FilesController {
   async getVideoStatus(
     @Param("id") videoId: string,
     @CurrentUser("id") userId: string,
+    @OrganizationId() organizationId: string,
   ) {
     const sanitizedVideoId = UrlSanitizerUtil.sanitizePathParam(videoId);
 
     const video = await this.videoRepository.findOne({
-      where: { id: sanitizedVideoId, userId },
+      where: { id: sanitizedVideoId, userId, organizationId },
     });
 
     if (!video) {
@@ -485,6 +511,7 @@ export class FilesController {
   @ApiResponse({ status: 200, description: "파일 목록 조회 성공" })
   async getUserFiles(
     @CurrentUser("id") userId: string,
+    @OrganizationId() organizationId: string,
     @Query("fileType") fileType?: string,
     @Query("page", new ParseIntPipe({ optional: true })) page = 1,
     @Query("limit", new ParseIntPipe({ optional: true })) limit = 20,
@@ -498,14 +525,18 @@ export class FilesController {
       fileType,
       safePage,
       safeLimit,
+      organizationId,
     );
   }
 
   @Get("stats")
   @ApiOperation({ summary: "파일 통계 조회" })
   @ApiResponse({ status: 200, description: "파일 통계 조회 성공" })
-  async getFileStats(@CurrentUser("id") userId: string) {
-    return this.filesService.getFileStats(userId as any);
+  async getFileStats(
+    @CurrentUser("id") userId: string,
+    @OrganizationId() organizationId: string,
+  ) {
+    return this.filesService.getFileStats(userId as any, organizationId);
   }
 
   @Get(":id")
@@ -515,10 +546,15 @@ export class FilesController {
   async getFile(
     @Param("id") fileId: string,
     @CurrentUser("id") userId: string,
+    @OrganizationId() organizationId: string,
   ) {
     // 파일 ID 안전하게 정제 (UUID 형식 검증)
     const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
-    return this.filesService.getFileById(sanitizedFileId as any, userId as any);
+    return this.filesService.getFileById(
+      sanitizedFileId as any,
+      userId as any,
+      organizationId,
+    );
   }
 
   @Get(":id/download-url")
@@ -537,12 +573,14 @@ export class FilesController {
   async getDownloadUrl(
     @Param("id") fileId: string,
     @CurrentUser("id") userId: string,
+    @OrganizationId() organizationId: string,
   ) {
     // 파일 ID 안전하게 정제
     const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
     const downloadUrl = await this.filesService.getDownloadUrl(
       sanitizedFileId as any,
       userId as any,
+      organizationId,
     );
     return { downloadUrl };
   }
@@ -565,7 +603,7 @@ export class FilesController {
     }
   }
 
-  @Options("proxy/*")
+  @Options("proxy/*fileKey")
   @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
   async proxyImageOptions(@Res() res: Response) {
@@ -579,12 +617,12 @@ export class FilesController {
     return res.send();
   }
 
-  @Get("proxy/*")
+  @Get("proxy/*fileKey")
   @Public()
   @ApiOperation({
     summary: "이미지 프록시 - S3 파일로 리다이렉트 (UUID 기반) - DEPRECATED",
     description:
-      "⚠️ 이 엔드포인트는 곧 제거될 예정입니다. 직접 CDN URL을 사용하세요 (https://cdn.codebase.blog/...)",
+      "⚠️ 레거시 호환용 파일 프록시입니다. 저장소 public URL 대신 사용할 수 있습니다.",
   })
   @ApiResponse({
     status: 302,
@@ -595,23 +633,38 @@ export class FilesController {
     description: "파일을 찾을 수 없음",
   })
   async proxyImage(
-    @Param("0") fileKey: string,
+    @Param("fileKey") fileKey: string | string[],
     @Res() res: Response,
     @Req() req: Request,
   ) {
+    const normalizedFileKey = normalizeProxyFileKey(fileKey);
+
+    if (!normalizedFileKey) {
+      return res.status(HttpStatus.NOT_FOUND).json({
+        message: "File not found",
+      });
+    }
+
     // ⚠️ DEPRECATION WARNING: 프록시 엔드포인트 사용 로그 추적
-    const referer = req.headers.referer || "unknown";
+    const referer = this.redactReferer(req.headers.referer);
     const userAgent = req.headers["user-agent"] || "unknown";
     this.logger.warn(
-      `🚨 [DEPRECATED] Proxy endpoint accessed. File: ${fileKey}, ` +
+      `🚨 [DEPRECATED] Proxy endpoint accessed. File: ${normalizedFileKey}, ` +
         `Referer: ${referer}, UA: ${userAgent.substring(0, 100)}`,
     );
 
     try {
       // UUID 기반 S3 키 처리 - 안전하게 정제
-      let processedFileKey = UrlSanitizerUtil.sanitizeFilePath(fileKey);
+      let processedFileKey =
+        UrlSanitizerUtil.sanitizeFilePath(normalizedFileKey);
 
-      this.logger.debug(`🔍 [PROXY] Raw fileKey from URL: ${fileKey}`);
+      if (!processedFileKey) {
+        throw new Error("Invalid file key");
+      }
+
+      this.logger.debug(
+        `🔍 [PROXY] Raw fileKey from URL: ${normalizedFileKey}`,
+      );
       this.logger.log(`🔄 [PROXY] After sanitization: ${processedFileKey}`);
 
       // 쿼리 파라미터 제거 (presigned URL 파라미터가 있을 수 있음)
@@ -643,11 +696,16 @@ export class FilesController {
       //   throw new Error('File not found in S3');
       // }
 
+      // The public presigned URL may contain localhost or a public reverse
+      // proxy that is not reachable from this container. Use the internal
+      // storage endpoint when the backend proxies the object.
       const presignedUrl =
-        await this.s3Service.generatePresignedDownloadUrl(processedFileKey);
+        await this.s3Service.generateInternalPresignedDownloadUrl(
+          processedFileKey,
+        );
 
       this.logger.log(
-        `🔗 [PROXY] Generated presigned URL: ${presignedUrl.substring(0, 100)}...`,
+        `🔗 [PROXY] Generated internal presigned URL for fileKey: ${processedFileKey}`,
       );
 
       // S3에서 이미지를 직접 스트리밍
@@ -678,6 +736,9 @@ export class FilesController {
         "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Cross-Origin-Resource-Policy": "cross-origin",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy":
+          "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
       });
 
       if (contentLength) {
@@ -722,6 +783,7 @@ export class FilesController {
     @Param("id") postId: string,
     @CurrentUser("id") userId: string,
     @Body() updateImageOrderDto: UpdateImageOrderDto,
+    @OrganizationId() organizationId: string,
   ) {
     // 포스트 ID 안전하게 정제
     const sanitizedPostId = UrlSanitizerUtil.sanitizePathParam(postId);
@@ -729,6 +791,7 @@ export class FilesController {
       sanitizedPostId,
       userId,
       updateImageOrderDto,
+      organizationId,
     );
   }
 
@@ -740,10 +803,15 @@ export class FilesController {
   async deleteFile(
     @Param("id") fileId: string,
     @CurrentUser("id") userId: string,
+    @OrganizationId() organizationId: string,
   ) {
     // 파일 ID 안전하게 정제
     const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
-    return this.filesService.deleteFile(sanitizedFileId, userId);
+    return this.filesService.deleteFile(
+      sanitizedFileId,
+      userId,
+      organizationId,
+    );
   }
 
   /**
@@ -792,6 +860,17 @@ export class FilesController {
 
     // 기타 파일: 7일 (합리적인 타협)
     return "public, max-age=604800, s-maxage=604800, immutable";
+  }
+
+  private redactReferer(referer: string | undefined): string {
+    if (!referer) return "unknown";
+
+    try {
+      const url = new URL(referer);
+      return `${url.origin}${url.pathname}`;
+    } catch {
+      return "<invalid-referer>";
+    }
   }
 
   // test/s3-connection, test/s3-files, test/db-files 등 테스트/디버깅 엔드포인트 삭제 또는 주석 처리

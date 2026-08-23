@@ -19,7 +19,6 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { Role } from "../common/enums/role.enum";
-import { Public } from "../common/decorators/public.decorator";
 import { UnifiedRedisService } from "../redis/unified-redis.service";
 
 @ApiTags("cache")
@@ -34,7 +33,9 @@ export class CacheController {
    * 캐시 상태 확인 (헬스체크)
    */
   @Get("health")
-  @Public()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: "캐시 시스템 헬스체크" })
   @ApiResponse({
     status: 200,
@@ -181,7 +182,9 @@ export class CacheController {
    * Redis 연결 테스트 (개발용)
    */
   @Get("test-connection")
-  @Public()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: "Redis 연결 테스트" })
   @ApiResponse({
     status: 200,

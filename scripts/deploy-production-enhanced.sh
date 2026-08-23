@@ -175,8 +175,8 @@ prepare_canary() {
     log_info "점진적 롤아웃 준비..."
 
     # 현재 버전 정보 저장
-    if docker inspect codebase-prod-backend >/dev/null 2>&1; then
-        CURRENT_IMAGE=$(docker inspect codebase-prod-backend --format='{{.Config.Image}}')
+    if docker inspect aigory-blog-prod-backend >/dev/null 2>&1; then
+        CURRENT_IMAGE=$(docker inspect aigory-blog-prod-backend --format='{{.Config.Image}}')
         echo "$CURRENT_IMAGE" > $BACKUP_DIR/.previous_image
         log_info "현재 이미지 저장: $CURRENT_IMAGE"
     fi
@@ -236,7 +236,7 @@ main() {
     log_info "Step 1-1: 빌드 검증"
 
     # 이미지 존재 확인
-    for IMAGE in "codebase-prod-frontend" "codebase-prod-backend" "codebase-prod-mcp-proxy"; do
+    for IMAGE in "aigory-blog-prod-frontend" "aigory-blog-prod-backend" "aigory-blog-prod-mcp-proxy"; do
         if ! docker inspect $IMAGE >/dev/null 2>&1; then
             log_error "$IMAGE 이미지를 찾을 수 없습니다"
             exit 1
@@ -258,7 +258,7 @@ main() {
 
     # 마이그레이션 전 데이터베이스 연결 확인
     log_info "데이터베이스 연결 확인..."
-    if ! docker exec codebase-prod-backend timeout 30 node -e "
+    if ! docker exec aigory-blog-prod-backend timeout 30 node -e "
         const { DataSource } = require('./dist/src/data-source.js');
         const dataSource = new DataSource();
         dataSource.initialize()
@@ -279,16 +279,16 @@ main() {
     log_info "마이그레이션 실행..."
     MIGRATION_START_TIME=$(date +%s)
 
-    if docker exec codebase-prod-backend ./scripts/run-migrations.sh 2>&1 | tee -a $LOG_FILE; then
+    if docker exec aigory-blog-prod-backend ./scripts/run-migrations.sh 2>&1 | tee -a $LOG_FILE; then
         MIGRATION_END_TIME=$(date +%s)
         MIGRATION_DURATION=$((MIGRATION_END_TIME - MIGRATION_START_TIME))
         log_info "✅ 마이그레이션 성공 (${MIGRATION_DURATION}초)"
 
         # 마이그레이션 상태 저장
-        docker exec codebase-prod-backend cat .migration_state.json | tee -a $LOG_FILE || true
+        docker exec aigory-blog-prod-backend cat .migration_state.json | tee -a $LOG_FILE || true
     else
         log_error "❌ 마이그레이션 실패!"
-        log_error "마이그레이션 로그 확인: docker exec codebase-prod-backend cat .migration_state.json"
+        log_error "마이그레이션 로그 확인: docker exec aigory-blog-prod-backend cat .migration_state.json"
         log_error "자동 롤백을 시작합니다..."
 
         # 롤백 실행
@@ -304,15 +304,15 @@ main() {
 
     # PM2 reload 실행
     log_info "PM2 reload 중..."
-    docker exec codebase-prod-backend pm2 reload all --update-env
+    docker exec aigory-blog-prod-backend pm2 reload all --update-env
 
     # PM2 워커 스케일 확인 및 조정
     log_info "PM2 워커 수 확인..."
-    CURRENT_WORKERS=$(docker exec codebase-prod-backend pm2 jlist | grep -o '"pm_id":[0-9]*' | wc -l | tr -d ' ')
+    CURRENT_WORKERS=$(docker exec aigory-blog-prod-backend pm2 jlist | grep -o '"pm_id":[0-9]*' | wc -l | tr -d ' ')
 
     if [ "$CURRENT_WORKERS" -lt 4 ]; then
         log_info "PM2 워커 스케일업 (${CURRENT_WORKERS} → 4)"
-        docker exec codebase-prod-backend pm2 scale codebase-backend 4
+        docker exec aigory-blog-prod-backend pm2 scale aigory-blog-backend 4
         sleep 5
     fi
 
@@ -322,15 +322,15 @@ main() {
     WAITED=0
 
     while [ $WAITED -lt $MAX_WAIT ]; do
-        if docker exec codebase-prod-backend curl -f http://localhost:3000/internal/health-check-2f4a8b9c >/dev/null 2>&1; then
+        if docker exec aigory-blog-prod-backend curl -f http://localhost:3000/internal/health-check-2f4a8b9c >/dev/null 2>&1; then
             log_info "✅ Backend 헬스체크 통과 (${WAITED}초)"
             break
         fi
 
         # PM2 프로세스 상태 확인
-        if ! docker exec codebase-prod-backend pm2 list | grep -q "online"; then
+        if ! docker exec aigory-blog-prod-backend pm2 list | grep -q "online"; then
             log_error "PM2 프로세스가 실행되지 않았습니다"
-            docker exec codebase-prod-backend pm2 logs --lines 20
+            docker exec aigory-blog-prod-backend pm2 logs --lines 20
             exit 1
         fi
 
@@ -340,7 +340,7 @@ main() {
 
     if [ $WAITED -ge $MAX_WAIT ]; then
         log_error "Backend 헬스체크 실패 (120초 타임아웃)"
-        docker exec codebase-prod-backend pm2 logs --lines 50
+        docker exec aigory-blog-prod-backend pm2 logs --lines 50
         exit 1
     fi
 
@@ -352,7 +352,7 @@ main() {
     log_info "Frontend 헬스체크 대기..."
     sleep 15
 
-    if docker exec codebase-prod-frontend curl -f http://localhost:3000 >/dev/null 2>&1; then
+    if docker exec aigory-blog-prod-frontend curl -f http://localhost:3000 >/dev/null 2>&1; then
         log_info "✅ Frontend 헬스체크 통과"
     else
         log_warn "Frontend 헬스체크 실패 (계속 진행)"
@@ -366,7 +366,7 @@ main() {
     log_info "MCP Proxy 헬스체크 대기..."
     sleep 10
 
-    if docker exec codebase-prod-mcp-proxy curl -f http://localhost:3002/health >/dev/null 2>&1; then
+    if docker exec aigory-blog-prod-mcp-proxy curl -f http://localhost:3002/health >/dev/null 2>&1; then
         log_info "✅ MCP Proxy 헬스체크 통과"
     else
         log_warn "MCP Proxy 헬스체크 실패 (계속 진행)"
@@ -381,7 +381,7 @@ main() {
 
     # PM2 상태
     log_info "PM2 상태:"
-    docker exec codebase-prod-backend pm2 status
+    docker exec aigory-blog-prod-backend pm2 status
 
     # 메모리 사용량
     log_info "메모리 사용량:"

@@ -242,8 +242,8 @@ export function getCDNUrl(s3Key: string, options?: {
   quality?: number;
   format?: 'auto' | 'webp' | 'avif' | 'json';
 }): string {
-  // CDN 도메인 직접 사용 (백엔드 프록시 우회)
-  const CDN_DOMAIN = process.env.NEXT_PUBLIC_CDN_DOMAIN || 'cdn.codebase.blog';
+  const configuredCdnBase = (process.env.NEXT_PUBLIC_CDN_BASE_URL || '').replace(/\/$/, '');
+  const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1').replace(/\/$/, '');
 
   // S3 키 정리
   let cleanKey = s3Key;
@@ -251,12 +251,15 @@ export function getCDNUrl(s3Key: string, options?: {
     cleanKey = `uploads/${cleanKey}`;
   }
 
-  // 기본 CDN URL
-  let url = `https://${CDN_DOMAIN}/${cleanKey}`;
+  // A configured CDN can serve transformed URLs. The default self-hosted
+  // path uses the authenticated backend's public file proxy instead.
+  let url = configuredCdnBase
+    ? `${configuredCdnBase}/${cleanKey}`
+    : `${apiBaseUrl}/files/proxy/${cleanKey}`;
 
   // Cloudflare Image Resizing 파라미터 추가 (향후 확장용)
   // https://developers.cloudflare.com/images/image-resizing/url-format/
-  if (options && (options.width || options.height || options.quality || options.format)) {
+  if (configuredCdnBase && options && (options.width || options.height || options.quality || options.format)) {
     const params = new URLSearchParams();
 
     if (options.width) params.append('width', options.width.toString());

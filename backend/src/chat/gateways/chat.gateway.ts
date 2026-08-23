@@ -197,59 +197,73 @@ export class ChatGateway
     @ConnectedSocket() client: Socket,
   ) {
     const userId = client.data.userId;
+    try {
+      // Never mutate room or presence state before membership is confirmed.
+      await this.chatService.assertConversationParticipant(
+        conversationId,
+        userId,
+      );
 
-    // Socket.io room 입장
-    client.join(`conversation:${conversationId}`);
+      await client.join(`conversation:${conversationId}`);
 
-    // Redis Set에 활성 사용자 추가 (대화방에 실제로 있는 사용자 추적)
-    await this.unifiedRedisService.addToSet(
-      "conversation",
-      `${conversationId}:active-users`,
-      userId,
-    );
-
-    // Room 멤버십 확인 로그 제거 - 디버깅용이므로 개발 환경에서만
-    if (
-      process.env.NODE_ENV === "development" &&
-      process.env.DEBUG_CHAT === "true"
-    ) {
-      const rooms = Array.from(client.rooms);
-      const activeUsers = await this.unifiedRedisService.getSetMembers(
+      // Redis Set에 활성 사용자 추가 (대화방에 실제로 있는 사용자 추적)
+      await this.unifiedRedisService.addToSet(
         "conversation",
         `${conversationId}:active-users`,
+        userId,
       );
-      this.logger.debug(
-        `Room joined - Conv: ${conversationId}, Active users: ${activeUsers.length}`,
-      );
-    }
 
-    /**
-     * lastReadAt 업데이트 - 채팅방 입장 시 필수
-     * - 모든 메시지를 읽은 것으로 처리
-     * - unreadCount가 자동으로 0이 됨
-     */
-    try {
+      // Room 멤버십 확인 로그 제거 - 디버깅용이므로 개발 환경에서만
+      if (
+        process.env.NODE_ENV === "development" &&
+        process.env.DEBUG_CHAT === "true"
+      ) {
+        const activeUsers = await this.unifiedRedisService.getSetMembers(
+          "conversation",
+          `${conversationId}:active-users`,
+        );
+        this.logger.debug(
+          `Room joined - Conv: ${conversationId}, Active users: ${activeUsers.length}`,
+        );
+      }
+
+      /**
+       * lastReadAt 업데이트 - 채팅방 입장 시 필수
+       * - 모든 메시지를 읽은 것으로 처리
+       * - unreadCount가 자동으로 0이 됨
+       */
       await this.chatService.markAllMessagesAsRead(conversationId, userId);
-      // lastReadAt 업데이트 성공 로그 제거 - 너무 빈번함
+
+      // 다른 사용자들에게 입장 알림
+      client.broadcast
+        .to(`conversation:${conversationId}`)
+        .emit("user-joined", { conversationId, userId });
+
+      return {
+        success: true,
+        joined: true,
+        conversationId,
+        userId,
+      };
     } catch (error) {
-      // 오류는 중요하므로 유지
-      this.logger.error(
-        "Failed to update lastReadAt on room join",
-        error.stack,
-      );
+      await client.leave(`conversation:${conversationId}`);
+      try {
+        await this.unifiedRedisService.removeFromSet(
+          "conversation",
+          `${conversationId}:active-users`,
+          userId,
+        );
+      } catch (cleanupError) {
+        this.logger.error(
+          "Failed to clean up room presence after join failure",
+          cleanupError instanceof Error ? cleanupError.stack : cleanupError,
+        );
+      }
+
+      const message =
+        error instanceof Error ? error.message : "Unable to join conversation";
+      throw new WsException(message);
     }
-
-    // 다른 사용자들에게 입장 알림
-    client.broadcast
-      .to(`conversation:${conversationId}`)
-      .emit("user-joined", { conversationId, userId });
-
-    return {
-      success: true,
-      joined: true,
-      conversationId,
-      userId,
-    };
   }
 
   /**
