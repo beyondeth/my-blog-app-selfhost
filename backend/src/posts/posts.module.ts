@@ -52,6 +52,8 @@ import { VoteService } from "./services/vote.service";
 import { ThumbnailService } from "./services/thumbnail.service";
 import { PostOutboxHandler } from "./services/post-outbox.handler";
 import { CloudflareModule } from "../cloudflare/cloudflare.module";
+import { PostsReadRepository } from "./repositories/posts-read.repository";
+import { PostAccessPolicyService } from "./services/post-access-policy.service";
 
 @Module({
   imports: [
@@ -122,6 +124,8 @@ import { CloudflareModule } from "../cloudflare/cloudflare.module";
     BlogStatsHandler, // 블로그 통계 이벤트 핸들러 (PostsModule로 이동)
     ThumbnailService, // 썸네일 관리 서비스
     PostOutboxHandler,
+    PostsReadRepository,
+    PostAccessPolicyService,
   ],
   controllers: [PostsController],
   exports: [
@@ -133,6 +137,8 @@ import { CloudflareModule } from "../cloudflare/cloudflare.module";
     PostInteractionService,
     PostCreationService,
     VoteService,
+    PostsReadRepository,
+    PostAccessPolicyService,
   ],
 })
 export class PostsModule {}
