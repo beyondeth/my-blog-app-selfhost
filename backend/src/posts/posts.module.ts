@@ -54,6 +54,11 @@ import { PostOutboxHandler } from "./services/post-outbox.handler";
 import { CloudflareModule } from "../cloudflare/cloudflare.module";
 import { PostsReadRepository } from "./repositories/posts-read.repository";
 import { PostAccessPolicyService } from "./services/post-access-policy.service";
+import { PostCreator } from "./services/post-creator";
+import { PostUpdater } from "./services/post-updater";
+import { PostDeleter } from "./services/post-deleter";
+import { PostMetadataSyncService } from "./services/post-metadata-sync.service";
+import { PostSearchVectorService } from "./services/post-search-vector.service";
 
 @Module({
   imports: [
@@ -126,6 +131,11 @@ import { PostAccessPolicyService } from "./services/post-access-policy.service";
     PostOutboxHandler,
     PostsReadRepository,
     PostAccessPolicyService,
+    PostCreator,
+    PostUpdater,
+    PostDeleter,
+    PostMetadataSyncService,
+    PostSearchVectorService,
   ],
   controllers: [PostsController],
   exports: [
@@ -139,6 +149,9 @@ import { PostAccessPolicyService } from "./services/post-access-policy.service";
     VoteService,
     PostsReadRepository,
     PostAccessPolicyService,
+    PostCreator,
+    PostUpdater,
+    PostDeleter,
   ],
 })
 export class PostsModule {}
