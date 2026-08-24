@@ -39,12 +39,18 @@ const configuredImagePatterns = [
   })
   .filter(Boolean);
 
+const configuredObjectStorageRegion = process.env.NEXT_PUBLIC_OBJECT_STORAGE_REGION?.trim();
+const configuredObjectStorageOrigin = configuredObjectStorageRegion && /^[a-z0-9-]+$/.test(configuredObjectStorageRegion)
+  ? `https://*.compat.objectstorage.${configuredObjectStorageRegion}.oraclecloud.com`
+  : null;
+
 const configuredOrigins = [
   process.env.NEXT_PUBLIC_BACKEND_URL,
   process.env.NEXT_PUBLIC_API_URL,
   process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL,
   process.env.NEXT_PUBLIC_CDN_BASE_URL,
   process.env.NEXT_PUBLIC_MCP_BASE_URL,
+  configuredObjectStorageOrigin,
 ]
   .map((value) => {
     if (!value) return null;
@@ -82,7 +88,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com`,
+  `script-src 'self' 'unsafe-inline' blob: https://cdn.jsdelivr.net${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com`,
   "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
   "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
