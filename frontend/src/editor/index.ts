@@ -19,6 +19,7 @@ export { usePostImageTracker } from './hooks/usePostImageTracker';
 // Utils
 export * from './utils/youtube.utils';
 export * from './utils/image-upload.utils';
+export * from './utils/pending-image-upload';
 
 // Constants
 export * from './constants/editor.constants';

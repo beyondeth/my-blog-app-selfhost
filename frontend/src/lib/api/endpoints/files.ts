@@ -28,6 +28,11 @@ export interface GetFilesParams {
  */
 export type FileType = 'image' | 'document' | 'video' | 'general';
 
+export interface UploadFileOptions {
+  onProgress?: (progress: number) => void;
+  signal?: AbortSignal;
+}
+
 /**
  * 파일 API 클래스
  * @description 파일 업로드/다운로드 관련 모든 API 메서드
@@ -61,18 +66,50 @@ export class FilesAPI {
    * @param uploadUrl - Presigned URL
    * @description S3에 직접 HTTP PUT 요청으로 파일 업로드
    */
-  async uploadFileToS3(file: File, uploadUrl: string): Promise<void> {
-    const response = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: file,
-      headers: {
-        'Content-Type': file.type,
-      },
-    });
+  async uploadFileToS3(
+    file: File,
+    uploadUrl: string,
+    options: UploadFileOptions = {},
+  ): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      const request = new XMLHttpRequest();
 
-    if (!response.ok) {
-      throw new Error(`S3 업로드 실패: ${response.statusText}`);
-    }
+      const abortRequest = () => request.abort();
+      options.signal?.addEventListener('abort', abortRequest, { once: true });
+
+      request.open('PUT', uploadUrl);
+      request.setRequestHeader('Content-Type', file.type);
+      request.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          options.onProgress?.(Math.round((event.loaded / event.total) * 100));
+        }
+      });
+      request.addEventListener('load', () => {
+        options.signal?.removeEventListener('abort', abortRequest);
+        if (request.status >= 200 && request.status < 300) {
+          options.onProgress?.(100);
+          resolve();
+          return;
+        }
+
+        reject(new Error(`S3 업로드 실패: HTTP ${request.status}`));
+      });
+      request.addEventListener('error', () => {
+        options.signal?.removeEventListener('abort', abortRequest);
+        reject(new Error('S3 업로드 중 네트워크 오류가 발생했습니다.'));
+      });
+      request.addEventListener('abort', () => {
+        options.signal?.removeEventListener('abort', abortRequest);
+        reject(new DOMException('업로드가 취소되었습니다.', 'AbortError'));
+      });
+
+      if (options.signal?.aborted) {
+        request.abort();
+        return;
+      }
+
+      request.send(file);
+    });
   }
 
   /**
@@ -84,9 +121,11 @@ export class FilesAPI {
    */
   async uploadFile(
     file: File,
-    fileType: FileType = 'general'
+    fileType: FileType = 'general',
+    options: UploadFileOptions = {},
   ): Promise<FileUpload> {
     try {
+      options.onProgress?.(0);
       apiLogger.debug('파일 업로드 시작', {
         fileName: file.name,
         fileType,
@@ -102,10 +141,14 @@ export class FilesAPI {
       };
 
       const presignedResponse = await this.createUploadUrl(uploadData);
+      options.onProgress?.(5);
       apiLogger.debug('Presigned URL 생성 완료');
 
       // 2. S3에 파일 업로드
-      await this.uploadFileToS3(file, presignedResponse.uploadUrl);
+      await this.uploadFileToS3(file, presignedResponse.uploadUrl, {
+        signal: options.signal,
+        onProgress: (progress) => options.onProgress?.(5 + Math.round(progress * 0.9)),
+      });
       apiLogger.debug('S3 업로드 완료');
 
       // 3. 업로드 완료 알림
@@ -122,6 +165,7 @@ export class FilesAPI {
       };
 
       const result = await this.uploadComplete(completeData);
+      options.onProgress?.(100);
       apiLogger.debug('파일 업로드 완료');
 
       return result;

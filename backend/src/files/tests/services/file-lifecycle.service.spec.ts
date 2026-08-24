@@ -84,6 +84,9 @@ describe("FileLifecycleService", () => {
       expect(fileRepository.update).toHaveBeenCalledWith(expect.any(Object), {
         expiresAt: null,
       });
+      expect(fileRepository.query.mock.calls[0][0]).toContain(
+        "community_post_files",
+      );
     });
 
     it("should delete files with expired timestamps", async () => {

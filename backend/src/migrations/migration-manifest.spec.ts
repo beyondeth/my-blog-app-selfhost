@@ -31,7 +31,7 @@ describe("migration release manifest", () => {
     const source = inspectMigrationDirectory(path.resolve(__dirname), ".ts");
 
     expect(source.errors).toEqual([]);
-    expect(source.identities).toHaveLength(160);
+    expect(source.identities).toHaveLength(161);
     expect(
       validateManifestRuntime(MIGRATION_MANIFEST, ORDERED_MIGRATIONS),
     ).toEqual([]);

@@ -4,7 +4,7 @@
  * @description Reddit 스타일 커뮤니티 시스템의 프론트엔드 타입
  */
 
-import type { User, VoteType } from './index';
+import type { FileUpload, User, VoteType } from './index';
 
 /**
  * 커뮤니티 잠금 상태 정보
@@ -406,6 +406,7 @@ export interface CommunityPost {
     readonly id: string;
     readonly url: string;
   };
+  readonly attachedFiles?: FileUpload[];
   readonly isPinned: boolean;
   readonly isLocked: boolean;
   readonly isNsfw: boolean;
@@ -628,6 +629,7 @@ export interface CreateCommunityPostDto {
   contentMarkdown?: string;
   flairId?: string;
   thumbnailImageId?: string;
+  attachedFileIds?: string[];
   isNsfw?: boolean;
   isSpoiler?: boolean;
   tags?: string[];
@@ -643,6 +645,7 @@ export interface UpdateCommunityPostDto {
   contentMarkdown?: string;
   flairId?: string;
   thumbnailImageId?: string;
+  attachedFileIds?: string[];
   isNsfw?: boolean;
   isSpoiler?: boolean;
   tags?: string[];

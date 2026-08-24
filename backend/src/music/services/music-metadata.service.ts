@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { S3Service } from "../../files/services/s3.service";
 
 import { SyncedLyricLine } from "../entities/music.entity";
+import { normalizeCdnBaseUrl } from "../../common/utils/cdn-url.util";
 
 /**
  * 추출된 음악 메타데이터 인터페이스
@@ -39,8 +40,9 @@ export class MusicMetadataService {
     private readonly s3Service: S3Service,
   ) {
     // CDN_DOMAIN에서 CDN 베이스 URL 구성 (CdnService와 동일한 패턴)
-    const cdnDomain = this.configService.get("CDN_DOMAIN", "");
-    this.cdnBaseUrl = cdnDomain ? `https://${cdnDomain}` : "";
+    this.cdnBaseUrl = normalizeCdnBaseUrl(
+      this.configService.get("CDN_DOMAIN", ""),
+    );
   }
 
   /**

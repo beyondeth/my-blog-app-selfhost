@@ -43,6 +43,16 @@ export default {
         });
       }
 
+      if (pathname === '/health') {
+        return new Response(request.method === 'HEAD' ? null : 'ok', {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'no-store',
+          },
+        });
+      }
+
       if (!isSafeObjectPath(pathname)) {
         return new Response('Not Found', {
           status: 404,
