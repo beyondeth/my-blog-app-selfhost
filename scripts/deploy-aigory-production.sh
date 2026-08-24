@@ -64,6 +64,31 @@ export DOCKER_BUILDKIT=1
 # for the replaced database container.
 "${compose[@]}" up -d --force-recreate pgbouncer
 
+# The native Nginx reverse proxy reaches the published backend port through
+# Docker's bridge gateway. Add the gateway to Express's explicit proxy trust
+# list so secure session cookies are emitted for HTTPS requests. The value is
+# discovered after the network is created and is only exported to Compose; the
+# protected environment file remains unchanged.
+proxy_gateway="$(
+  docker network inspect "${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-network" \
+    --format '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null || true
+)"
+if [[ -n "$proxy_gateway" ]]; then
+  configured_trust_proxy_cidrs="$(
+    awk -F= '$1 == "TRUST_PROXY_CIDRS" { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"
+  )"
+  if [[ "$proxy_gateway" == *:* ]]; then
+    proxy_gateway_cidr="$proxy_gateway/128"
+  else
+    proxy_gateway_cidr="$proxy_gateway/32"
+  fi
+  if [[ -n "$configured_trust_proxy_cidrs" ]]; then
+    export TRUST_PROXY_CIDRS="$configured_trust_proxy_cidrs,$proxy_gateway_cidr"
+  else
+    export TRUST_PROXY_CIDRS="$proxy_gateway_cidr"
+  fi
+fi
+
 for attempt in {1..10}; do
   if "${compose[@]}" run --rm --no-deps backend pnpm migration:run:prod:nobuild; then
     break

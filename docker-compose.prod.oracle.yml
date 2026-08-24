@@ -83,6 +83,8 @@ services:
       - .env.production
     environment:
       NODE_ENV: production
+      # Nginx reaches the published port through the Docker bridge gateway.
+      TRUST_PROXY_CIDRS: ${TRUST_PROXY_CIDRS}
       # PgBouncer 연결 (연결 풀링)
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@pgbouncer:5432/${DB_NAME:-blog_prod}
       REDIS_URL: redis://redis:6379
