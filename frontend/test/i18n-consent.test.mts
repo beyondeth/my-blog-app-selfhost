@@ -8,6 +8,7 @@ import {
 } from '../src/lib/i18n/config.ts';
 import { hasPendingImageUpload } from '../src/editor/utils/pending-image-upload.ts';
 import { getProductContent } from '../src/app/product/product-content.ts';
+import { getLandingContent } from '../src/app/landing/landing-content.ts';
 
 test('selects the supported locale with the highest Accept-Language weight', () => {
   assert.equal(detectPreferredLocale('en-US;q=0.7, ko-KR;q=0.9'), 'ko');
@@ -18,6 +19,8 @@ test('selects the supported locale with the highest Accept-Language weight', () 
 test('localizes only explicitly localized routes', () => {
   assert.equal(localizePath('/product', 'ko'), '/ko/product');
   assert.equal(localizePath('/en/product?from=header', 'ko'), '/ko/product?from=header');
+  assert.equal(localizePath('/landing', 'ko'), '/ko/landing');
+  assert.equal(localizePath('/en/landing#open-source', 'ko'), '/ko/landing#open-source');
   assert.equal(localizePath('/settings/profile', 'ko'), '/settings/profile');
 
   assert.deepEqual(extractLocaleFromPathname('/ko/product'), {
@@ -25,6 +28,17 @@ test('localizes only explicitly localized routes', () => {
     hasLocalePrefix: true,
     pathnameWithoutLocale: '/product',
   });
+});
+
+test('renders complete landing copy for English and Korean', () => {
+  const english = getLandingContent('en');
+  const korean = getLandingContent('ko');
+
+  assert.equal(english.hero.githubCta, 'Start on GitHub');
+  assert.equal(korean.hero.githubCta, 'GitHub에서 시작하기');
+  assert.equal(english.pipeline.steps.length, 5);
+  assert.equal(korean.pipeline.steps.length, 5);
+  assert.notEqual(english.hero.title, korean.hero.title);
 });
 
 test('renders different product copy for English and Korean', () => {

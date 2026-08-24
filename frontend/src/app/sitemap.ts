@@ -63,7 +63,12 @@ const staticRoutes = [
     changeFrequency: 'monthly' as const,
   },
   {
-    url: '/landing',
+    url: '/ko/landing',
+    priority: 0.7,
+    changeFrequency: 'monthly' as const,
+  },
+  {
+    url: '/en/landing',
     priority: 0.7,
     changeFrequency: 'monthly' as const,
   },

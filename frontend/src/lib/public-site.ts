@@ -14,17 +14,17 @@ export type PublicDocsSection = {
 
 export const PUBLIC_USE_CASES: PublicNavItem[] = [
   {
-    href: '/product#use-cases',
+    href: '/landing#automation',
     labelKey: 'publicSite.useCases.autopost.label',
     descriptionKey: 'publicSite.useCases.autopost.description',
   },
   {
-    href: '/product#community',
+    href: '/landing#community',
     labelKey: 'publicSite.useCases.community.label',
     descriptionKey: 'publicSite.useCases.community.description',
   },
   {
-    href: '/product#marketplace',
+    href: '/landing#open-source',
     labelKey: 'publicSite.useCases.marketplace.label',
     descriptionKey: 'publicSite.useCases.marketplace.description',
   },
