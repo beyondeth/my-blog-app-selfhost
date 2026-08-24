@@ -50,7 +50,51 @@ const redisCache = new RedisCacheService(
 );
 
 // OAuth 라우터 초기화 (Redis 인스턴스 공유)
-const { wellKnownRouter, oauthRouter, mcpRemoteRouter } = createOAuthRouter(redis, metricsService);
+const { wellKnownRouter, oauthRouter, mcpRemoteRouter, storage } = createOAuthRouter(redis, metricsService);
+
+function isPrivatePeer(address: string | undefined): boolean {
+  if (!address) return false;
+  const normalized = address.replace(/^::ffff:/, '').replace(/^\[|\]$/g, '');
+  if (normalized === '127.0.0.1' || normalized === '::1') return true;
+  if (/^10\./.test(normalized) || /^192\.168\./.test(normalized)) return true;
+  const ipv4Parts = normalized.split('.').map(Number);
+  if (
+    ipv4Parts.length === 4 &&
+    ipv4Parts.every(Number.isInteger) &&
+    ipv4Parts[0] === 172 &&
+    ipv4Parts[1] >= 16 &&
+    ipv4Parts[1] <= 31
+  ) {
+    return true;
+  }
+  return /^fc|^fd|^fe80:/i.test(normalized);
+}
+
+function hasMetricsAccess(req: express.Request): boolean {
+  const token = config.METRICS_AUTH_TOKEN;
+  if (token) {
+    const authorization = req.header('authorization') || '';
+    const supplied = authorization.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length)
+      : '';
+    const expected = Buffer.from(token);
+    const actual = Buffer.from(supplied);
+    return (
+      expected.length === actual.length &&
+      crypto.timingSafeEqual(expected, actual)
+    );
+  }
+  return isPrivatePeer(req.socket.remoteAddress || req.ip);
+}
+
+function requireMetricsAccess(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  if (hasMetricsAccess(req)) return next();
+  return res.status(404).json({ error: 'Not found' });
+}
 
 // Redis 연결 상태 모니터링 (10초마다)
 setInterval(() => {
@@ -98,16 +142,9 @@ app.use((req, res, next) => {
     if (isMcpEndpoint) {
       isAllowed = true;
     } else {
-      // 다른 엔드포인트는 whitelist 검증
-      for (const allowed of allowedOrigins) {
-        const pattern = allowed.replace(/\*/g, '.*');
-        const regex = new RegExp(`^${pattern}$`);
-
-        if (regex.test(origin)) {
-          isAllowed = true;
-          break;
-        }
-      }
+      // 다른 엔드포인트는 명시된 origin의 정확한 일치만 허용한다.
+      // 정규식/와일드카드 비교는 credentialed CORS에서 우회 위험이 있다.
+      isAllowed = allowedOrigins.includes(origin);
     }
 
     if (isAllowed) {
@@ -228,7 +265,7 @@ async function createMcpServer(userData: {
 }): Promise<McpServer> {
   const server = new McpServer(
     {
-      name: 'codebase-blog-mcp',
+      name: 'aigory-mcp',
       version: '8.0.0',  // API Key 버전
     },
     {
@@ -273,30 +310,17 @@ app.use('/mcp-remote', mcpRemoteRouter);
  * 헬스 체크
  */
 app.get('/health', (req, res) => {
-  const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
   res.json({
     status: 'healthy',
-    service: 'MCP Proxy Server',
-    version: '8.0.0',
-    pattern: 'Stateless API Key + OAuth 2.1',
+    service: 'mcp-proxy',
     timestamp: new Date().toISOString(),
-    environment: config.NODE_ENV,
-    redis: redisCache.getConnectionStatus() ? 'connected' : 'disconnected',
-    endpoints: {
-      apiKey: '/mcp',
-      oauth: '/mcp-remote',
-      metadata: {
-        resource: `${serverUrl}/.well-known/oauth-protected-resource`,
-        authServer: `${serverUrl}/.well-known/oauth-authorization-server`,
-      },
-    },
   });
 });
 
 /**
  * Prometheus 메트릭 (Grafana 수집용)
  */
-app.get('/metrics', async (req, res) => {
+app.get('/metrics', requireMetricsAccess, async (req, res) => {
   try {
     const metrics = await metricsService.getMetrics();
     res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
@@ -310,7 +334,7 @@ app.get('/metrics', async (req, res) => {
 /**
  * 메트릭 통계 (디버그용)
  */
-app.get('/metrics/stats', async (req, res) => {
+app.get('/metrics/stats', requireMetricsAccess, async (req, res) => {
   try {
     const stats = await metricsService.getStats();
     const redisStats = await redisCache.getStats();
@@ -336,7 +360,7 @@ app.get('/metrics/stats', async (req, res) => {
  * 5. 요청 처리
  * 6. 자동 cleanup (GC)
  */
-app.post('/mcp', async (req, res) => {
+app.post('/mcp', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   try {
     // 1. Authorization 헤더 검증
     const authHeader = req.headers.authorization;
@@ -348,16 +372,32 @@ app.post('/mcp', async (req, res) => {
         jsonrpc: '2.0',
         error: {
           code: -32000,
-          message: 'Unauthorized: Bearer token required (format: Bearer blog_sk_...)',
+          message: 'Unauthorized: Bearer token required (format: Bearer blog_sk_... or OAuth Bearer token)',
         },
         id: null,
       });
     }
 
-    const apiKey = authHeader.substring(7);  // "Bearer " 제거
+    const token = authHeader.substring(7);  // "Bearer " 제거
+
+    // 1-1. OAuth 토큰 검증 (mcp_at_ 접두사 또는 Redis 유효성 검사)
+    if (token.startsWith('mcp_at_')) {
+      const oauthToken = await storage.validateAccessToken(token);
+      if (oauthToken) {
+        logger.debug({ userId: oauthToken.userId.substring(0, 8) }, '🔐 OAuth token recognized on /mcp, delegating');
+        return mcpRemoteRouter(req, res, next);
+      }
+    } else if (!token.startsWith('blog_sk_')) {
+      // blog_sk_ 가 아닌 경우에도 OAuth 토큰인지 확인
+      const oauthToken = await storage.validateAccessToken(token);
+      if (oauthToken) {
+        logger.debug({ userId: oauthToken.userId.substring(0, 8) }, '🔐 OAuth token recognized on /mcp, delegating');
+        return mcpRemoteRouter(req, res, next);
+      }
+    }
 
     // 2. API Key 검증 (Backend 호출)
-    const userData = await validateApiKey(apiKey);
+    const userData = await validateApiKey(token);
 
     if (!userData) {
       logger.warn('⚠️ Invalid API key');
@@ -381,7 +421,7 @@ app.post('/mcp', async (req, res) => {
     // userData에 원본 API Key 추가
     const mcpServer = await createMcpServer({
       ...userData,
-      apiKey, // 원본 API Key 전달
+      apiKey: token, // 원본 API Key 전달
     });
 
     // 4. Transport 생성 (Context7와 동일한 옵션)
@@ -440,9 +480,9 @@ app.post('/mcp', async (req, res) => {
 app.get('/mcp', (req, res) => {
   // MCP 서버 Discovery 응답
   res.json({
-    name: 'codebase-blog-mcp',
+    name: 'aigory-mcp',
     version: '8.0.0',
-    description: 'Codebase.blog Auto-posting MCP Server',
+    description: 'Aigory Auto-posting MCP Server',
     capabilities: {
       tools: true,
       prompts: false,

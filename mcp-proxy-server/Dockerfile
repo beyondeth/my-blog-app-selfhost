@@ -1,5 +1,5 @@
 # ============================================
-# Codebase MCP Proxy - Multi-stage Dockerfile
+# Aigory MCP Proxy - Multi-stage Dockerfile
 # ============================================
 # Node 22 LTS (Active until 2027-04-30)
 #
@@ -11,13 +11,13 @@
 # ============================================
 # Stage 1: Development (Hot Reload)
 # ============================================
-FROM node:22-slim AS development
+FROM node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS development
 
 # 작업 디렉토리 설정
 WORKDIR /app
 
 # pnpm 설치 (Node 22와 호환되는 최신 버전)
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm@9.0.0
 
 # package.json과 pnpm-lock.yaml 복사 (의존성 캐싱 최적화)
 COPY package.json pnpm-lock.yaml* ./
@@ -38,12 +38,12 @@ CMD ["pnpm", "run", "dev"]
 # ============================================
 # Stage 2: Builder (의존성 설치 및 빌드)
 # ============================================
-FROM node:22-slim AS builder
+FROM node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS builder
 
 WORKDIR /app
 
 # pnpm 설치
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm@9.0.0
 
 # package.json과 pnpm-lock.yaml 복사
 COPY package.json pnpm-lock.yaml* ./
@@ -64,7 +64,10 @@ RUN rm -rf node_modules && \
 # ============================================
 # Stage 3: Production (최적화된 런타임)
 # ============================================
-FROM node:22-slim AS production
+FROM node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS production
+
+LABEL org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/beyondeth/my-blog-app-selfhost"
 
 # 보안 강화: 비-루트 사용자 생성 (Debian 방식)
 RUN groupadd -g 1001 nodejs && \
@@ -77,6 +80,7 @@ COPY --from=builder --chown=mcp:nodejs /app/dist ./dist
 COPY --from=builder --chown=mcp:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=mcp:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=mcp:nodejs /app/writing-styles ./writing-styles
+COPY --chown=mcp:nodejs LICENSE NOTICE /usr/share/licenses/aigory-selfhost/
 
 # 비-루트 사용자로 전환
 USER mcp

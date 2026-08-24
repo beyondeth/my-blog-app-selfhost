@@ -33,7 +33,7 @@ const corsOriginsSchema = z.string()
       message: 'CORS wildcard (*) is not allowed in production. Use specific domain whitelist.'
     }
   )
-  .default('http://localhost:*');
+  .default('http://localhost:3001,http://127.0.0.1:3001');
 
 // 환경 변수 스키마 정의
 const envSchema = z.object({
@@ -118,10 +118,19 @@ const envSchema = z.object({
     .default('300') // 5분
     .transform(Number),
 
-  // Backend 통신용 공유 시크릿 (선택적)
+  // Backend 통신용 공유 시크릿 (개발에서는 선택적, 프로덕션에서는 필수)
   MCP_SHARED_SECRET: z.string()
     .min(16, 'MCP_SHARED_SECRET must be at least 16 characters')
     .optional(),
+
+  // Optional bearer token for metrics when the proxy is reachable outside the
+  // Docker network. Without it, metrics are limited to loopback/private peers.
+  METRICS_AUTH_TOKEN: z.preprocess(
+    (value) => value === '' ? undefined : value,
+    z.string()
+      .min(32, 'METRICS_AUTH_TOKEN must be at least 32 characters')
+      .optional(),
+  ),
 });
 
 // 환경 변수 타입 정의
@@ -147,6 +156,10 @@ export function validateEnv(): EnvConfig {
 
     // 프로덕션 환경 추가 검증
     if (env.NODE_ENV === 'production') {
+      if (!env.MCP_SHARED_SECRET) {
+        throw new Error('MCP_SHARED_SECRET is required in production');
+      }
+
       console.log('\n🔍 프로덕션 환경 추가 검증:');
 
       // CORS 와일드카드 확인
@@ -170,7 +183,7 @@ export function validateEnv(): EnvConfig {
       }
     }
 
-    if (!env.MCP_SHARED_SECRET) {
+    if (!env.MCP_SHARED_SECRET && env.NODE_ENV !== 'production') {
       console.warn('  ⚠️ MCP_SHARED_SECRET is not set. Internal MCP requests will rely solely on network isolation.');
     } else {
       console.log('  🔐 MCP shared secret configured');

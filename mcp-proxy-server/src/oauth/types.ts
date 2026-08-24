@@ -203,6 +203,21 @@ export interface OAuthSession {
 }
 
 /**
+ * Backend-authenticated, short-lived authorization result passed to the MCP
+ * proxy. This is a compact HS256 JWS and must be consumed only once.
+ */
+export interface McpOAuthGrantClaims {
+  iss: string;
+  aud: string;
+  sub: string;
+  state: string;
+  callback: string;
+  jti: string;
+  iat: number;
+  exp: number;
+}
+
+/**
  * 검증된 토큰 정보 (미들웨어에서 사용)
  */
 export interface ValidatedToken {

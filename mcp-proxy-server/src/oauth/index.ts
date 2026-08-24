@@ -36,7 +36,7 @@ import type { ValidatedToken } from './types.js';
  *
  * Bearer 토큰을 검증하고 req.oauth에 토큰 정보 추가
  */
-async function oauthMiddleware(
+export async function oauthMiddleware(
   storage: OAuthStorage,
   req: Request,
   res: Response,
@@ -112,7 +112,7 @@ async function oauthMiddleware(
 /**
  * OAuth 인증 사용자 정보 조회 (Backend에서)
  */
-async function getUserInfo(userId: string): Promise<{
+export async function getUserInfo(userId: string): Promise<{
   user: { id: string; username: string; email: string };
   blog: { id: string; name: string; slug: string };
 } | null> {
@@ -152,6 +152,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   wellKnownRouter: Router;
   oauthRouter: Router;
   mcpRemoteRouter: Router;
+  storage: OAuthStorage;
 } {
   const storage = new OAuthStorage(redis);
 
@@ -215,7 +216,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
       // MCP 서버 생성
       const mcpServer = new McpServer(
         {
-          name: 'codebase-blog-mcp',
+          name: 'aigory-mcp',
           version: '8.0.0',
         },
         {
@@ -292,9 +293,9 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
     const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
 
     res.json({
-      name: 'codebase-blog-mcp',
+      name: 'aigory-mcp',
       version: '8.0.0',
-      description: 'Codebase.blog Auto-posting MCP Server (OAuth)',
+      description: 'Aigory Auto-posting MCP Server (OAuth)',
       capabilities: {
         tools: true,
         prompts: false,
@@ -325,6 +326,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
     wellKnownRouter,
     oauthRouter,
     mcpRemoteRouter,
+    storage,
   };
 }
 
