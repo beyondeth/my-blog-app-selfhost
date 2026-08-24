@@ -162,6 +162,12 @@ export function normalizeImageUrl(url: string): string {
       return sameOriginPath;
     }
 
+    // 공개 CDN과 storage public URL이 같은 운영 구성에서는 CDN URL을
+    // 저장소 원본으로 오인해 API 프록시로 되돌리지 않는다.
+    if (CDN_BASE_URL && (url === CDN_BASE_URL || url.startsWith(`${CDN_BASE_URL}/`))) {
+      return url;
+    }
+
     const configuredStorageKey = extractConfiguredStorageKey(url);
     if (configuredStorageKey) {
       return getProxyImageUrl(configuredStorageKey);

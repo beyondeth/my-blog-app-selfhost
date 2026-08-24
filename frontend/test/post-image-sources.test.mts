@@ -24,3 +24,28 @@ test('keeps an explicitly selected thumbnail first and removes logical duplicate
     [selected, first],
   );
 });
+
+test('keeps a configured public CDN URL instead of converting it back to the API proxy', async () => {
+  const previousCdnBaseUrl = process.env.NEXT_PUBLIC_CDN_BASE_URL;
+  const previousStoragePublicUrl = process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL;
+  process.env.NEXT_PUBLIC_CDN_BASE_URL = 'https://cdn.aigory.com';
+  process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL = 'https://cdn.aigory.com';
+
+  try {
+    const configuredModule = await import('../src/utils/imageUtils.ts?configured-cdn');
+    const cdnImage = 'https://cdn.aigory.com/uploads/image/example.webp';
+
+    assert.equal(configuredModule.normalizeImageUrl(cdnImage), cdnImage);
+  } finally {
+    if (previousCdnBaseUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_CDN_BASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_CDN_BASE_URL = previousCdnBaseUrl;
+    }
+    if (previousStoragePublicUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL;
+    } else {
+      process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL = previousStoragePublicUrl;
+    }
+  }
+});
