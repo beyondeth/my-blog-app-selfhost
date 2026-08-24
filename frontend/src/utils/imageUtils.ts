@@ -376,6 +376,52 @@ export function extractImageKey(url: string): string | null {
 }
 
 /**
+ * 게시글 이미지 목록을 썸네일 순서로 정렬하되, 같은 업로드 파일의 CDN URL을
+ * 오래된 API 프록시 URL보다 우선합니다.
+ */
+export function getPreferredPostImageSources(
+  images: Array<string | null | undefined> | null | undefined,
+  thumbnail?: string | null,
+): string[] {
+  const normalizedImages = (Array.isArray(images) ? images : [])
+    .map((url) => (typeof url === 'string' ? normalizeImageUrl(url) : ''))
+    .filter((url): url is string => Boolean(url && url.trim()));
+  const normalizedThumbnail = thumbnail ? normalizeImageUrl(thumbnail) : '';
+  const prioritized = normalizedThumbnail
+    ? [normalizedThumbnail, ...normalizedImages]
+    : normalizedImages;
+  const preferredByKey = new Map<string, string>();
+
+  prioritized.forEach((url) => {
+    const key = extractImageKey(url);
+    if (!key) {
+      return;
+    }
+
+    const existing = preferredByKey.get(key);
+    const isProxyUrl = url.includes(FILE_PROXY_PATH_PREFIX);
+    if (!existing || (existing.includes(FILE_PROXY_PATH_PREFIX) && !isProxyUrl)) {
+      preferredByKey.set(key, url);
+    }
+  });
+
+  const unique: string[] = [];
+  const seen = new Set<string>();
+
+  prioritized.forEach((url) => {
+    const key = extractImageKey(url) ?? url;
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    unique.push(preferredByKey.get(key) ?? url);
+  });
+
+  return unique;
+}
+
+/**
  * 파일 크기를 사람이 읽기 쉬운 형태로 변환
  */
 export function formatFileSize(bytes: number): string {

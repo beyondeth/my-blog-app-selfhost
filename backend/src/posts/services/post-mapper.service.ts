@@ -374,6 +374,11 @@ export class PostMapperService {
     if ((!dto.images || dto.images.length === 0) && dto.thumbnail) {
       dto.images = [dto.thumbnail];
     }
+    // 명시적인 썸네일이 없으면 첫 게시글 이미지를 사용한다. 첨부 파일에서
+    // 계산된 images URL은 오래된 본문 프록시 URL보다 안정적인 CDN URL이다.
+    if (!post.thumbnailImageId && dto.images?.length) {
+      dto.thumbnail = dto.images[0];
+    }
 
     return dto;
   }

@@ -42,6 +42,7 @@ export default function Modal({
 }: ModalProps) {
   // react-zoom-pan-pinch ref
   const transformComponentRef = useRef<ReactZoomPanPinchRef>(null);
+  const [imageStatus, setImageStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const handleOverlayReset = useCallback(() => {
     if (isOpen) {
       onClose();
@@ -82,6 +83,12 @@ export default function Modal({
       // react-zoom-pan-pinch가 자동으로 초기화 처리
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && type === 'image') {
+      setImageStatus('loading');
+    }
+  }, [content, isOpen, type]);
 
   if (!isOpen) return null;
 
@@ -200,13 +207,38 @@ export default function Modal({
             }}
           >
             {type === 'image' ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={content}
-                alt={alt}
-                className="max-w-full max-h-full object-contain"
-                draggable={false}
-              />
+              <div className="relative flex h-full w-full items-center justify-center">
+                {imageStatus === 'loading' && (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center gap-3 text-sm text-gray-700"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <RotateCw className="h-6 w-6 animate-spin" aria-hidden="true" />
+                    <span>이미지를 불러오는 중입니다.</span>
+                  </div>
+                )}
+                {imageStatus === 'error' && (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-gray-700"
+                    role="alert"
+                  >
+                    이미지를 불러오지 못했습니다.
+                  </div>
+                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  key={content}
+                  src={content}
+                  alt={alt}
+                  className={`max-h-full max-w-full object-contain transition-opacity duration-150 ${
+                    imageStatus === 'loaded' ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  draggable={false}
+                  onLoad={() => setImageStatus('loaded')}
+                  onError={() => setImageStatus('error')}
+                />
+              </div>
             ) : (
               /* SVG 다이어그램 - 모달에서는 별도 클래스 사용 */
               <div

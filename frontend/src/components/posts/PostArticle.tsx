@@ -30,7 +30,7 @@ import {
 } from 'react-icons/fi';
 import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
 import { formatRelativeTime } from '@/utils/timeFormat';
-import { extractImageKey, normalizeImageUrl, shouldDisableOptimization } from '@/utils/imageUtils';
+import { getPreferredPostImageSources, shouldDisableOptimization } from '@/utils/imageUtils';
 import {
   determineFeedLayout,
   extractYouTubeVideoId,
@@ -263,27 +263,10 @@ const PostArticle = React.memo(function PostArticle({
   const { user } = useAuth();
   const router = useRouter();
   const isVideoPost = hasVideo && !!videoId;
-  const imageSources = React.useMemo(() => {
-    const orderedImages = Array.isArray(post.images)
-      ? post.images.filter((url): url is string => Boolean(url && url.trim()))
-      : [];
-    const prioritized = post.thumbnail
-      ? [post.thumbnail, ...orderedImages]
-      : orderedImages;
-    const normalized = prioritized
-      .map((url) => normalizeImageUrl(url))
-      .filter((url): url is string => Boolean(url && url.trim()));
-    const unique: string[] = [];
-    const seen = new Set<string>();
-    normalized.forEach((url) => {
-      const key = extractImageKey(url) ?? url;
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(url);
-      }
-    });
-    return unique;
-  }, [post.images, post.thumbnail]);
+  const imageSources = React.useMemo(
+    () => getPreferredPostImageSources(post.images, post.thumbnail),
+    [post.images, post.thumbnail],
+  );
   const hasImages = imageSources.length > 0;
   const [lightboxOpen, setLightboxOpen] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);

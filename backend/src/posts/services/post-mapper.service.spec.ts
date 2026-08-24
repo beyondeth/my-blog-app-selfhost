@@ -38,4 +38,53 @@ describe("PostMapperService image batching", () => {
     ).toEqual(["uploads/image/first.webp", "uploads/image/second.webp"]);
     expect(result.get("00000000-0000-0000-0000-000000000002")).toEqual([]);
   });
+
+  it("uses the canonical attached image as the fallback thumbnail", async () => {
+    const cdnService = {
+      generateCdnUrlFromKey: jest.fn(
+        (key: string) => `https://cdn.aigory.com/${key}`,
+      ),
+    };
+    const service = new PostMapperService(
+      {} as any,
+      {} as any,
+      {} as any,
+      cdnService as any,
+      {} as any,
+    );
+    const attachedImage = {
+      id: "00000000-0000-0000-0000-000000000011",
+      fileName: "example.webp",
+      originalName: "example.webp",
+      fileKey: "uploads/image/2026/08/example.webp",
+      fileUrl:
+        "http://localhost:3000/api/v1/files/proxy/uploads/image/2026/08/example.webp",
+      fileSize: 100,
+      mimeType: "image/webp",
+      fileType: "image",
+      createdAt: new Date("2026-08-24T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-24T00:00:00.000Z"),
+    };
+    const post = {
+      id: "00000000-0000-0000-0000-000000000001",
+      title: "Post",
+      excerpt: "",
+      category: "",
+      tags: [],
+      content:
+        '<p><img src="http://localhost:3000/api/v1/files/proxy/uploads/image/2026/08/example.webp"></p>',
+      content_markdown: "",
+      thumbnailImageId: null,
+      attachedFiles: [attachedImage],
+    };
+
+    const result = await service.toPostDto(post as any);
+
+    expect(result.images).toEqual([
+      "https://cdn.aigory.com/uploads/image/2026/08/example.webp",
+    ]);
+    expect(result.thumbnail).toBe(
+      "https://cdn.aigory.com/uploads/image/2026/08/example.webp",
+    );
+  });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LoaderCircle, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { normalizeImageUrl } from '@/utils/imageUtils';
@@ -26,6 +26,8 @@ export default function PostImageLightbox({
         .filter((url): url is string => Boolean(url && url.trim()))
     : [];
   const [currentIndex, setCurrentIndex] = useState(startIndex);
+  const [imageStatus, setImageStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const currentImage = safeImages[currentIndex];
 
   useEffect(() => {
     if (!open) return;
@@ -35,6 +37,12 @@ export default function PostImageLightbox({
         : 0;
     setCurrentIndex(clamped);
   }, [open, startIndex, safeImages.length]);
+
+  useEffect(() => {
+    if (open && currentImage) {
+      setImageStatus('loading');
+    }
+  }, [currentImage, open]);
 
   useEffect(() => {
     if (!open || safeImages.length === 0) {
@@ -93,13 +101,38 @@ export default function PostImageLightbox({
           <div className="relative flex-1 flex items-center justify-center">
             <div className="relative w-full h-full sm:max-w-5xl sm:h-auto">
               <div className="relative w-full h-full sm:aspect-[16/10]">
+                {imageStatus === 'loading' && (
+                  <div
+                    className="absolute inset-0 z-10 flex items-center justify-center gap-3 text-sm text-white/80"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <LoaderCircle className="h-6 w-6 animate-spin" aria-hidden="true" />
+                    <span>Loading image...</span>
+                  </div>
+                )}
+                {imageStatus === 'error' && (
+                  <div
+                    className="absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-sm text-white/80"
+                    role="alert"
+                  >
+                    Unable to load this image.
+                  </div>
+                )}
                 <Image
-                  src={safeImages[currentIndex]}
+                  key={currentImage}
+                  src={currentImage}
                   alt={`Post image ${currentIndex + 1}`}
                   fill
                   sizes="100vw"
-                  className="object-contain select-none"
+                  className={cn(
+                    'object-contain select-none transition-opacity duration-150',
+                    imageStatus === 'loaded' ? 'opacity-100' : 'opacity-0',
+                  )}
                   priority
+                  unoptimized
+                  onLoad={() => setImageStatus('loaded')}
+                  onError={() => setImageStatus('error')}
                 />
               </div>
 

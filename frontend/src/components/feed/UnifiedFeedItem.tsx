@@ -10,7 +10,7 @@ import BlurredImage from '@/components/ui/BlurredImage';
 import { FiHeart, FiMessageCircle, FiEye, FiAlertTriangle, FiLock } from 'react-icons/fi';
 import type { VoteType } from '@/types';
 import { formatRelativeTime } from '@/utils/timeFormat';
-import { extractImageKey, normalizeImageUrl, shouldDisableOptimization } from '@/utils/imageUtils';
+import { getPreferredPostImageSources, shouldDisableOptimization } from '@/utils/imageUtils';
 import { determineFeedLayout, FeedLayoutType, extractYouTubeVideoId } from '@/utils/feedLayoutUtils';
 import { useAdultVerificationStatus } from '@/hooks/adult-verification/useAdultVerification';
 import { UnifiedFeedItem as FeedItemType } from '@/services/api/feed.service';
@@ -141,27 +141,10 @@ const UnifiedFeedItem = React.memo(function UnifiedFeedItem({
     return '#';
   };
   const postUrl = getPostUrl();
-  const imageSources = React.useMemo(() => {
-    const orderedImages = Array.isArray(item.images)
-      ? item.images.filter((url): url is string => Boolean(url && url.trim()))
-      : [];
-    const prefixed = item.thumbnail
-      ? [item.thumbnail, ...orderedImages]
-      : orderedImages;
-    const normalized = prefixed
-      .map((url) => normalizeImageUrl(url))
-      .filter((url): url is string => Boolean(url && url.trim()));
-    const unique: string[] = [];
-    const seen = new Set<string>();
-    normalized.forEach((url) => {
-      const key = extractImageKey(url) ?? url;
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(url);
-      }
-    });
-    return unique;
-  }, [item.images, item.thumbnail]);
+  const imageSources = React.useMemo(
+    () => getPreferredPostImageSources(item.images, item.thumbnail),
+    [item.images, item.thumbnail],
+  );
   const hasImages = imageSources.length > 0;
   const handleOpenLightbox = React.useCallback((index: number) => {
     setLightboxIndex(index);
