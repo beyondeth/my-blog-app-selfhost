@@ -11,6 +11,7 @@ import { useCreatePost } from '@/hooks/usePosts';
 import ProductFileUpload from '@/components/marketplace/ProductFileUpload';
 import type { UploadedDeliveryFile } from '@/components/marketplace/ProductFileUpload';
 import { canAccessMarketplaceSellerTools } from '@/lib/marketplace-access';
+import { hasPendingImageUpload } from '@/editor/utils/pending-image-upload';
 
 // 에디터 동적 로드 (SSR 비활성화)
 const BlogSimpleEditor = dynamic(
@@ -47,6 +48,8 @@ export default function NewProductPage() {
 
   // 콘텐츠
   const [descriptionContent, setDescriptionContent] = useState('');
+  const [descriptionFileIds, setDescriptionFileIds] = useState<string[]>([]);
+  const [isDescriptionImageUploading, setIsDescriptionImageUploading] = useState(false);
   const [deliveryFiles, setDeliveryFiles] = useState<UploadedDeliveryFile[]>([]);
 
   // 미리보기 설정
@@ -102,6 +105,10 @@ export default function NewProductPage() {
       toast.error('파일 업로드가 진행 중입니다. 완료 후 다시 시도해주세요');
       return;
     }
+    if (isDescriptionImageUploading || hasPendingImageUpload(descriptionContent)) {
+      toast.error('상품 소개 이미지 업로드가 진행 중입니다. 완료 후 다시 시도해주세요');
+      return;
+    }
     if (!hasFiles) {
       toast.error('판매 파일을 최소 1개 이상 업로드해주세요');
       return;
@@ -125,6 +132,7 @@ export default function NewProductPage() {
           mimeType: f.mimeType,
         })),
         isPublished: !asDraft,
+        attachedFileIds: descriptionFileIds,
         ...(previewMode === 'custom' && customPreview.trim()
           ? { previewContent: customPreview }
           : {}),
@@ -300,6 +308,10 @@ export default function NewProductPage() {
                 <BlogSimpleEditor
                   content={descriptionContent}
                   onChange={setDescriptionContent}
+                  onFileIdsChange={setDescriptionFileIds}
+                  onUploadStateChange={({ isUploading: imageUploading }) => {
+                    setIsDescriptionImageUploading(imageUploading);
+                  }}
                   placeholder="상품의 특징과 가치를 설명해주세요..."
                 />
               </div>
@@ -480,14 +492,18 @@ export default function NewProductPage() {
               <div className="space-y-2">
                 <button
                   onClick={() => handleSubmit(false)}
-                  disabled={isSubmitting || isUploading}
+                  disabled={isSubmitting || isUploading || isDescriptionImageUploading}
                   className="w-full py-2.5 rounded-lg bg-gray-900 dark:bg-white text-sm font-semibold text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? '등록 중...' : isUploading ? '업로드 진행 중...' : '상품 등록'}
+                  {isSubmitting
+                    ? '등록 중...'
+                    : isUploading || isDescriptionImageUploading
+                      ? '업로드 진행 중...'
+                      : '상품 등록'}
                 </button>
                 <button
                   onClick={() => handleSubmit(true)}
-                  disabled={isSubmitting || isUploading}
+                  disabled={isSubmitting || isUploading || isDescriptionImageUploading}
                   className="w-full py-2.5 rounded-lg border border-gray-200 dark:border-zinc-700 text-sm font-medium text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
                 >
                   초안 저장

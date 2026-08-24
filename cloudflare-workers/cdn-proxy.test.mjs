@@ -2,6 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import worker from './cdn-proxy.js';
 
+test('serves health checks without origin access', async () => {
+  const response = await worker.fetch(
+    new Request('https://cdn.aigory.com/health', { method: 'HEAD' }),
+    {},
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});
+
 test('rejects write methods without contacting OCI', async () => {
   const originalFetch = globalThis.fetch;
   let called = false;

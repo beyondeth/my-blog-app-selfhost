@@ -4,6 +4,7 @@ import "./globals.css";
 import '@/editor/styles/editor.css';  // 전역 로드 - 포스트 페이지 CSS preload 경고 해결
 import LayoutClient from './layout-client';
 import { SocketProvider } from '@/providers/SocketProvider';
+import { getRequestLocale } from '@/lib/i18n/server';
 
 // 동적 렌더링 강제 - prerendering 시 useContext 오류 방지
 export const dynamic = 'force-dynamic';
@@ -67,13 +68,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getRequestLocale();
+
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         {/* Pretendard Font - preload for LCP optimization */}
         <link
@@ -121,7 +124,7 @@ export default function RootLayout({
         }}
         suppressHydrationWarning={true}
       >
-        <LayoutClient>
+        <LayoutClient initialLocale={locale}>
           <SocketProvider>
             {children}
           </SocketProvider>

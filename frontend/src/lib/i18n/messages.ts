@@ -152,7 +152,73 @@ const en: MessageTree = {
   },
 };
 
-const ko: MessageTree = en;
+const ko: MessageTree = {
+  ...en,
+  locale: {
+    en: 'English',
+    ko: '한국어',
+    switcher: '언어',
+  },
+  common: {
+    back: '뒤로',
+    loading: '불러오는 중...',
+    cancel: '취소',
+    save: '저장',
+  },
+  publicSite: {
+    header: {
+      docsSidebar: '문서 사이드바 열기',
+      features: '기능',
+      useCases: '활용 사례',
+      community: '커뮤니티',
+      pricing: '요금',
+      docs: '문서',
+      getStarted: '시작하기',
+      openApp: '앱 열기',
+      mobileMenu: '공개 사이트 메뉴 열기',
+    },
+    useCases: {
+      autopost: {
+        label: 'MCP 자동 포스팅',
+        description: 'AI 대화를 한 번의 작업 흐름으로 구조화된 글로 바꿉니다.',
+      },
+      community: {
+        label: '커뮤니티 지식 공유',
+        description: '팀이 배운 내용을 발행하고 다른 사람이 다시 찾을 수 있게 보관합니다.',
+      },
+      marketplace: {
+        label: '지식 배포',
+        description: '결제 기능을 공개하기 전에 가이드와 자료의 배포 구조를 준비합니다.',
+      },
+    },
+    resources: {
+      docs: {
+        label: '문서',
+        description: '제품 흐름과 연결 방법을 확인합니다.',
+      },
+      updates: {
+        label: '변경 내역',
+        description: '제품 업데이트와 릴리스 내용을 확인합니다.',
+      },
+      support: {
+        label: '지원',
+        description: '도움말, 자주 묻는 질문과 지원 채널을 엽니다.',
+      },
+    },
+    legal: {
+      privacy: '개인정보처리방침',
+      terms: '이용약관',
+      guidelines: '커뮤니티 가이드라인',
+    },
+    footer: {
+      resources: '자료',
+      legal: '법적 고지',
+      description:
+        'Codebase는 일상의 AI 대화를 팀, 커뮤니티와 개인 빌더가 다시 쓸 수 있는 구조화된 지식으로 바꿉니다.',
+      cookiePreferences: '쿠키 설정',
+    },
+  },
+};
 
 const allMessages = {
   en,

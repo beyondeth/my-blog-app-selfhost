@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { File } from "../entities/file.entity";
+import { normalizeCdnBaseUrl } from "../../common/utils/cdn-url.util";
 
 export interface CDNUrl {
   url: string;
@@ -17,7 +18,7 @@ export interface CDNUrl {
 export class CdnService {
   private readonly logger = new Logger(CdnService.name);
   private readonly cdnEnabled: boolean;
-  private readonly cdnDomain: string;
+  private readonly cdnBaseUrl: string;
   private readonly cloudflareZoneId: string;
   private readonly cloudflareApiToken: string;
 
@@ -28,8 +29,9 @@ export class CdnService {
   constructor(private configService: ConfigService) {
     // 환경변수 직접 읽기 (S3Service와 동일한 패턴)
     const cdnEnabledRaw = this.configService.get("CDN_ENABLED", "false");
-    this.cdnEnabled = cdnEnabledRaw === "true";
-    this.cdnDomain = this.configService.get("CDN_DOMAIN", "");
+    const configuredCdnDomain = this.configService.get("CDN_DOMAIN", "");
+    this.cdnBaseUrl = normalizeCdnBaseUrl(configuredCdnDomain);
+    this.cdnEnabled = cdnEnabledRaw === "true" && Boolean(this.cdnBaseUrl);
     this.cloudflareZoneId = this.configService.get("CLOUDFLARE_ZONE_ID", "");
     this.cloudflareApiToken = this.configService.get(
       "CLOUDFLARE_API_TOKEN",
@@ -41,11 +43,17 @@ export class CdnService {
       `CDN_ENABLED raw value: "${cdnEnabledRaw}" (type: ${typeof cdnEnabledRaw})`,
     );
     this.logger.debug(`CDN_ENABLED parsed: ${this.cdnEnabled}`);
-    this.logger.debug(`CDN_DOMAIN: "${this.cdnDomain}"`);
+    this.logger.debug(`CDN base URL: "${this.cdnBaseUrl}"`);
+
+    if (cdnEnabledRaw === "true" && !this.cdnBaseUrl) {
+      this.logger.warn(
+        "CDN_ENABLED is true, but CDN_DOMAIN is missing or invalid",
+      );
+    }
 
     if (this.cdnEnabled) {
       this.logger.log(
-        `✅ Cloudflare CDN enabled with domain: ${this.cdnDomain}`,
+        `✅ Cloudflare CDN enabled with base URL: ${this.cdnBaseUrl}`,
       );
       if (!this.cloudflareZoneId || !this.cloudflareApiToken) {
         this.logger.warn(
@@ -90,7 +98,7 @@ export class CdnService {
       cdnPath = `${cdnPath}?${params}`;
     }
 
-    const baseUrl = `https://${this.cdnDomain}/${cdnPath}`;
+    const baseUrl = `${this.cdnBaseUrl}/${cdnPath}`;
 
     return {
       url: baseUrl,
@@ -130,7 +138,7 @@ export class CdnService {
     } else {
       // 선행 슬래시 제거 (중복 슬래시 방지)
       const cleanKey = s3Key.startsWith("/") ? s3Key.substring(1) : s3Key;
-      url = `https://${this.cdnDomain}/${cleanKey}`;
+      url = `${this.cdnBaseUrl}/${cleanKey}`;
     }
 
     // LRU 캐시 관리
@@ -281,7 +289,7 @@ export class CdnService {
       }
       // 아니면 CDN 도메인과 결합
       const cleanPath = path.startsWith("/") ? path : `/${path}`;
-      return `https://${this.cdnDomain}${cleanPath}`;
+      return `${this.cdnBaseUrl}${cleanPath}`;
     });
 
     const apiUrl = `https://api.cloudflare.com/client/v4/zones/${this.cloudflareZoneId}/purge_cache`;
@@ -444,7 +452,7 @@ export class CdnService {
 
     try {
       // CDN 엔드포인트 체크
-      const testUrl = `https://${this.cdnDomain}/health`;
+      const testUrl = `${this.cdnBaseUrl}/health`;
       const response = await fetch(testUrl, {
         method: "HEAD",
         signal: AbortSignal.timeout(5000), // 5초 타임아웃
@@ -452,7 +460,7 @@ export class CdnService {
 
       return {
         enabled: true,
-        domain: this.cdnDomain,
+        domain: this.cdnBaseUrl,
         provider: "cloudflare",
         status: response.ok ? "healthy" : "degraded",
       };
@@ -460,7 +468,7 @@ export class CdnService {
       this.logger.warn(`CDN health check failed: ${error.message}`);
       return {
         enabled: true,
-        domain: this.cdnDomain,
+        domain: this.cdnBaseUrl,
         provider: "cloudflare",
         status: "unhealthy",
       };

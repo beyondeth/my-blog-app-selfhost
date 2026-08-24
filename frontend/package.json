@@ -12,7 +12,7 @@
     "build": "next build --webpack",
     "start": "next start -p 3001",
     "lint": "eslint .",
-    "test:security": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test test/security-regressions.test.mts",
+    "test:security": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test test/*.test.mts",
     "type-check": "tsc --noEmit"
   },
   "pnpm": {

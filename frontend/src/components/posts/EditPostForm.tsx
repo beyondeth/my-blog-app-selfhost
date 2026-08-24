@@ -39,6 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { hasPendingImageUpload } from '@/editor/utils/pending-image-upload';
 
 // 폼 스키마 정의
 const postFormSchema = z.object({
@@ -150,6 +151,14 @@ export default function EditPostForm({
       if (isSubmittingRef.current || isLoading || isLocalSubmitting) {
         return;
       }
+      if (
+        isRichTextImageUploading
+        || isMarkdownImageUploading
+        || hasPendingImageUpload(data.content)
+      ) {
+        toast.warning('이미지 업로드가 끝난 후에 저장할 수 있습니다.');
+        return;
+      }
       onSubmit(data, targetIsPublished);
     })();
   };
@@ -164,6 +173,8 @@ export default function EditPostForm({
   const markdownImageInputRef = useRef<HTMLInputElement | null>(null);
   const [markdownImages, setMarkdownImages] = useState<MarkdownImageInfo[]>([]);
   const [isMarkdownImageUploading, setIsMarkdownImageUploading] = useState(false);
+  const [markdownImageProgress, setMarkdownImageProgress] = useState(0);
+  const [isRichTextImageUploading, setIsRichTextImageUploading] = useState(false);
   const markdownImageUploadMutation = useUploadFile();
   const fileMetadataRef = useRef<Map<string, MarkdownImageMeta>>(new Map());
   const pendingFileMetadataRef = useRef<Set<string>>(new Set());
@@ -241,7 +252,8 @@ export default function EditPostForm({
   }, [form, initialData?.attachedFiles, initialData?.thumbnailImageId]);
 
   const handleFileIdsChange = useCallback((fileIds: string[]) => {
-    form.setValue('attachedFileIds', fileIds, {
+    const currentFileIds = form.getValues('attachedFileIds') || [];
+    form.setValue('attachedFileIds', Array.from(new Set([...currentFileIds, ...fileIds])), {
       shouldDirty: true,
       shouldTouch: true,
     });
@@ -493,6 +505,15 @@ export default function EditPostForm({
       return;
     }
 
+    if (
+      isRichTextImageUploading
+      || isMarkdownImageUploading
+      || hasPendingImageUpload(data.content)
+    ) {
+      toast.warning('이미지 업로드가 끝난 후에 저장할 수 있습니다.');
+      return;
+    }
+
     const isMarkdownMode = editorMode === 'markdown';
     const securityError = validateContentSecurity(data.content, isMarkdownMode ? 'markdown' : 'html');
     if (securityError) {
@@ -572,10 +593,12 @@ export default function EditPostForm({
       return;
     }
     setIsMarkdownImageUploading(true);
+    setMarkdownImageProgress(0);
     try {
       const result = await markdownImageUploadMutation.mutateAsync({
         file,
         fileType: 'image' as const,
+        onProgress: setMarkdownImageProgress,
       });
 
       const fileId = result.id;
@@ -600,6 +623,7 @@ export default function EditPostForm({
       toast.error(message);
     } finally {
       setIsMarkdownImageUploading(false);
+      setMarkdownImageProgress(0);
     }
   }, [appendFileId, form, handleThumbnailChange, insertMarkdownSnippet, markdownImageUploadMutation, syncMarkdownImages]);
 
@@ -742,7 +766,7 @@ export default function EditPostForm({
                               </Button>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 업로드 중...
+                                  이미지 업로드 중 ({markdownImageProgress}%)
                                 </span>
                               )}
                               <span className="text-[11px] text-gray-500 dark:text-gray-400">
@@ -863,6 +887,9 @@ export default function EditPostForm({
                                 setThumbnailIndex(index);
                               }}
                               onFileIdsChange={handleFileIdsChange}
+                              onUploadStateChange={({ isUploading }) => {
+                                setIsRichTextImageUploading(isUploading);
+                              }}
                             />
                           </div>
                         )}
@@ -892,7 +919,7 @@ export default function EditPostForm({
                 <Button
                   type="button"
                   variant="secondary"
-                  disabled={isLoading || isLocalSubmitting}
+                  disabled={isLoading || isLocalSubmitting || isRichTextImageUploading || isMarkdownImageUploading}
                   onClick={(e) => {
                     e.preventDefault();
                     handleFormSubmit(false); // 임시저장 (isPublished: false)
@@ -904,7 +931,7 @@ export default function EditPostForm({
                 </Button>
                 <Button
                   type="button"
-                  disabled={isLoading || isLocalSubmitting}
+                  disabled={isLoading || isLocalSubmitting || isRichTextImageUploading || isMarkdownImageUploading}
                   onClick={(e) => {
                     e.preventDefault();
                     handleFormSubmit(true); // 발행하기 (isPublished: true)
@@ -925,7 +952,7 @@ export default function EditPostForm({
               /* 이미 발행된 글일 경우: 수정 버튼 하나만 표시 */
               <Button
                 type="button"
-                disabled={isLoading || isLocalSubmitting}
+                disabled={isLoading || isLocalSubmitting || isRichTextImageUploading || isMarkdownImageUploading}
                 onClick={(e) => {
                   e.preventDefault();
                   handleFormSubmit(true); // 계속 발행 상태 유지

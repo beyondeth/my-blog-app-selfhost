@@ -6,8 +6,10 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   ManyToOne,
+  ManyToMany,
   OneToMany,
   JoinColumn,
+  JoinTable,
   BeforeInsert,
   Index,
 } from "typeorm";
@@ -258,6 +260,14 @@ export class CommunityPost {
   @JoinColumn({ name: "thumbnailImageId" })
   thumbnailImage: File;
 
+  @ManyToMany(() => File)
+  @JoinTable({
+    name: "community_post_files",
+    joinColumn: { name: "communityPostId", referencedColumnName: "id" },
+    inverseJoinColumn: { name: "fileId", referencedColumnName: "id" },
+  })
+  attachedFiles: File[];
+
   @OneToMany(() => CommunityComment, (comment) => comment.post)
   comments: CommunityComment[];
 
@@ -316,6 +326,17 @@ export class CommunityPost {
           }
         : null,
       thumbnailUrl: this.thumbnailImage?.fileUrl || null,
+      thumbnailImageId: this.thumbnailImageId || null,
+      attachedFiles:
+        this.attachedFiles?.map((file) => ({
+          id: file.id,
+          originalName: file.originalName,
+          fileName: file.fileName,
+          fileUrl: file.fileUrl,
+          fileType: file.fileType,
+          mimeType: file.mimeType,
+          fileSize: file.fileSize,
+        })) || [],
       isPinned: this.isPinned,
       isLocked: this.isLocked,
       isNsfw: this.isNsfw,
