@@ -255,6 +255,10 @@ export interface BlogSimpleEditorProps {
    * 파일 ID 목록 변경 시 호출되는 콜백
    */
   onFileIdsChange?: (fileIds: string[]) => void
+  /**
+   * 이미지 업로드가 진행 중인지 부모 폼에 알립니다.
+   */
+  onUploadStateChange?: (state: { isUploading: boolean; pendingCount: number }) => void
   githubUrl?: string
   githubDescription?: string
   onGithubUrlChange?: (value: string) => void
@@ -271,6 +275,7 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
   initialThumbnailIndex,
   onThumbnailIndexChange,
   onFileIdsChange,
+  onUploadStateChange,
   githubUrl = "",
   githubDescription = "",
   onGithubUrlChange = () => undefined,
@@ -296,26 +301,25 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   // 이미지 목록 추적 상태 (new post mode용)
-  const [uploadedImages, setUploadedImages] = useState<Array<{id: string, url: string}>>([]);
-  const [urlToIdMap, setUrlToIdMap] = useState<Map<string, string>>(new Map());
+  const uploadedImagesRef = useRef<Array<{id: string, url: string}>>([]);
   const thumbnailIndexRef = useRef(initialThumbnailIndex || -1);
+  const pendingUploadCountRef = useRef(0);
+  const onFileIdsChangeRef = useRef(onFileIdsChange);
+  const onUploadStateChangeRef = useRef(onUploadStateChange);
+  onFileIdsChangeRef.current = onFileIdsChange;
+  onUploadStateChangeRef.current = onUploadStateChange;
 
-  // 🐛 BUG FIX: uploadedImages 항상 최신 상태에 접근하기 위한 ref
-  const uploadedImagesRef = useRef(uploadedImages);
-  uploadedImagesRef.current = uploadedImages;
+  const updatePendingUploadCount = useCallback((change: number) => {
+    pendingUploadCountRef.current = Math.max(0, pendingUploadCountRef.current + change);
+    onUploadStateChangeRef.current?.({
+      isUploading: pendingUploadCountRef.current > 0,
+      pendingCount: pendingUploadCountRef.current,
+    });
+  }, []);
 
-  // 🐛 BUG FIX: 렌더링 중 부모 상태 업데이트 방지를 위해 useEffect로 분리
-  const isFirstRun = useRef(true);
-  useEffect(() => {
-    if (isFirstRun.current) {
-      isFirstRun.current = false;
-      return;
-    }
-    if (onFileIdsChange) {
-      const fileIds = uploadedImages.map(img => img.id);
-      onFileIdsChange(fileIds);
-    }
-  }, [uploadedImages, onFileIdsChange]);
+  useEffect(() => () => {
+    onUploadStateChangeRef.current?.({ isUploading: false, pendingCount: 0 });
+  }, []);
 
   // S3 파일 업로드 mutation
   const uploadMutation = useUploadFile()
@@ -324,7 +328,8 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
     file: File,
     onProgress?: (event: { progress: number }) => void,
     abortSignal?: AbortSignal
-  ): Promise<string> => {
+  ): Promise<{ url: string; fileId: string }> => {
+    updatePendingUploadCount(1)
     try {
       // 파일 크기 체크 (5MB) - 프론트엔드에서 사전 검증
       const MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -336,6 +341,8 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       const result = await uploadMutation.mutateAsync({
         file,
         fileType: 'image' as const,
+        signal: abortSignal,
+        onProgress: (progress) => onProgress?.({ progress }),
       })
 
       // FileUpload 객체에서 정보 추출
@@ -352,32 +359,29 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
 
       // 이미지 목록에 추가 (new post mode)
       if (fileId) {
-        setUploadedImages(prev => {
-          const newImages = [...prev, { id: fileId, url: finalUrl }];
-          return newImages;
-        });
-
-        // URL to ID 매핑 업데이트 (ImageUploadNode에서 사용)
-        setUrlToIdMap(prev => {
-          const newMap = new Map(prev);
-          newMap.set(finalUrl, fileId);
-          return newMap;
-        });
+        const nextImages = [
+          ...uploadedImagesRef.current.filter((image) => image.id !== fileId),
+          { id: fileId, url: finalUrl },
+        ];
+        uploadedImagesRef.current = nextImages;
+        onFileIdsChangeRef.current?.(nextImages.map((image) => image.id));
       } else {
-        console.error('[BlogSimpleEditor] No file ID in upload result:', result);
+        throw new Error('Failed to get file ID from upload result');
       }
 
       // 이미지 업로드는 여러 개일 수 있으므로 개별 토스트는 표시하지 않음
       // ImageUploadManager에서 배치 토스트를 표시함
 
-      return finalUrl
+      return { url: finalUrl, fileId }
     } catch (error) {
       console.error('Image upload failed:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to upload the image.'
       toast.error(errorMessage)
       throw error
+    } finally {
+      updatePendingUploadCount(-1)
     }
-  }, [uploadMutation])
+  }, [updatePendingUploadCount, uploadMutation])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -443,55 +447,7 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
         accept: "image/*",
         maxSize: 5 * 1024 * 1024,
         limit: 10,  // 최대 10개 이미지
-        upload: async (file: File, onProgress?: (event: { progress: number }) => void, abortSignal?: AbortSignal) => {
-          // 파일 업로드 직접 처리 (handleImageUpload를 우회)
-          try {
-            const MAX_FILE_SIZE = 5 * 1024 * 1024;
-            if (file.size > MAX_FILE_SIZE) {
-              throw new Error(`Each image must be ${MAX_FILE_SIZE / (1024 * 1024)}MB or smaller.`);
-            }
-
-            const result = await uploadMutation.mutateAsync({
-              file,
-              fileType: 'image' as const,
-            });
-
-            const fileId = result.id;
-            const imageUrl = result.accessUrl || result.fileUrl;
-            const finalUrl = normalizeImageUrl(imageUrl);
-
-            console.log('[BlogSimpleEditor] Direct upload completed:', {
-              fileId,
-              finalUrl,
-              hasFileId: !!fileId
-            });
-
-            if (fileId) {
-              // uploadedImages 상태 업데이트
-              setUploadedImages(prev => {
-                const newImages = [...prev, { id: fileId, url: finalUrl }];
-                return newImages;
-              });
-
-              // URL to ID 매핑 업데이트
-              setUrlToIdMap(prev => {
-                const newMap = new Map(prev);
-                newMap.set(finalUrl, fileId);
-                return newMap;
-              });
-
-              // ImageUploadNode가 fileId를 사용할 수 있도록 객체로 반환
-              return { url: finalUrl, fileId };
-            } else {
-              throw new Error('Failed to get file ID from upload result');
-            }
-          } catch (error) {
-            console.error('Direct upload failed:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Failed to upload the image.';
-            toast.error(errorMessage);
-            throw error;
-          }
-        },
+        upload: handleImageUpload,
         onError: (error) => {
           // 개발 환경에서만 콘솔 에러 표시
           if (process.env.NODE_ENV === 'development') {

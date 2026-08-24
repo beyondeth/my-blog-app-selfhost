@@ -127,11 +127,11 @@ export class ExtendedApiClient extends ApiClient {
   // Files API - 레거시 메서드
   async createUploadUrl(data: any) { return this.files.createUploadUrl(data); }
   async uploadComplete(data: any) { return this.files.uploadComplete(data); }
-  async uploadFileToS3(file: File, uploadUrl: string) {
-    return this.files.uploadFileToS3(file, uploadUrl);
+  async uploadFileToS3(file: File, uploadUrl: string, options?: import('./endpoints/files').UploadFileOptions) {
+    return this.files.uploadFileToS3(file, uploadUrl, options);
   }
-  async uploadFile(file: File, fileType?: any) {
-    return this.files.uploadFile(file, fileType);
+  async uploadFile(file: File, fileType?: any, options?: import('./endpoints/files').UploadFileOptions) {
+    return this.files.uploadFile(file, fileType, options);
   }
   async getUserFiles(params?: any) { return this.files.getUserFiles(params); }
   async getFile(id: number) { return this.files.getFile(id); }

@@ -23,6 +23,7 @@ import {
 import { CacheService } from "../../cache/cache.service";
 import { S3Service } from "../../files/services/s3.service";
 import { MUSIC_CACHE_KEYS, MUSIC_CACHE_TTL } from "../constants";
+import { normalizeCdnBaseUrl } from "../../common/utils/cdn-url.util";
 
 /**
  * 음악 서비스
@@ -42,8 +43,9 @@ export class MusicService {
     private readonly s3Service: S3Service,
   ) {
     // CDN_DOMAIN에서 CDN 베이스 URL 구성 (CdnService와 동일한 패턴)
-    const cdnDomain = this.configService.get("CDN_DOMAIN", "");
-    this.cdnBaseUrl = cdnDomain ? `https://${cdnDomain}` : "";
+    this.cdnBaseUrl = normalizeCdnBaseUrl(
+      this.configService.get("CDN_DOMAIN", ""),
+    );
   }
 
   // ============================================

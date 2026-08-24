@@ -17,9 +17,16 @@ import Script from 'next/script';
 import { Debug } from '@/components/debug/Debug';
 import { CacheClearButton } from '@/components/CacheClearButton';
 import { LocaleProvider } from '@/providers/LocaleProvider';
+import {
+  extractLocaleFromPathname,
+  LOCALE_COOKIE_NAME,
+  stripLocalePrefix,
+  type AppLocale,
+} from '@/lib/i18n/config';
 
 interface LayoutClientProps {
   children: React.ReactNode;
+  initialLocale: AppLocale;
 }
 
 /**
@@ -30,11 +37,20 @@ interface LayoutClientProps {
  * - 랜딩 페이지: 헤더만 표시
  * - 일반 페이지: 전체 레이아웃 (헤더 + 사이드바 + 하단바)
  */
-export default function LayoutClient({ children }: LayoutClientProps) {
+export default function LayoutClient({ children, initialLocale }: LayoutClientProps) {
   const pathname = usePathname();
   const [shouldHideLayout, setShouldHideLayout] = useState(false);
   const [isLandingPage, setIsLandingPage] = useState(false);
-  const isHomePage = pathname === '/';
+  const localizedPath = extractLocaleFromPathname(pathname || '/');
+  const locale = localizedPath.locale ?? initialLocale;
+  const normalizedPathname = stripLocalePrefix(pathname || '/');
+  const isStandalonePublicPage = normalizedPathname === '/product';
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${LOCALE_COOKIE_NAME}=${locale}; Max-Age=${365 * 24 * 60 * 60}; Path=/; SameSite=Lax${secure}`;
+  }, [locale]);
 
   // 경로별 레이아웃 제어 로직
   // 중요: 함수형 업데이트로 의존성에서 상태 제거 (pathname 변경 시만 실행)
@@ -89,7 +105,7 @@ export default function LayoutClient({ children }: LayoutClientProps) {
   }, [pathname]);
 
   return (
-    <LocaleProvider locale="en">
+    <LocaleProvider locale={locale}>
       <ThemeProvider
         attribute="class"
         defaultTheme="system"
@@ -105,7 +121,7 @@ export default function LayoutClient({ children }: LayoutClientProps) {
               {/* Header: 항상 렌더링, 조건에 따라 CSS 숨김 처리 (언마운트 방지) */}
               {/* 음악 플레이어 버튼만 Header에 있고, 드롭다운은 Portal로 body에 직접 렌더링 */}
               {/* Suspense 제거: useSearchParams는 Header 내부에서 개별 Suspense 처리 */}
-              {!shouldHideLayout && (
+              {!shouldHideLayout && !isStandalonePublicPage && (
                 <>
                   <Header />
                   <div className="h-[72px]" />
@@ -113,7 +129,11 @@ export default function LayoutClient({ children }: LayoutClientProps) {
               )}
 
               {/* 메인 콘텐츠 영역: 조건부 렌더링 유지 */}
-              {shouldHideLayout ? (
+              {isStandalonePublicPage ? (
+                <div className="min-h-screen bg-white dark:bg-[#0E141B]">
+                  {children}
+                </div>
+              ) : shouldHideLayout ? (
                 // 인증 페이지 또는 법적 문서 페이지(인증에서 온 경우): 사이드바 없이 콘텐츠만
                 <div className="min-h-screen bg-white dark:bg-[#0E141B]">
                   <MainContent>

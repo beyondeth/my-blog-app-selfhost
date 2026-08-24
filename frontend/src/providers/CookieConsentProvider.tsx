@@ -7,6 +7,7 @@ import {
   createKlaroConfig,
   syncCookieConsentAudit,
 } from '@/lib/consent';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 type CookieConsentContextValue = {
   ready: boolean;
@@ -18,6 +19,7 @@ type CookieConsentContextValue = {
 const CookieConsentContext = createContext<CookieConsentContextValue | null>(null);
 
 export function CookieConsentProvider({ children }: { children: React.ReactNode }) {
+  const { locale } = useLocaleContext();
   const [ready, setReady] = useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [consentConfirmed, setConsentConfirmed] = useState(false);
@@ -32,6 +34,7 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     let disposed = false;
+    setReady(false);
 
     clearLegacyConsentCookie();
 
@@ -43,7 +46,7 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
           return;
         }
 
-        const klaroConfig = createKlaroConfig();
+        const klaroConfig = createKlaroConfig(locale);
         klaroModuleRef.current = klaroModule;
         klaroConfigRef.current = klaroConfig;
 
@@ -92,8 +95,10 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
       if (manager && watcher) {
         manager.unwatch(watcher);
       }
+
+      consentWatcherRef.current = null;
     };
-  }, [syncFromManager]);
+  }, [locale, syncFromManager]);
 
   const openPreferences = useCallback(() => {
     const klaroModule = klaroModuleRef.current;

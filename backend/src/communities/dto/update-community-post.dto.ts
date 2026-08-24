@@ -107,6 +107,19 @@ export class UpdateCommunityPostDto {
   thumbnailImageId?: string;
 
   @ApiPropertyOptional({
+    description: "게시물 본문에 연결할 파일 ID 목록 (최대 10개)",
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10, { message: "첨부 파일은 최대 10개까지 가능합니다" })
+  @IsUUID("all", {
+    each: true,
+    message: "첨부 파일 ID는 UUID 형식이어야 합니다",
+  })
+  attachedFileIds?: string[];
+
+  @ApiPropertyOptional({
     description: "게시물 상태",
     enum: CommunityPostStatus,
     example: CommunityPostStatus.PUBLISHED,

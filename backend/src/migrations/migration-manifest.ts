@@ -654,6 +654,10 @@ export const MIGRATION_MANIFEST = [
     fileName: "1808200000000-AddCookieConsentAuditAction",
     className: "AddCookieConsentAuditAction1808200000000",
   },
+  {
+    fileName: "1808300000000-AddCommunityPostFiles",
+    className: "AddCommunityPostFiles1808300000000",
+  },
 ] as const satisfies readonly MigrationManifestEntry[];
 
 /** Existing timestamp ties are frozen for private deployment compatibility. */

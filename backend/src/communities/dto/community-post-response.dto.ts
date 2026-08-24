@@ -2,6 +2,7 @@ import { Exclude, Expose, Type } from "class-transformer";
 import { UserResponseDto } from "../../users/dto/user-response.dto";
 import { FlairSummaryDto } from "./community-response.dto";
 import { CommunityPostStatus } from "../enums";
+import { File } from "../../files/entities/file.entity";
 
 /**
  * 커뮤니티 게시물 응답 DTO
@@ -35,6 +36,13 @@ export class CommunityPostResponseDto {
 
   @Expose()
   thumbnailImageUrl: string;
+
+  @Expose()
+  thumbnailImageId: string;
+
+  @Expose()
+  @Type(() => File)
+  attachedFiles: File[];
 
   @Expose()
   status: CommunityPostStatus;

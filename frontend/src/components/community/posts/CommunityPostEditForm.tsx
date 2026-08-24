@@ -56,6 +56,7 @@ import {
   extractYouTubeThumbnailMarker,
   stripYouTubeThumbnailMarker,
 } from '@/utils/youtubeMarkdown';
+import { hasPendingImageUpload } from '@/editor/utils/pending-image-upload';
 
 // Define schema for community post editing
 const communityPostFormSchema = z.object({
@@ -135,6 +136,8 @@ export default function CommunityPostEditForm({
   const markdownVideoInputRef = useRef<HTMLInputElement | null>(null);
   const [markdownImages, setMarkdownImages] = useState<MarkdownImageInfo[]>([]);
   const [isMarkdownImageUploading, setIsMarkdownImageUploading] = useState(false);
+  const [markdownImageProgress, setMarkdownImageProgress] = useState(0);
+  const [isRichTextImageUploading, setIsRichTextImageUploading] = useState(false);
   const [isMarkdownVideoUploading, setIsMarkdownVideoUploading] = useState(false);
   const markdownImageUploadMutation = useUploadFile();
   const {
@@ -191,7 +194,10 @@ export default function CommunityPostEditForm({
       content: initialMode === 'markdown' ? cleanedMarkdownContent : (initialData.content || ''),
       flairId: initialData.flairId || undefined,
       tags: initialData.tags || [],
-      attachedFileIds: initialData.thumbnailImageId ? [initialData.thumbnailImageId] : [],
+      attachedFileIds: Array.from(new Set([
+        ...(initialData.attachedFiles?.map((file) => file.id).filter(Boolean) ?? []),
+        ...(initialData.thumbnailImageId ? [initialData.thumbnailImageId] : []),
+      ])),
       thumbnailImageId: initialData.thumbnailImageId || undefined,
     },
   });
@@ -241,7 +247,8 @@ export default function CommunityPostEditForm({
   // --- Helper functions from EditPostForm (simplified/adapted) ---
 
   const handleFileIdsChange = useCallback((fileIds: string[]) => {
-    form.setValue('attachedFileIds', fileIds, {
+    const currentFileIds = form.getValues('attachedFileIds') || [];
+    form.setValue('attachedFileIds', Array.from(new Set([...currentFileIds, ...fileIds])), {
       shouldDirty: true,
       shouldTouch: true,
     });
@@ -395,6 +402,14 @@ export default function CommunityPostEditForm({
       toast.warning('You can save after the video upload and processing are complete.');
       return;
     }
+    if (
+      isRichTextImageUploading
+      || isMarkdownImageUploading
+      || hasPendingImageUpload(data.content)
+    ) {
+      toast.warning('You can save after the image upload is complete.');
+      return;
+    }
 
     const isMarkdownMode = editorMode === 'markdown';
     const securityError = validateContentSecurity(data.content, isMarkdownMode ? 'markdown' : 'html');
@@ -421,6 +436,7 @@ export default function CommunityPostEditForm({
       contentMarkdown: contentWithYouTubeMarker,
       flairId: data.flairId,
       tags: data.tags,
+      attachedFileIds: data.attachedFileIds,
       thumbnailImageId: hasPreferredYouTube ? '' : data.thumbnailImageId || undefined,
       isNsfw,
       isSpoiler,
@@ -465,10 +481,12 @@ export default function CommunityPostEditForm({
       return;
     }
     setIsMarkdownImageUploading(true);
+    setMarkdownImageProgress(0);
     try {
       const result = await markdownImageUploadMutation.mutateAsync({
         file,
         fileType: 'image' as const,
+        onProgress: setMarkdownImageProgress,
       });
 
       const fileId = result.id;
@@ -507,6 +525,7 @@ export default function CommunityPostEditForm({
       toast.error(message);
     } finally {
       setIsMarkdownImageUploading(false);
+      setMarkdownImageProgress(0);
     }
   }, [appendFileId, form, handleThumbnailChange, insertMarkdownSnippet, markdownImageUploadMutation, syncMarkdownImages]);
 
@@ -674,7 +693,8 @@ export default function CommunityPostEditForm({
     markdownVideoState.stage === 'uploading' ||
     markdownVideoState.stage === 'processing';
   const isSaving = isLoading || isLocalSubmitting;
-  const isSaveDisabled = isSaving || isVideoBusy;
+  const isImageBusy = isRichTextImageUploading || isMarkdownImageUploading;
+  const isSaveDisabled = isSaving || isVideoBusy || isImageBusy;
   const currentThumbnailFileId = watchedThumbnailImageId || null;
   const hasPublishTarget = Boolean(publishTarget);
 
@@ -883,7 +903,7 @@ export default function CommunityPostEditForm({
                               </Button>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  Uploading image...
+                                  Uploading image ({markdownImageProgress}%)
                                 </span>
                               )}
                               {markdownVideoStatusMessage && (
@@ -1012,6 +1032,9 @@ export default function CommunityPostEditForm({
                                 thumbnailImageId={watchedThumbnailImageId || undefined}
                                 onThumbnailChange={handleThumbnailChange}
                                 onFileIdsChange={handleFileIdsChange}
+                                onUploadStateChange={({ isUploading }) => {
+                                  setIsRichTextImageUploading(isUploading);
+                                }}
                               />
                             </div>
                           </div>
@@ -1038,10 +1061,14 @@ export default function CommunityPostEditForm({
               type="submit"
               disabled={isSaveDisabled}
               onClick={(e) => {
-                if (isSaveDisabled && isVideoBusy) {
+                if (isSaveDisabled && (isVideoBusy || isImageBusy)) {
                   e.preventDefault();
                   e.stopPropagation();
-                  toast.warning('You can save after the video upload and processing are complete.');
+                  toast.warning(
+                    isImageBusy
+                      ? 'You can save after the image upload is complete.'
+                      : 'You can save after the video upload and processing are complete.',
+                  );
                 }
               }}
               className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 min-w-[88px] text-[13px] font-semibold rounded-md bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-gray-100 shadow-lg"

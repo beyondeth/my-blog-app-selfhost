@@ -4,6 +4,12 @@ import { apiClient } from '@/lib/api';
 import { FileUpload, FileType, FileTypeType } from '@/types';
 import { getErrorMessage } from '@/utils/queryHelpers';
 import { convertImageToWebP, validateImageFile } from '@/utils/imageUtils';
+import type { UploadFileOptions } from '@/lib/api/endpoints/files';
+
+export interface UploadFileVariables extends UploadFileOptions {
+  file: File;
+  fileType?: FileTypeType;
+}
 
 // File Query Keys
 export const fileQueryKeys = {
@@ -34,7 +40,8 @@ export function useUploadFile() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async ({ file, fileType }: { file: File; fileType?: FileTypeType }) => {
+    mutationFn: async ({ file, fileType, onProgress, signal }: UploadFileVariables) => {
+      onProgress?.(0);
       // 타입 안전성을 위한 유효성 검사
       const validFileType = fileType && Object.values(FileType).includes(fileType)
         ? fileType
@@ -55,6 +62,7 @@ export function useUploadFile() {
           });
 
           fileToUpload = await convertImageToWebP(file);
+          onProgress?.(3);
 
           console.log('[useUploadFile] WebP conversion completed:', {
             convertedName: fileToUpload.name,
@@ -67,7 +75,10 @@ export function useUploadFile() {
         }
       }
 
-      return await apiClient.uploadFile(fileToUpload, validFileType);
+      return await apiClient.uploadFile(fileToUpload, validFileType, {
+        signal,
+        onProgress: (progress) => onProgress?.(3 + Math.round(progress * 0.97)),
+      });
     },
     retry: 1,
   });

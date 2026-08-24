@@ -8,18 +8,6 @@ export const LOCALE_HEADER_NAME = 'x-codebase-locale';
 
 const LOCALIZED_ROUTE_PATTERNS = [
   /^\/product(?:\/|$)/,
-  /^\/pricing(?:\/|$)/,
-  /^\/updates(?:\/|$)/,
-  /^\/support(?:\/|$)/,
-  /^\/landing(?:\/|$)/,
-  /^\/docs(?:\/|$)/,
-  /^\/legal(?:\/|$)/,
-  /^\/login(?:\/|$)/,
-  /^\/register(?:\/|$)/,
-  /^\/forgot-password(?:\/|$)/,
-  /^\/reset-password(?:\/|$)/,
-  /^\/consent(?:\/|$)/,
-  /^\/auth\/mcp-consent(?:\/|$)/,
 ];
 
 function splitPathSuffix(pathname: string) {
@@ -61,6 +49,35 @@ export function normalizePathname(pathname: string): string {
 }
 
 export function detectPreferredLocale(acceptLanguage: string | null | undefined): AppLocale {
+  if (!acceptLanguage) {
+    return DEFAULT_LOCALE;
+  }
+
+  const candidates = acceptLanguage
+    .split(',')
+    .map((entry, index) => {
+      const [languageTag, ...parameters] = entry.trim().split(';');
+      const qualityParameter = parameters.find((parameter) => parameter.trim().startsWith('q='));
+      const quality = qualityParameter
+        ? Number.parseFloat(qualityParameter.trim().slice(2))
+        : 1;
+
+      return {
+        languageTag: languageTag.toLowerCase(),
+        quality: Number.isFinite(quality) ? quality : 0,
+        index,
+      };
+    })
+    .filter(({ quality }) => quality > 0)
+    .sort((left, right) => right.quality - left.quality || left.index - right.index);
+
+  for (const { languageTag } of candidates) {
+    const primaryLanguage = languageTag.split('-')[0];
+    if (isSupportedLocale(primaryLanguage)) {
+      return primaryLanguage;
+    }
+  }
+
   return DEFAULT_LOCALE;
 }
 
@@ -96,12 +113,17 @@ export function shouldLocalizePath(pathname: string): boolean {
   return LOCALIZED_ROUTE_PATTERNS.some((pattern) => pattern.test(normalizedPathname));
 }
 
-export function localizePath(pathname: string, _locale?: AppLocale): string {
+export function localizePath(pathname: string, locale: AppLocale = DEFAULT_LOCALE): string {
   if (!pathname.startsWith('/')) {
     return pathname;
   }
 
   const { path, suffix } = splitPathSuffix(pathname);
   const { pathnameWithoutLocale } = extractLocaleFromPathname(path);
+
+  if (shouldLocalizePath(pathnameWithoutLocale)) {
+    return `/${locale}${pathnameWithoutLocale}${suffix}`;
+  }
+
   return `${pathnameWithoutLocale}${suffix}`;
 }

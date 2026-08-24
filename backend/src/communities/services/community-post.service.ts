@@ -35,6 +35,7 @@ import { CursorPaginationHelper } from "../../common/dto/pagination.dto";
 import { CommunityPostViewService } from "./community-post-view.service";
 import { PostContentService } from "../../posts/services/post-content.service";
 import { HtmlSanitizerService } from "../../content-processing/services/html-sanitizer.service";
+import { File } from "../../files/entities/file.entity";
 
 /**
  * 게시물 캐시 키 상수
@@ -159,6 +160,13 @@ export class CommunityPostService {
       dto.content,
       dto.contentMarkdown,
     );
+    const attachedFileIds = Array.from(
+      new Set([
+        ...(dto.attachedFileIds || []),
+        ...(dto.thumbnailImageId ? [dto.thumbnailImageId] : []),
+      ]),
+    );
+    const attachedFiles = await this.loadOwnedFiles(attachedFileIds, authorId);
 
     // 게시물 생성
     const post = this.postRepository.create({
@@ -170,6 +178,7 @@ export class CommunityPostService {
       content_markdown: canonicalContent.markdown,
       flairId: dto.flairId,
       thumbnailImageId: dto.thumbnailImageId,
+      attachedFiles,
       status: dto.isPublished
         ? CommunityPostStatus.PUBLISHED
         : CommunityPostStatus.DRAFT,
@@ -194,6 +203,32 @@ export class CommunityPostService {
     this.logger.log(`게시물 생성: ${saved.slug} in ${community.slug}`);
 
     return saved;
+  }
+
+  private async loadOwnedFiles(
+    fileIds: string[],
+    userId: string,
+  ): Promise<File[]> {
+    if (fileIds.length === 0) {
+      return [];
+    }
+
+    const uniqueFileIds = Array.from(new Set(fileIds));
+    const files = await this.dataSource.getRepository(File).find({
+      where: {
+        id: In(uniqueFileIds),
+        userId,
+      },
+    });
+
+    if (files.length !== uniqueFileIds.length) {
+      throw new NotFoundException(
+        "첨부 파일을 찾을 수 없거나 해당 파일에 대한 권한이 없습니다.",
+      );
+    }
+
+    const filesById = new Map(files.map((file) => [file.id, file]));
+    return uniqueFileIds.map((id) => filesById.get(id)!);
   }
 
   private applySortingAndCursor(
@@ -362,6 +397,7 @@ export class CommunityPostService {
           "flair",
           "community",
           "thumbnailImage",
+          "attachedFiles",
         ],
       });
 
@@ -440,6 +476,7 @@ export class CommunityPostService {
           "flair",
           "community",
           "thumbnailImage",
+          "attachedFiles",
         ],
       });
 
@@ -780,7 +817,7 @@ export class CommunityPostService {
   ): Promise<CommunityPost> {
     const post = await this.postRepository.findOne({
       where: { id: postId },
-      relations: ["community"],
+      relations: ["community", "attachedFiles"],
     });
 
     if (!post) {
@@ -817,6 +854,17 @@ export class CommunityPostService {
       if (dto.isSpoiler !== undefined) post.isSpoiler = dto.isSpoiler;
       if (dto.thumbnailImageId !== undefined)
         post.thumbnailImageId = dto.thumbnailImageId;
+      if (dto.attachedFileIds !== undefined) {
+        const attachedFileIds = Array.from(
+          new Set([
+            ...dto.attachedFileIds,
+            ...(dto.thumbnailImageId || post.thumbnailImageId
+              ? [dto.thumbnailImageId || post.thumbnailImageId]
+              : []),
+          ]),
+        );
+        post.attachedFiles = await this.loadOwnedFiles(attachedFileIds, userId);
+      }
     }
 
     // 모더레이터도 수정 가능한 필드
@@ -924,6 +972,7 @@ export class CommunityPostService {
         "author.profile",
         "flair",
         "thumbnailImage",
+        "attachedFiles",
         "community",
       ],
     });

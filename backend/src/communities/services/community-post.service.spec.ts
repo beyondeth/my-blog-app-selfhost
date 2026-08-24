@@ -14,6 +14,7 @@ import { RedisLockService } from "../../redis/redis-lock.service";
 import { CommunityPostViewService } from "./community-post-view.service";
 import { HtmlSanitizerService } from "../../content-processing/services/html-sanitizer.service";
 import { CommunityPostStatus } from "../enums";
+import { File } from "../../files/entities/file.entity";
 
 describe("CommunityPostService content sanitization", () => {
   let service: CommunityPostService;
@@ -40,7 +41,14 @@ describe("CommunityPostService content sanitization", () => {
   };
   const redisLockService = { withLock: jest.fn() };
   const communityPostViewService = { bufferView: jest.fn() };
-  const dataSource = { transaction: jest.fn() };
+  const fileRepository = { find: jest.fn() };
+  const dataSource = {
+    transaction: jest.fn(),
+    getRepository: jest.fn((entity) => {
+      if (entity === File) return fileRepository;
+      throw new Error("Unexpected repository");
+    }),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -122,6 +130,35 @@ describe("CommunityPostService content sanitization", () => {
     expect(created.content).not.toContain("onerror");
     expect(created.content).not.toContain("javascript:");
     expect(created.content).toContain("<p>Safe</p>");
+  });
+
+  it("links only files owned by the author when creating a post", async () => {
+    const attachedFile = {
+      id: "550e8400-e29b-41d4-a716-446655440001",
+      userId: "author-id",
+    } as File;
+    fileRepository.find.mockResolvedValueOnce([attachedFile]);
+
+    await service.create(
+      "community-id",
+      {
+        title: "Post with image",
+        content: "<p>Image</p>",
+        attachedFileIds: [attachedFile.id],
+        isPublished: false,
+      },
+      "author-id",
+    );
+
+    expect(fileRepository.find).toHaveBeenCalledWith({
+      where: {
+        id: expect.any(Object),
+        userId: "author-id",
+      },
+    });
+    expect(postRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ attachedFiles: [attachedFile] }),
+    );
   });
 
   it("rejects a title that becomes empty after sanitization", async () => {

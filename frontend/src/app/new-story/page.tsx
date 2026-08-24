@@ -63,6 +63,7 @@ import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownCo
 import { validateContentSecurity } from '@/utils/contentSecurity';
 import { apiClient } from '@/lib/api';
 import type { CreatePostRequest } from '@/types';
+import { hasPendingImageUpload } from '@/editor/utils/pending-image-upload';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogSimpleEditor = dynamic(
@@ -232,6 +233,8 @@ export default function NewStoryPage() {
   const pendingFileMetadataRef = useRef<Set<string>>(new Set());
   const autoConversionSkipRef = useRef(false);
   const [isMarkdownImageUploading, setIsMarkdownImageUploading] = useState(false);
+  const [markdownImageProgress, setMarkdownImageProgress] = useState(0);
+  const [isRichTextImageUploading, setIsRichTextImageUploading] = useState(false);
   const [isMarkdownVideoUploading, setIsMarkdownVideoUploading] = useState(false);
   const markdownImageUploadMutation = useUploadFile();
   const currentThumbnailFileId = useMemo(() => {
@@ -378,9 +381,11 @@ export default function NewStoryPage() {
 
   // 파일 ID 변경 핸들러
   const handleFileIdsChange = useCallback((fileIds: string[]) => {
-    console.log('🎯 [DEBUG] File IDs updated:', fileIds);
+    const currentFileIds = form.getValues('fileIds') || [];
+    const nextFileIds = Array.from(new Set([...currentFileIds, ...fileIds]));
+    console.log('🎯 [DEBUG] File IDs updated:', nextFileIds);
     // React Hook Form의 setValue를 사용하여 form state 업데이트
-    form.setValue('fileIds', fileIds, {
+    form.setValue('fileIds', nextFileIds, {
       shouldValidate: true,
       shouldDirty: true
     });
@@ -831,10 +836,12 @@ export default function NewStoryPage() {
       return;
     }
     setIsMarkdownImageUploading(true);
+    setMarkdownImageProgress(0);
     try {
       const result = await markdownImageUploadMutation.mutateAsync({
         file,
         fileType: 'image' as const,
+        onProgress: setMarkdownImageProgress,
       });
 
       const fileId = result.id;
@@ -859,6 +866,7 @@ export default function NewStoryPage() {
       toast.error(message);
     } finally {
       setIsMarkdownImageUploading(false);
+      setMarkdownImageProgress(0);
     }
   }, [appendFileId, handleThumbnailChange, insertMarkdownSnippet, markdownImageUploadMutation, syncMarkdownImages, thumbnailIndex]);
 
@@ -906,6 +914,15 @@ export default function NewStoryPage() {
 
   // 폼 제출 핸들러
   const onSubmit = async (data: PostFormData) => {
+    if (
+      isRichTextImageUploading
+      || isMarkdownImageUploading
+      || hasPendingImageUpload(data.content)
+    ) {
+      toast.warning('이미지 업로드가 끝난 후에 저장할 수 있습니다.');
+      return;
+    }
+
     // 발행 대상이 없으면 제출 불가
     if (!publishTarget) {
       toast.error('발행 대상을 선택해주세요.');
@@ -1005,6 +1022,7 @@ export default function NewStoryPage() {
         const communityPostData: any = {
           title: data.title,
           tags: data.tags,
+          attachedFileIds: data.fileIds,
           ...(thumbnailImageId && { thumbnailImageId }),
           isPublished: true,
           ...(selectedFlairId && { flairId: selectedFlairId }),
@@ -1089,7 +1107,8 @@ export default function NewStoryPage() {
     ? createPostMutation.isPending
     : createCommunityPostMutation.isPending;
   const isSaving = isSubmitting || isMutationPending;
-  const isSaveDisabled = isSaving || hasPendingVideoUploads;
+  const hasPendingImageUploads = isRichTextImageUploading || isMarkdownImageUploading;
+  const isSaveDisabled = isSaving || hasPendingVideoUploads || hasPendingImageUploads;
   const isCommunityTarget = publishTarget?.type === 'community';
   const lacksCommunityPermission =
     isCommunityTarget &&
@@ -1402,7 +1421,7 @@ export default function NewStoryPage() {
                               </Button>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  이미지 업로드 중...
+                                  이미지 업로드 중 ({markdownImageProgress}%)
                                 </span>
                               )}
                               {markdownVideoStatusMessage && (
@@ -1537,6 +1556,9 @@ export default function NewStoryPage() {
                                 initialThumbnailIndex={thumbnailIndex}
                                 onThumbnailIndexChange={handleThumbnailChange}
                                 onFileIdsChange={handleFileIdsChange}
+                                onUploadStateChange={({ isUploading }) => {
+                                  setIsRichTextImageUploading(isUploading);
+                                }}
                               />
                             </div>
                           </div>
@@ -1593,10 +1615,14 @@ export default function NewStoryPage() {
           )}
 
           {/* 제출 버튼 */}
-          {hasPendingVideoUploads && (
+          {(hasPendingVideoUploads || hasPendingImageUploads) && (
             <p className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 pt-2">
               <AlertCircle className="h-4 w-4" />
-              <span>{videoUploadStatusText ?? '비디오 업로드와 처리가 완료될 때까지 기다려주세요.'}</span>
+              <span>
+                {hasPendingImageUploads
+                  ? '이미지 업로드가 완료될 때까지 기다려주세요.'
+                  : videoUploadStatusText ?? '비디오 업로드와 처리가 완료될 때까지 기다려주세요.'}
+              </span>
             </p>
           )}
 
@@ -1612,12 +1638,16 @@ export default function NewStoryPage() {
             <Button
               type="button"
               variant="secondary"
-              disabled={isMutationPending || !form.getValues('title')?.trim()}
+              disabled={isSaveDisabled || !form.getValues('title')?.trim()}
               onClick={async () => {
                 // 임시저장 (isPublished: false로 저장)
                 const data = form.getValues();
                 if (!data.title?.trim()) {
                   setTitleError('제목을 입력해주세요.');
+                  return;
+                }
+                if (hasPendingImageUploads || hasPendingImageUpload(data.content)) {
+                  toast.warning('이미지 업로드가 끝난 후에 저장할 수 있습니다.');
                   return;
                 }
                 setTitleError(null);
@@ -1659,6 +1689,7 @@ export default function NewStoryPage() {
                     const communityPostData: any = {
                       title: data.title,
                       tags: data.tags,
+                      attachedFileIds: data.fileIds,
                       ...(thumbnailImageId && { thumbnailImageId }),
                       isPublished: false, // 초안으로 저장
                       ...(selectedFlairId && { flairId: selectedFlairId }),
@@ -1700,6 +1731,8 @@ export default function NewStoryPage() {
                   e.stopPropagation();
                   if (hasPendingVideoUploads) {
                     toast.warning('비디오 업로드/처리가 끝난 후에 저장할 수 있습니다.');
+                  } else if (hasPendingImageUploads) {
+                    toast.warning('이미지 업로드가 끝난 후에 저장할 수 있습니다.');
                   }
                 }
               }}

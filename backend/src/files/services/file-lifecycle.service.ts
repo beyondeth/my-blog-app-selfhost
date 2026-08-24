@@ -301,6 +301,11 @@ export class FileLifecycleService {
                FROM community_posts cp
                WHERE cp."thumbnailImageId" = f.id
              )
+             OR EXISTS (
+               SELECT 1
+               FROM community_post_files cpf
+               WHERE cpf."fileId" = f.id
+             )
            )`,
         [expiredFiles.map((file) => file.id)],
       );
