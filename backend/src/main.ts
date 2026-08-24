@@ -209,7 +209,9 @@ async function bootstrap() {
       cookie: {
         maxAge: 60 * 60 * 1000, // 1시간
         httpOnly: true,
-        sameSite: isProduction ? "strict" : "lax", // 개발 환경에서는 lax 사용
+        // OAuth providers return to the callback via a top-level GET. Strict
+        // would drop this session cookie and lose the stored OAuth state.
+        sameSite: "lax",
         secure: isProduction,
       },
       name: "session-id", // 세션 쿠키 이름
