@@ -19,7 +19,7 @@ import { registerAllTools } from './tools/index.js';
 import { getDiscoveryTools } from './tools/catalog.js';
 import { RedisCacheService } from './services/RedisCacheService.js';
 import { MetricsService } from './services/MetricsService.js';
-import { createOAuthRouter } from './oauth/index.js';
+import { createOAuthRouter, handleOAuthMcp } from './oauth/index.js';
 import axios from 'axios';
 
 // Express 앱 초기화
@@ -384,16 +384,8 @@ app.post('/mcp', async (req, res) => {
     // 1) 토큰이 mcp_at_ 로 시작하거나
     // 2) validateAccessToken을 통과하면 OAuth 토큰으로 간주하여 /mcp-remote 로직을 타게 한다.
     if (token.startsWith('mcp_at_') || await storage.validateAccessToken(token)) {
-      logger.info('🔄 OAuth token detected on /mcp, delegating to mcpRemoteRouter');
-      
-      // req.url을 /mcp-remote 로 변경하여 mcpRemoteRouter가 처리하게 위임
-      req.url = '/'; // mcpRemoteRouter에 마운트되므로 루트로 변경
-      return mcpRemoteRouter(req, res, (err) => {
-        if (err) {
-          logger.error({ error: err }, '❌ Error delegating to mcpRemoteRouter');
-          res.status(500).json({ error: 'Internal Server Error' });
-        }
-      });
+      logger.info('🔄 OAuth token detected on /mcp, delegating to handleOAuthMcp');
+      return handleOAuthMcp(storage, metricsService, req, res);
     }
 
     const apiKey = token;

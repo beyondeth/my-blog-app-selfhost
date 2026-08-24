@@ -143,6 +143,118 @@ export async function getUserInfo(userId: string): Promise<{
 }
 
 /**
+ * OAuth 인증 MCP 요청 처리
+ */
+export async function handleOAuthMcp(
+  storage: OAuthStorage,
+  metricsService: MetricsService,
+  req: Request,
+  res: Response
+): Promise<void> {
+  // OAuth 토큰 검증 미들웨어
+  await oauthMiddleware(storage, req, res, () => {});
+
+  // 미들웨어에서 응답을 보냈으면 종료
+  if (res.headersSent) {
+    return;
+  }
+
+  const oauth = (req as any).oauth as ValidatedToken;
+
+  try {
+    logger.debug({
+      userId: oauth.userId.substring(0, 8),
+      clientId: oauth.clientId.substring(0, 12),
+    }, '🔐 OAuth MCP request');
+
+    // 사용자 정보 조회
+    const userInfo = await getUserInfo(oauth.userId);
+    if (!userInfo) {
+      res.status(403).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32002,
+          message: 'Forbidden: User not found or no blog configured',
+        },
+        id: null,
+      });
+      return;
+    }
+
+    // MCP 서버 생성
+    const mcpServer = new McpServer(
+      {
+        name: 'aigory-mcp',
+        version: '8.0.0',
+      },
+      {
+        capabilities: {
+          tools: {},
+          prompts: {},
+        },
+      }
+    );
+
+    // 도구 등록 (OAuth 모드 - API Key 없음)
+    await registerAllTools(mcpServer, {
+      userData: {
+        keyId: `oauth:${oauth.clientId}`,
+        userId: oauth.userId,
+        blogId: userInfo.blog.id,
+        user: userInfo.user,
+        blog: userInfo.blog,
+      },
+      apiKey: null,  // OAuth 모드에서는 API Key 없음
+      oauthToken: oauth.token,  // 대신 OAuth 토큰 전달
+      metricsService,
+      config: {
+        MCP_BASE_URL: config.MCP_BASE_URL,
+        BACKEND_BASE_URL: config.BACKEND_BASE_URL,
+        BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
+        PUBLIC_SITE_URL: config.PUBLIC_SITE_URL,
+        MCP_SHARED_SECRET: config.MCP_SHARED_SECRET,
+      },
+    });
+
+    // Transport 생성
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+
+    // MCP 서버와 Transport 연결
+    await mcpServer.connect(transport);
+
+    // 요청 처리
+    const startTime = Date.now();
+    await transport.handleRequest(req, res);
+
+    // 메트릭 기록
+    const duration = Date.now() - startTime;
+    metricsService.recordRequest('success');
+    metricsService.recordRequestDuration(duration);
+
+    logger.debug({
+      userId: oauth.userId.substring(0, 8),
+      duration: `${duration}ms`,
+    }, '✅ OAuth MCP request processed');
+  } catch (error: any) {
+    metricsService.recordRequest('error');
+    logger.error({ error: error.message }, '❌ OAuth MCP request failed');
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: 'Internal error',
+        },
+        id: null,
+      });
+    }
+  }
+}
+
+/**
  * OAuth 라우터 팩토리
  *
  * @param redis Redis 인스턴스
@@ -180,110 +292,9 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
 
   /**
    * POST /mcp-remote - OAuth 인증된 MCP 요청 처리
-   *
-   * /mcp과 동일한 MCP 처리 로직이지만 OAuth 토큰으로 인증
    */
-  mcpRemoteRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
-    // OAuth 토큰 검증 미들웨어
-    await oauthMiddleware(storage, req, res, () => {});
-
-    // 미들웨어에서 응답을 보냈으면 종료
-    if (res.headersSent) {
-      return;
-    }
-
-    const oauth = (req as any).oauth as ValidatedToken;
-
-    try {
-      logger.debug({
-        userId: oauth.userId.substring(0, 8),
-        clientId: oauth.clientId.substring(0, 12),
-      }, '🔐 OAuth MCP request');
-
-      // 사용자 정보 조회
-      const userInfo = await getUserInfo(oauth.userId);
-      if (!userInfo) {
-        return res.status(403).json({
-          jsonrpc: '2.0',
-          error: {
-            code: -32002,
-            message: 'Forbidden: User not found or no blog configured',
-          },
-          id: null,
-        });
-      }
-
-      // MCP 서버 생성
-      const mcpServer = new McpServer(
-        {
-          name: 'aigory-mcp',
-          version: '8.0.0',
-        },
-        {
-          capabilities: {
-            tools: {},
-            prompts: {},
-          },
-        }
-      );
-
-      // 도구 등록 (OAuth 모드 - API Key 없음)
-      await registerAllTools(mcpServer, {
-        userData: {
-          keyId: `oauth:${oauth.clientId}`,
-          userId: oauth.userId,
-          blogId: userInfo.blog.id,
-          user: userInfo.user,
-          blog: userInfo.blog,
-        },
-        apiKey: null,  // OAuth 모드에서는 API Key 없음
-        oauthToken: oauth.token,  // 대신 OAuth 토큰 전달
-        metricsService,
-        config: {
-          MCP_BASE_URL: config.MCP_BASE_URL,
-          BACKEND_BASE_URL: config.BACKEND_BASE_URL,
-          BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
-          PUBLIC_SITE_URL: config.PUBLIC_SITE_URL,
-          MCP_SHARED_SECRET: config.MCP_SHARED_SECRET,
-        },
-      });
-
-      // Transport 생성
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      });
-
-      // MCP 서버와 Transport 연결
-      await mcpServer.connect(transport);
-
-      // 요청 처리
-      const startTime = Date.now();
-      await transport.handleRequest(req, res);
-
-      // 메트릭 기록
-      const duration = Date.now() - startTime;
-      metricsService.recordRequest('success');
-      metricsService.recordRequestDuration(duration);
-
-      logger.debug({
-        userId: oauth.userId.substring(0, 8),
-        duration: `${duration}ms`,
-      }, '✅ OAuth MCP request processed');
-    } catch (error: any) {
-      metricsService.recordRequest('error');
-      logger.error({ error: error.message }, '❌ OAuth MCP request failed');
-
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: '2.0',
-          error: {
-            code: -32603,
-            message: 'Internal error',
-          },
-          id: null,
-        });
-      }
-    }
+  mcpRemoteRouter.post('/', async (req: Request, res: Response) => {
+    await handleOAuthMcp(storage, metricsService, req, res);
   });
 
   /**
