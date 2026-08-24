@@ -1,5 +1,5 @@
-import { permanentRedirect } from 'next/navigation';
+import DesktopHomePage from './desktop/page';
 
-export default function HomePage() {
-  permanentRedirect('/product');
-}
+export const revalidate = 10;
+
+export default DesktopHomePage;
