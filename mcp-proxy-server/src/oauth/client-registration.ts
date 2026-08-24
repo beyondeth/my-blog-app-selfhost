@@ -168,15 +168,11 @@ export function createClientRegistrationRouter(storage: OAuthStorage): Router {
       const existingClient = await storage.findClientByRedirectUri(primaryRedirectUri);
 
       if (existingClient) {
-        logger.debug({
+        logger.info({
           clientId: existingClient.clientId,
           redirectUri: primaryRedirectUri,
-        }, '⚠️ Duplicate OAuth client registration rejected');
-
-        return res.status(409).json({
-          error: OAuthErrorCodes.INVALID_CLIENT_METADATA,
-          error_description: 'A client is already registered for this redirect_uri',
-        });
+        }, '🔄 Overwriting existing OAuth client registration for redirect_uri');
+        await storage.deleteClient(existingClient.clientId);
       }
 
       // 새 클라이언트 생성
@@ -193,7 +189,7 @@ export function createClientRegistrationRouter(storage: OAuthStorage): Router {
         redirectUris: request.redirect_uris,
         clientName: request.client_name || 'Unknown Client',
         clientUri: request.client_uri,
-        scope: request.scope || 'mcp:tools mcp:read mcp:write',
+        scope: request.scope || 'mcp:tools mcp:read mcp:write mcp:create',
         tokenEndpointAuthMethod: request.token_endpoint_auth_method || 'client_secret_post',
         grantTypes: request.grant_types || ['authorization_code', 'refresh_token'],
         responseTypes: request.response_types || ['code'],

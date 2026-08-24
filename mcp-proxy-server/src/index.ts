@@ -50,7 +50,7 @@ const redisCache = new RedisCacheService(
 );
 
 // OAuth 라우터 초기화 (Redis 인스턴스 공유)
-const { wellKnownRouter, oauthRouter, mcpRemoteRouter } = createOAuthRouter(redis, metricsService);
+const { wellKnownRouter, oauthRouter, mcpRemoteRouter, storage } = createOAuthRouter(redis, metricsService);
 
 function isPrivatePeer(address: string | undefined): boolean {
   if (!address) return false;
@@ -378,7 +378,25 @@ app.post('/mcp', async (req, res) => {
       });
     }
 
-    const apiKey = authHeader.substring(7);  // "Bearer " 제거
+    const token = authHeader.substring(7);  // "Bearer " 제거
+
+    // [OAuth 연동 추가] - ChatGPT가 OAuth 토큰을 /mcp 로 보내는 경우 처리
+    // 1) 토큰이 mcp_at_ 로 시작하거나
+    // 2) validateAccessToken을 통과하면 OAuth 토큰으로 간주하여 /mcp-remote 로직을 타게 한다.
+    if (token.startsWith('mcp_at_') || await storage.validateAccessToken(token)) {
+      logger.info('🔄 OAuth token detected on /mcp, delegating to mcpRemoteRouter');
+      
+      // req.url을 /mcp-remote 로 변경하여 mcpRemoteRouter가 처리하게 위임
+      req.url = '/'; // mcpRemoteRouter에 마운트되므로 루트로 변경
+      return mcpRemoteRouter(req, res, (err) => {
+        if (err) {
+          logger.error({ error: err }, '❌ Error delegating to mcpRemoteRouter');
+          res.status(500).json({ error: 'Internal Server Error' });
+        }
+      });
+    }
+
+    const apiKey = token;
 
     // 2. API Key 검증 (Backend 호출)
     const userData = await validateApiKey(apiKey);

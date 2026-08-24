@@ -152,6 +152,13 @@ export class OAuthStorage {
    * 클라이언트 삭제
    */
   async deleteClient(clientId: string): Promise<void> {
+    const client = await this.getClient(clientId);
+    if (client) {
+      for (const redirectUri of client.redirectUris) {
+        const redirectKey = `${KEYS.CLIENT_BY_REDIRECT}${this.hashToken(redirectUri)}`;
+        await this.redis.del(redirectKey);
+      }
+    }
     const key = `${KEYS.CLIENT}${clientId}`;
     await this.redis.del(key);
     logger.debug({ clientId }, '🗑️ OAuth client deleted');

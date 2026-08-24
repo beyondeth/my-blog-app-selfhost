@@ -152,6 +152,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   wellKnownRouter: Router;
   oauthRouter: Router;
   mcpRemoteRouter: Router;
+  storage: OAuthStorage;
 } {
   const storage = new OAuthStorage(redis);
 
@@ -180,7 +181,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   /**
    * POST /mcp-remote - OAuth 인증된 MCP 요청 처리
    *
-   * /mcp와 동일한 MCP 처리 로직이지만 OAuth 토큰으로 인증
+   * /mcp과 동일한 MCP 처리 로직이지만 OAuth 토큰으로 인증
    */
   mcpRemoteRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
     // OAuth 토큰 검증 미들웨어
@@ -215,7 +216,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
       // MCP 서버 생성
       const mcpServer = new McpServer(
         {
-          name: 'aigory-blog-mcp',
+          name: 'aigory-mcp',
           version: '8.0.0',
         },
         {
@@ -292,7 +293,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
     const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
 
     res.json({
-      name: 'aigory-blog-mcp',
+      name: 'aigory-mcp',
       version: '8.0.0',
       description: 'Aigory Auto-posting MCP Server (OAuth)',
       capabilities: {
@@ -325,6 +326,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
     wellKnownRouter,
     oauthRouter,
     mcpRemoteRouter,
+    storage,
   };
 }
 
