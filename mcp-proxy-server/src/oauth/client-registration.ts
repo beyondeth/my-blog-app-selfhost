@@ -172,7 +172,9 @@ export function createClientRegistrationRouter(storage: OAuthStorage): Router {
           clientId: existingClient.clientId,
           redirectUri: primaryRedirectUri,
         }, '🔄 Overwriting existing OAuth client registration for redirect_uri');
-        await storage.deleteClient(existingClient.clientId);
+        if (typeof storage.deleteClient === 'function') {
+          await storage.deleteClient(existingClient.clientId);
+        }
       }
 
       // 새 클라이언트 생성
