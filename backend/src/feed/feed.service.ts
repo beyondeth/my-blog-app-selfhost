@@ -14,6 +14,7 @@ import {
   FeedSourceType,
 } from "./dto";
 import { FeedRankingService, RankedEntry } from "./feed-ranking.service";
+import { CdnService } from "../files/services/cdn.service";
 
 type UserVoteType = "upvote" | "downvote";
 
@@ -49,6 +50,7 @@ export class FeedService {
     private readonly dataSource: DataSource,
     private readonly cacheService: CacheService,
     private readonly feedRankingService: FeedRankingService,
+    private readonly cdnService: CdnService,
   ) {}
 
   /**
@@ -1018,7 +1020,9 @@ export class FeedService {
       slug: row.slug,
       excerpt: row.excerpt || undefined,
       category: row.category || undefined,
-      thumbnail: row.thumbnail || undefined,
+      thumbnail: row.thumbnail
+        ? this.toCanonicalFeedImageUrl(row.thumbnail)
+        : undefined,
       sourceType,
       author: {
         id: row.user_id,
@@ -1148,7 +1152,7 @@ export class FeedService {
     while ((match = htmlRegex.exec(content)) !== null) {
       const url = match[1]?.trim();
       if (url && !url.startsWith("data:") && !url.startsWith("javascript:")) {
-        urls.add(url);
+        urls.add(this.toCanonicalFeedImageUrl(url));
       }
     }
 
@@ -1157,7 +1161,7 @@ export class FeedService {
       const rawUrl = match[1]?.trim();
       const url = rawUrl?.replace(/^<|>$/g, "");
       if (url && !url.startsWith("data:") && !url.startsWith("javascript:")) {
-        urls.add(url);
+        urls.add(this.toCanonicalFeedImageUrl(url));
       }
     }
 
@@ -1166,11 +1170,43 @@ export class FeedService {
     while ((match = plainImageUrlRegex.exec(content)) !== null) {
       const url = match[0]?.trim();
       if (url && !url.startsWith("javascript:")) {
-        urls.add(url);
+        urls.add(this.toCanonicalFeedImageUrl(url));
       }
     }
 
     return Array.from(urls);
+  }
+
+  /**
+   * 저장된 예전 localhost/API 프록시 URL을 공개 CDN URL로 변환합니다.
+   * 외부 이미지 URL은 그대로 유지합니다.
+   */
+  private toCanonicalFeedImageUrl(url: string): string {
+    const trimmed = url?.trim();
+    if (!trimmed) {
+      return trimmed;
+    }
+
+    const proxyMarker = "/api/v1/files/proxy/";
+    const proxyIndex = trimmed.indexOf(proxyMarker);
+    let storageKey: string | null = null;
+
+    if (proxyIndex >= 0) {
+      storageKey = trimmed.slice(proxyIndex + proxyMarker.length);
+    } else if (trimmed.startsWith("uploads/") || trimmed.startsWith("v2/")) {
+      storageKey = trimmed;
+    }
+
+    if (!storageKey) {
+      return trimmed;
+    }
+
+    try {
+      const cleanKey = decodeURIComponent(storageKey.split(/[?#]/, 1)[0]);
+      return this.cdnService.generateCdnUrlFromKey(cleanKey);
+    } catch {
+      return trimmed;
+    }
   }
 
   /**

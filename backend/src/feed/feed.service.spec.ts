@@ -7,6 +7,7 @@ import { CacheService } from "../cache/cache.service";
 import { Post } from "../posts/entities/post.entity";
 import { CommunityPost } from "../communities/entities/community-post.entity";
 import { FeedFilterType, FeedSortType } from "./dto";
+import { CdnService } from "../files/services/cdn.service";
 
 describe("FeedService - Community Visibility Filters", () => {
   let service: FeedService;
@@ -18,6 +19,11 @@ describe("FeedService - Community Visibility Filters", () => {
   };
   const mockFeedRankingService = {
     getRankedEntries: jest.fn(),
+  };
+  const mockCdnService = {
+    generateCdnUrlFromKey: jest.fn(
+      (key: string) => `https://cdn.aigory.com/${key}`,
+    ),
   };
   const mockQueryRunner = {
     query: jest.fn().mockResolvedValue([]),
@@ -40,6 +46,7 @@ describe("FeedService - Community Visibility Filters", () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: CacheService, useValue: mockCacheService },
         { provide: FeedRankingService, useValue: mockFeedRankingService },
+        { provide: CdnService, useValue: mockCdnService },
       ],
     }).compile();
 
@@ -72,5 +79,25 @@ describe("FeedService - Community Visibility Filters", () => {
     expect(query).toContain('c."isPublic" = true');
     expect(query).toContain('c."isPostDiscoverable" = true');
     expect(query).toContain("c.\"joinPolicy\" <> 'private'");
+  });
+
+  it("maps legacy inline proxy images to the canonical CDN URL", () => {
+    const result = (service as any).mapToFeedItem({
+      id: "00000000-0000-0000-0000-000000000001",
+      title: "Post",
+      slug: "post",
+      source_type: "blog",
+      content_html:
+        '<img src="http://localhost:3000/api/v1/files/proxy/uploads/image/2026/08/example.webp">',
+      created_at: "2026-08-24T00:00:00.000Z",
+      updated_at: "2026-08-24T00:00:00.000Z",
+    });
+
+    expect(result.images).toEqual([
+      "https://cdn.aigory.com/uploads/image/2026/08/example.webp",
+    ]);
+    expect(result.thumbnail).toBe(
+      "https://cdn.aigory.com/uploads/image/2026/08/example.webp",
+    );
   });
 });

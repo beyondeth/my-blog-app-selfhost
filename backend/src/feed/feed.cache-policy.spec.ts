@@ -7,6 +7,7 @@ import { CacheService, CacheTTL } from "../cache/cache.service";
 import { Post } from "../posts/entities/post.entity";
 import { CommunityPost } from "../communities/entities/community-post.entity";
 import { FeedFilterType, FeedPeriodType, FeedSortType } from "./dto";
+import { CdnService } from "../files/services/cdn.service";
 
 describe("FeedService - Cache Policy", () => {
   let service: FeedService;
@@ -20,6 +21,11 @@ describe("FeedService - Cache Policy", () => {
   };
   const mockFeedRankingService = {
     getRankedEntries: jest.fn(),
+  };
+  const mockCdnService = {
+    generateCdnUrlFromKey: jest.fn(
+      (key: string) => `https://cdn.aigory.com/${key}`,
+    ),
   };
   const mockQueryRunner = {
     query: jest.fn().mockResolvedValue([]),
@@ -42,6 +48,7 @@ describe("FeedService - Cache Policy", () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: CacheService, useValue: mockCacheService },
         { provide: FeedRankingService, useValue: mockFeedRankingService },
+        { provide: CdnService, useValue: mockCdnService },
       ],
     }).compile();
 
@@ -153,6 +160,7 @@ describe("FeedService - Cache Policy", () => {
       mockDataSource as any,
       mockCacheService as any,
       mockFeedRankingService as any,
+      mockCdnService as any,
     );
 
     mockCacheService.get.mockResolvedValue(null);
