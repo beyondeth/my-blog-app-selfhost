@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react"
 import { EditorContent, EditorContext, useEditor } from "@tiptap/react"
-import { toast } from "sonner"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -23,7 +22,8 @@ import { VideoEmbed } from "@/editor/extensions/VideoEmbed.extension"
 
 // --- Hooks ---
 import { useUploadFile } from "@/hooks/useFiles"
-import { normalizeImageUrl } from "@/utils/imageUtils"
+import { IMAGE_UPLOAD_POLICY, normalizeImageUrl } from "@/utils/imageUtils"
+import type { ImageUploadProgress } from "@/utils/imageUpload"
 
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
@@ -258,7 +258,12 @@ export interface BlogSimpleEditorProps {
   /**
    * 이미지 업로드가 진행 중인지 부모 폼에 알립니다.
    */
-  onUploadStateChange?: (state: { isUploading: boolean; pendingCount: number }) => void
+  onUploadStateChange?: (state: {
+    isUploading: boolean
+    pendingCount: number
+    progress: number
+    stage?: ImageUploadProgress["stage"]
+  }) => void
   githubUrl?: string
   githubDescription?: string
   onGithubUrlChange?: (value: string) => void
@@ -301,24 +306,45 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   // 이미지 목록 추적 상태 (new post mode용)
-  const uploadedImagesRef = useRef<Array<{id: string, url: string}>>([]);
+  const uploadedImagesRef = useRef<Array<{id: string, url: string, uploadOrder: number}>>([]);
+  const nextUploadOrderRef = useRef(0);
   const thumbnailIndexRef = useRef(initialThumbnailIndex || -1);
   const pendingUploadCountRef = useRef(0);
+  const uploadProgressRef = useRef(new Map<File, ImageUploadProgress>());
   const onFileIdsChangeRef = useRef(onFileIdsChange);
   const onUploadStateChangeRef = useRef(onUploadStateChange);
   onFileIdsChangeRef.current = onFileIdsChange;
   onUploadStateChangeRef.current = onUploadStateChange;
 
-  const updatePendingUploadCount = useCallback((change: number) => {
-    pendingUploadCountRef.current = Math.max(0, pendingUploadCountRef.current + change);
+  const emitUploadState = useCallback(() => {
+    const progressEntries = Array.from(uploadProgressRef.current.values());
+    const progress = progressEntries.length
+      ? Math.round(
+          progressEntries.reduce((sum, entry) => sum + entry.progress, 0) /
+            progressEntries.length
+        )
+      : 0;
+    const activeEntry = progressEntries.find((entry) => entry.progress < 100);
+
     onUploadStateChangeRef.current?.({
       isUploading: pendingUploadCountRef.current > 0,
       pendingCount: pendingUploadCountRef.current,
+      progress,
+      stage: activeEntry?.stage,
     });
   }, []);
 
+  const updatePendingUploadCount = useCallback((change: number) => {
+    pendingUploadCountRef.current = Math.max(0, pendingUploadCountRef.current + change);
+    emitUploadState();
+  }, [emitUploadState]);
+
   useEffect(() => () => {
-    onUploadStateChangeRef.current?.({ isUploading: false, pendingCount: 0 });
+    onUploadStateChangeRef.current?.({
+      isUploading: false,
+      pendingCount: 0,
+      progress: 0,
+    });
   }, []);
 
   // S3 파일 업로드 mutation
@@ -326,23 +352,24 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
   // S3 이미지 업로드 핸들러
   const handleImageUpload = useCallback(async (
     file: File,
-    onProgress?: (event: { progress: number }) => void,
+    onProgress?: (event: ImageUploadProgress) => void,
     abortSignal?: AbortSignal
   ): Promise<{ url: string; fileId: string }> => {
+    const uploadOrder = nextUploadOrderRef.current;
+    nextUploadOrderRef.current += 1;
+    uploadProgressRef.current.set(file, { progress: 0, stage: "validating" });
     updatePendingUploadCount(1)
     try {
-      // 파일 크기 체크 (5MB) - 프론트엔드에서 사전 검증
-      const MAX_FILE_SIZE = 5 * 1024 * 1024
-      if (file.size > MAX_FILE_SIZE) {
-        throw new Error(`Each image must be ${MAX_FILE_SIZE / (1024 * 1024)}MB or smaller.`)
-      }
-
       // S3 업로드
       const result = await uploadMutation.mutateAsync({
         file,
         fileType: 'image' as const,
         signal: abortSignal,
-        onProgress: (progress) => onProgress?.({ progress }),
+        onProgress: (event) => {
+          uploadProgressRef.current.set(file, event);
+          onProgress?.(event);
+          emitUploadState();
+        },
       })
 
       // FileUpload 객체에서 정보 추출
@@ -361,8 +388,8 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       if (fileId) {
         const nextImages = [
           ...uploadedImagesRef.current.filter((image) => image.id !== fileId),
-          { id: fileId, url: finalUrl },
-        ];
+          { id: fileId, url: finalUrl, uploadOrder },
+        ].sort((a, b) => a.uploadOrder - b.uploadOrder);
         uploadedImagesRef.current = nextImages;
         onFileIdsChangeRef.current?.(nextImages.map((image) => image.id));
       } else {
@@ -375,13 +402,12 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       return { url: finalUrl, fileId }
     } catch (error) {
       console.error('Image upload failed:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to upload the image.'
-      toast.error(errorMessage)
       throw error
     } finally {
+      uploadProgressRef.current.delete(file);
       updatePendingUploadCount(-1)
     }
-  }, [updatePendingUploadCount, uploadMutation])
+  }, [emitUploadState, updatePendingUploadCount, uploadMutation])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -445,7 +471,7 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       ImageUploadNode.configure({
         type: "mediumImage",  // MediumStyleImage extension과 매칭
         accept: "image/*",
-        maxSize: 5 * 1024 * 1024,
+        maxSize: IMAGE_UPLOAD_POLICY.maxInputSizeBytes,
         limit: 10,  // 최대 10개 이미지
         upload: handleImageUpload,
         onError: (error) => {

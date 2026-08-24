@@ -841,7 +841,7 @@ export default function NewStoryPage() {
       const result = await markdownImageUploadMutation.mutateAsync({
         file,
         fileType: 'image' as const,
-        onProgress: setMarkdownImageProgress,
+        onProgress: ({ progress }) => setMarkdownImageProgress(progress),
       });
 
       const fileId = result.id;

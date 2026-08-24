@@ -8,6 +8,32 @@ import { CloseIcon } from "@/components/tiptap-icons/close-icon"
 import { toast } from "sonner"
 import "@/components/tiptap-node/image-upload-node/image-upload-node.scss"
 import { focusNextNode, isValidPosition } from "@/lib/tiptap-utils"
+import {
+  IMAGE_UPLOAD_LIMITS,
+  mapWithConcurrency,
+  type ImageUploadProgress,
+  type ImageUploadStage,
+} from "@/utils/imageUpload"
+import { useLocaleContext } from "@/providers/LocaleProvider"
+
+const STAGE_LABELS: Record<"ko" | "en", Record<ImageUploadStage, string>> = {
+  ko: {
+    validating: "파일 확인 중",
+    optimizing: "WebP 최적화 중",
+    preparing: "업로드 준비 중",
+    uploading: "CDN 업로드 중",
+    finalizing: "저장 확인 중",
+    complete: "완료",
+  },
+  en: {
+    validating: "Validating",
+    optimizing: "Optimizing WebP",
+    preparing: "Preparing upload",
+    uploading: "Uploading to CDN",
+    finalizing: "Finalizing",
+    complete: "Complete",
+  },
+}
 
 export interface FileItem {
   /**
@@ -27,6 +53,10 @@ export interface FileItem {
    * @default "uploading"
    */
   status: "uploading" | "success" | "error"
+
+  stage?: ImageUploadStage
+
+  errorMessage?: string
 
   /**
    * URL to the uploaded file, available after successful upload
@@ -68,7 +98,7 @@ export interface UploadOptions {
    */
   upload: (
     file: File,
-    onProgress: (event: { progress: number }) => void,
+    onProgress: (event: ImageUploadProgress) => void,
     signal: AbortSignal
   ) => Promise<string | {url: string, fileId: string}>
   /**
@@ -121,10 +151,12 @@ function useFileUpload(options: UploadOptions) {
 
       const result = await options.upload(
         file,
-        (event: { progress: number }) => {
+        (event: ImageUploadProgress) => {
           setFileItems((prev) =>
             prev.map((item) =>
-              item.id === fileId ? { ...item, progress: event.progress } : item
+              item.id === fileId
+                ? { ...item, progress: event.progress, stage: event.stage }
+                : item
             )
           )
         },
@@ -169,7 +201,9 @@ function useFileUpload(options: UploadOptions) {
     }
   }
 
-  const uploadFiles = async (files: File[]): Promise<Array<{url: string, fileId?: string}>> => {
+  const uploadFiles = async (
+    files: File[]
+  ): Promise<Array<{ url: string; fileId?: string; sourceIndex: number }>> => {
     if (!files || files.length === 0) {
       const error = new Error("업로드할 파일이 없습니다")
       toast.error(error.message)
@@ -186,67 +220,136 @@ function useFileUpload(options: UploadOptions) {
       return []
     }
 
-    // Upload all files concurrently and track which file corresponds to which result
-    const uploadPromises = files.map(async (file, index) => {
-      // Create a unique ID for this upload session
-      const fileId = `upload_${Date.now()}_${index}`
-      const fileItem = {
-        id: fileId,
-        file,
-        progress: 0,
-        status: "uploading" as const,
-        abortController: new AbortController(),
-      }
+    const oversizedFile = files.find((file) => file.size > options.maxSize)
+    if (oversizedFile) {
+      const error = new Error(
+        `${oversizedFile.name}: 이미지는 1개당 최대 ${options.maxSize / 1024 / 1024}MB까지 업로드 가능합니다`
+      )
+      toast.error(error.message)
+      options.onError?.(error)
+      return []
+    }
 
-      // Add to fileItems for tracking
-      setFileItems(prev => [...prev, fileItem])
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+    if (totalSize > IMAGE_UPLOAD_LIMITS.maxBatchSizeBytes) {
+      const error = new Error("한 번에 업로드할 수 있는 이미지의 총 용량은 50MB입니다")
+      toast.error(error.message)
+      options.onError?.(error)
+      return []
+    }
 
-      try {
-        const result = await options.upload(
-          file,
-          (event: { progress: number }) => {
+    const pendingItems: FileItem[] = files.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      progress: 0,
+      stage: "validating",
+      status: "uploading",
+      abortController: new AbortController(),
+    }))
+    setFileItems((prev) => [...prev, ...pendingItems])
+
+    const results = await mapWithConcurrency(
+      files,
+      IMAGE_UPLOAD_LIMITS.concurrency,
+      async (file, index) => {
+        const fileItem = pendingItems[index]
+
+        try {
+          const result = await options.upload(
+            file,
+            (event: ImageUploadProgress) => {
+              setFileItems((prev) =>
+                prev.map((item) =>
+                  item.id === fileItem.id
+                    ? {
+                        ...item,
+                        progress: event.progress,
+                        stage: event.stage,
+                      }
+                    : item
+                )
+              )
+            },
+            fileItem.abortController!.signal
+          )
+
+          if (fileItem.abortController!.signal.aborted) {
+            throw new DOMException("업로드가 취소되었습니다", "AbortError")
+          }
+
+          const url = typeof result === "string" ? result : result?.url
+          const serverFileId = typeof result === "string" ? undefined : result?.fileId
+
+          if (!url) throw new Error("Upload failed: No URL returned")
+
+          setFileItems((prev) =>
+            prev.map((item) =>
+              item.id === fileItem.id
+                ? {
+                    ...item,
+                    status: "success",
+                    url,
+                    fileId: serverFileId,
+                    progress: 100,
+                    stage: "complete",
+                  }
+                : item
+            )
+          )
+          options.onSuccess?.(url)
+
+          return { url, fileId: serverFileId, sourceIndex: index }
+        } catch (error) {
+          if (fileItem.abortController!.signal.aborted) {
+            throw new DOMException("업로드가 취소되었습니다", "AbortError")
+          }
+
+          if (!fileItem.abortController!.signal.aborted) {
+            const uploadError =
+              error instanceof Error ? error : new Error("Upload failed")
             setFileItems((prev) =>
               prev.map((item) =>
-                item.id === fileId ? { ...item, progress: event.progress } : item
+                item.id === fileItem.id
+                  ? {
+                      ...item,
+                      status: "error",
+                      errorMessage: uploadError.message,
+                    }
+                  : item
               )
             )
-          },
-          fileItem.abortController!.signal
-        )
-
-        // Handle both old string format and new object format
-        const url = typeof result === 'string' ? result : result?.url
-        const serverFileId = typeof result === 'string' ? null : result?.fileId
-
-        if (!url) throw new Error("Upload failed: No URL returned")
-
-        setFileItems((prev) =>
-          prev.map((item) =>
-            item.id === fileId
-              ? { ...item, status: "success", url, fileId: serverFileId || undefined, progress: 100 }
-              : item
-          )
-        )
-
-        return { url, fileId: serverFileId || undefined }
-      } catch (error) {
-        setFileItems((prev) =>
-          prev.map((item) =>
-            item.id === fileId
-              ? { ...item, status: "error" }
-              : item
-          )
-        )
-        throw error
+          }
+          throw error
+        }
       }
+    )
+
+    const successful = results.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value.value] : []
+    )
+    const failures = results.filter((result) => {
+      if (result.status !== "rejected") return false
+      return !(
+        result.reason instanceof DOMException && result.reason.name === "AbortError"
+      )
     })
 
-    const results = await Promise.all(uploadPromises)
+    if (failures.length > 0) {
+      const error = new Error(
+        `${successful.length}개 업로드 완료, ${failures.length}개 업로드 실패`
+      )
+      toast.error(error.message)
+      options.onError?.(error)
+    }
 
-    // Remove file items after successful upload
-    setFileItems([])
+    if (successful.length > 0) {
+      const successfulIds = new Set(
+        successful.map((result) => pendingItems[result.sourceIndex].id)
+      )
+      setFileItems((prev) => prev.filter((item) => !successfulIds.has(item.id)))
+    }
 
-    return results
+    return successful
   }
 
   const removeFileItem = (fileId: string) => {
@@ -425,6 +528,9 @@ const ImageUploadPreview: React.FC<ImageUploadPreviewProps> = ({
   fileItem,
   onRemove,
 }) => {
+  const { locale } = useLocaleContext()
+  const isKorean = locale === "ko"
+  const stageLabels = STAGE_LABELS[isKorean ? "ko" : "en"]
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return "0 Bytes"
     const k = 1024
@@ -454,6 +560,11 @@ const ImageUploadPreview: React.FC<ImageUploadPreviewProps> = ({
             <span className="tiptap-image-upload-subtext">
               {formatFileSize(fileItem.file.size)}
             </span>
+            <span className="tiptap-image-upload-subtext" aria-live="polite">
+              {fileItem.status === "error"
+                ? fileItem.errorMessage || (isKorean ? "업로드 실패" : "Upload failed")
+                : stageLabels[fileItem.stage || "validating"]}
+            </span>
           </div>
         </div>
         <div className="tiptap-image-upload-actions">
@@ -465,6 +576,7 @@ const ImageUploadPreview: React.FC<ImageUploadPreviewProps> = ({
           <Button
             type="button"
             data-style="ghost"
+            aria-label={isKorean ? "업로드 취소" : "Cancel upload"}
             onClick={(e) => {
               e.stopPropagation()
               onRemove()
@@ -521,6 +633,7 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
 
   // 업로드창 닫기 핸들러
   const handleRemoveUploadNode = () => {
+    clearAllFiles()
     const pos = props.getPos()
     if (pos !== undefined) {
       props.editor.commands.deleteRange({ from: pos, to: pos + props.node.nodeSize })
@@ -537,7 +650,7 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
         // Create image nodes with both URL and file ID
         const imageNodes = uploadResults.map((result, index) => {
           const filename =
-            files[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
+            files[result.sourceIndex]?.name.replace(/\.[^/.]+$/, "") || "unknown"
           return {
             type: extension.options.type,
             attrs: {
@@ -586,6 +699,12 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
   }
 
   const hasFiles = fileItems.length > 0
+  const completedCount = fileItems.filter((item) => item.status !== "uploading").length
+  const aggregateProgress = fileItems.length
+    ? Math.round(
+        fileItems.reduce((sum, item) => sum + item.progress, 0) / fileItems.length
+      )
+    : 0
 
   return (
     <NodeViewWrapper
@@ -602,7 +721,7 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
               e.stopPropagation()
               handleRemoveUploadNode()
             }}
-            className="absolute -top-2 -right-2 z-10 w-6 h-6 bg-white dark:bg-gray-800 rounded-full border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="absolute -top-3 -right-3 z-10 w-11 h-11 bg-white dark:bg-gray-800 rounded-full border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             title="닫기"
           >
             <CloseIcon className="w-3 h-3 text-gray-600 dark:text-gray-400" />
@@ -623,7 +742,7 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
               e.stopPropagation()
               handleRemoveUploadNode()
             }}
-            className="absolute -top-2 -right-2 z-10 w-6 h-6 bg-white dark:bg-gray-800 rounded-full border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="absolute -top-3 -right-3 z-10 w-11 h-11 bg-white dark:bg-gray-800 rounded-full border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             title="닫기"
           >
             <CloseIcon className="w-3 h-3 text-gray-600 dark:text-gray-400" />
@@ -632,7 +751,9 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
           <div className="tiptap-image-upload-previews">
             {fileItems.length > 1 && (
               <div className="tiptap-image-upload-header">
-                <span>{fileItems.length}개 파일 업로드 중</span>
+                <span aria-live="polite">
+                  {completedCount}/{fileItems.length} 완료 · {aggregateProgress}%
+                </span>
                 <Button
                   type="button"
                   data-style="ghost"

@@ -6,6 +6,13 @@
 import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+export const IMAGE_UPLOAD_POLICY = {
+  maxInputSizeBytes: 10 * 1024 * 1024,
+  maxOutputSizeMB: 2,
+  maxWidthOrHeight: 2400,
+  initialQuality: 0.85,
+} as const;
+
 // 환경변수에서 설정값 가져오기
 const CDN_BASE_URL = (process.env.NEXT_PUBLIC_CDN_BASE_URL || '').replace(/\/$/, '');
 const STORAGE_PUBLIC_URL = (process.env.NEXT_PUBLIC_STORAGE_PUBLIC_URL || '').replace(/\/$/, '');
@@ -462,9 +469,8 @@ export function validateFileSize(size: number): boolean {
  * 이미지 파일 검증 (크기 + MIME 타입)
  */
 export function validateImageFile(file: File): { valid: boolean; error?: string } {
-  const maxSize = 10 * 1024 * 1024; // 10MB
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  if (file.size > maxSize) {
+  if (file.size > IMAGE_UPLOAD_POLICY.maxInputSizeBytes) {
     return { valid: false, error: '파일 크기가 10MB를 초과합니다.' };
   }
   if (!allowedTypes.includes(file.type)) {
@@ -849,14 +855,38 @@ export function stripHtmlTags(html: string): string {
 /**
  * 이미지를 WebP 형식으로 변환
  */
-export async function convertImageToWebP(file: File): Promise<File> {
+export async function convertImageToWebP(
+  file: File,
+  options: {
+    onProgress?: (progress: number) => void;
+    signal?: AbortSignal;
+  } = {},
+): Promise<File> {
+  if (
+    file.type === 'image/webp'
+    && file.size <= IMAGE_UPLOAD_POLICY.maxOutputSizeMB * 1024 * 1024
+  ) {
+    options.onProgress?.(100);
+    return file;
+  }
+
+  if (options.signal?.aborted) {
+    throw new DOMException('이미지 최적화가 취소되었습니다.', 'AbortError');
+  }
+
   const imageCompression = (await import('browser-image-compression')).default;
-  const options = {
+  const compressionOptions = {
     fileType: 'image/webp',
     useWebWorker: true,
-    maxSizeMB: 5,
-    maxWidthOrHeight: 3840,
+    maxSizeMB: IMAGE_UPLOAD_POLICY.maxOutputSizeMB,
+    maxWidthOrHeight: IMAGE_UPLOAD_POLICY.maxWidthOrHeight,
+    initialQuality: IMAGE_UPLOAD_POLICY.initialQuality,
+    onProgress: options.onProgress,
+    signal: options.signal,
   };
-  const webpFile = await imageCompression(file, options);
-  return new File([webpFile], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' });
+  const webpFile = await imageCompression(file, compressionOptions);
+  return new File([webpFile], file.name.replace(/\.[^.]+$/, '.webp'), {
+    type: 'image/webp',
+    lastModified: file.lastModified,
+  });
 } 

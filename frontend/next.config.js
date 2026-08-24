@@ -219,7 +219,8 @@ const nextConfig = {
         pathname: '/**',
       },
     ].filter(Boolean),
-    formats: ['image/webp', 'image/avif'],
+    // WebP는 AVIF보다 첫 변환 CPU 비용이 낮아 단일 Oracle 인스턴스에 적합하다.
+    formats: ['image/webp'],
   },
 
   // Next.js 16: serverComponentsExternalPackages를 루트 레벨로 이동

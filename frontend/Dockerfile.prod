@@ -140,6 +140,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # Sharp 복사 (이미지 최적화용)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
 
+# Next Image 변환 캐시는 배포 후에도 named volume에서 재사용한다.
+RUN mkdir -p /app/.next/cache/images && chown -R nextjs:nodejs /app/.next/cache
+
 # 비-루트 사용자로 전환
 USER nextjs
 

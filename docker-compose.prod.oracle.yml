@@ -58,6 +58,8 @@ services:
       HOSTNAME: "0.0.0.0"
     ports:
       - "127.0.0.1:3001:3000"  # Next.js는 내부적으로 3000 포트 사용
+    volumes:
+      - next_image_cache:/app/.next/cache/images
     networks:
       - aigory_blog_network
     restart: unless-stopped
@@ -373,11 +375,14 @@ networks:
     name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-network
     driver: bridge
 
+volumes:
+  next_image_cache:
+    name: ${COMPOSE_PROJECT_NAME:-aigory-blog-prod}-next-image-cache
+
 # ============================================
-# 볼륨 설정 (외부 마운트 사용)
+# 볼륨 설정 (데이터는 외부 마운트, Next Image 캐시는 named volume 사용)
 # ============================================
-# Block Volume을 /mnt/data에 마운트하여 사용
-# 별도 Named Volume 불필요
+# Block Volume을 /mnt/data에 마운트하고 변환 이미지 캐시만 배포 간 재사용
 
 # ============================================
 # 리소스 사용 요약 (최적화된 PM2 Cluster)

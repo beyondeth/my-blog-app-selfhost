@@ -2,13 +2,17 @@ import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import { FileUpload, FileType, FileTypeType } from '@/types';
-import { getErrorMessage } from '@/utils/queryHelpers';
 import { convertImageToWebP, validateImageFile } from '@/utils/imageUtils';
 import type { UploadFileOptions } from '@/lib/api/endpoints/files';
+import {
+  getImageUploadProgress,
+  type ImageUploadProgress,
+} from '@/utils/imageUpload';
 
-export interface UploadFileVariables extends UploadFileOptions {
+export interface UploadFileVariables extends Omit<UploadFileOptions, 'onProgress'> {
   file: File;
   fileType?: FileTypeType;
+  onProgress?: (event: ImageUploadProgress) => void;
 }
 
 // File Query Keys
@@ -41,7 +45,7 @@ export function useUploadFile() {
 
   const mutation = useMutation({
     mutationFn: async ({ file, fileType, onProgress, signal }: UploadFileVariables) => {
-      onProgress?.(0);
+      onProgress?.(getImageUploadProgress('validating'));
       // 타입 안전성을 위한 유효성 검사
       const validFileType = fileType && Object.values(FileType).includes(fileType)
         ? fileType
@@ -49,11 +53,13 @@ export function useUploadFile() {
 
       let fileToUpload = file;
 
-      // 이미지 파일이고 WebP가 아니면 변환
-      if (validFileType === FileType.IMAGE && file.type !== 'image/webp') {
-        if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
-          throw new Error('SVG 이미지는 업로드할 수 없습니다.');
+      // 모든 게시물 이미지는 동일한 입력 정책을 통과한 뒤 WebP로 최적화합니다.
+      if (validFileType === FileType.IMAGE) {
+        const validation = validateImageFile(file);
+        if (!validation.valid) {
+          throw new Error(validation.error || '이미지 파일을 확인해주세요.');
         }
+
         try {
           console.log('[useUploadFile] Converting image to WebP:', {
             originalName: file.name,
@@ -61,8 +67,12 @@ export function useUploadFile() {
             originalSize: file.size
           });
 
-          fileToUpload = await convertImageToWebP(file);
-          onProgress?.(3);
+          fileToUpload = await convertImageToWebP(file, {
+            signal,
+            onProgress: (progress) => {
+              onProgress?.(getImageUploadProgress('optimizing', progress));
+            },
+          });
 
           console.log('[useUploadFile] WebP conversion completed:', {
             convertedName: fileToUpload.name,
@@ -71,16 +81,28 @@ export function useUploadFile() {
           });
         } catch (error) {
           console.error('[useUploadFile] WebP conversion failed:', error);
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            throw error;
+          }
           throw new Error(typeof error === 'string' ? error : 'WebP 변환에 실패했습니다. 이미지는 WebP 형식만 업로드할 수 있습니다.');
         }
       }
 
       return await apiClient.uploadFile(fileToUpload, validFileType, {
         signal,
-        onProgress: (progress) => onProgress?.(3 + Math.round(progress * 0.97)),
+        onProgress: (progress) => {
+          if (progress <= 5) {
+            onProgress?.(getImageUploadProgress('preparing', progress * 20));
+          } else if (progress < 95) {
+            onProgress?.(getImageUploadProgress('uploading', ((progress - 5) / 90) * 100));
+          } else if (progress < 100) {
+            onProgress?.(getImageUploadProgress('finalizing'));
+          } else {
+            onProgress?.(getImageUploadProgress('complete'));
+          }
+        },
       });
     },
-    retry: 1,
   });
 
   // 성공 처리

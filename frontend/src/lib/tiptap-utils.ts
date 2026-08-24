@@ -7,8 +7,9 @@ import {
   TextSelection,
 } from "@tiptap/pm/state"
 import type { Editor, NodeWithPos } from "@tiptap/react"
+import type { ImageUploadProgress } from "@/utils/imageUpload"
 
-export const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+export const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export const MAC_SYMBOLS: Record<string, string> = {
   mod: "⌘",
@@ -355,7 +356,7 @@ export function selectionWithinConvertibleTypes(
  */
 export const handleImageUpload = async (
   file: File,
-  onProgress?: (event: { progress: number }) => void,
+  onProgress?: (event: ImageUploadProgress) => void,
   abortSignal?: AbortSignal
 ): Promise<string> => {
   // Validate file
@@ -376,7 +377,7 @@ export const handleImageUpload = async (
       throw new Error("Upload cancelled")
     }
     await new Promise((resolve) => setTimeout(resolve, 500))
-    onProgress?.({ progress })
+    onProgress?.({ progress, stage: progress === 100 ? "complete" : "uploading" })
   }
 
   return "/images/tiptap-ui-placeholder-image.jpg"

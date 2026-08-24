@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ZoomIn, ZoomOut, RotateCw, RefreshCw } from 'lucide-react';
+import { X, RotateCw } from 'lucide-react';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
+import ZoomControls from '@/components/ui/ZoomControls';
 
 interface ModalProps {
   type: 'image' | 'diagram';
@@ -108,29 +109,12 @@ export default function Modal({
           </div>
 
           {/* 통합된 컨트롤 버튼 (이미지와 Mermaid 모두 사용) */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => transformComponentRef.current?.zoomOut()}
-              className="p-2 rounded-lg text-gray-700 dark:text-gray-800 hover:bg-gray-100 dark:hover:bg-gray-200 transition-colors"
-              title="축소"
-            >
-              <ZoomOut className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => transformComponentRef.current?.zoomIn()}
-              className="p-2 rounded-lg text-gray-700 dark:text-gray-800 hover:bg-gray-100 dark:hover:bg-gray-200 transition-colors"
-              title="확대"
-            >
-              <ZoomIn className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => transformComponentRef.current?.resetTransform()}
-              className="p-2 rounded-lg text-gray-700 dark:text-gray-800 hover:bg-gray-100 dark:hover:bg-gray-200 transition-colors"
-              title="초기화"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </button>
-          </div>
+          <ZoomControls
+            onZoomOut={() => transformComponentRef.current?.zoomOut()}
+            onZoomIn={() => transformComponentRef.current?.zoomIn()}
+            onReset={() => transformComponentRef.current?.resetTransform()}
+            labels={{ zoomOut: '축소', zoomIn: '확대', reset: '초기화' }}
+          />
 
           <button
             onClick={onClose}
