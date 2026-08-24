@@ -11,17 +11,23 @@ import { shouldHideProductionRoute } from '@/lib/security/production-route-polic
 export function proxy(request: NextRequest) {
   const localizedPath = extractLocaleFromPathname(request.nextUrl.pathname);
 
-  if (localizedPath.pathnameWithoutLocale === '/product') {
+  if (
+    localizedPath.pathnameWithoutLocale === '/landing'
+    || localizedPath.pathnameWithoutLocale === '/product'
+  ) {
     const explicitLocale = localizedPath.locale;
     const cookieLocale = request.cookies.get(LOCALE_COOKIE_NAME)?.value;
     const locale = explicitLocale
       ?? (isSupportedLocale(cookieLocale) ? cookieLocale : null)
       ?? detectPreferredLocale(request.headers.get('accept-language'));
 
-    if (!localizedPath.hasLocalePrefix) {
+    if (localizedPath.pathnameWithoutLocale === '/product' || !localizedPath.hasLocalePrefix) {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = `/${locale}/product`;
-      const response = NextResponse.redirect(redirectUrl, 307);
+      redirectUrl.pathname = `/${locale}/landing`;
+      const response = NextResponse.redirect(
+        redirectUrl,
+        localizedPath.pathnameWithoutLocale === '/product' ? 308 : 307,
+      );
       response.cookies.set(LOCALE_COOKIE_NAME, locale, {
         maxAge: 365 * 24 * 60 * 60,
         path: '/',
@@ -34,7 +40,7 @@ export function proxy(request: NextRequest) {
     }
 
     const rewriteUrl = request.nextUrl.clone();
-    rewriteUrl.pathname = '/product';
+    rewriteUrl.pathname = '/landing';
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set(LOCALE_HEADER_NAME, locale);
     const response = NextResponse.rewrite(rewriteUrl, {
@@ -65,6 +71,9 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/landing',
+    '/en/landing',
+    '/ko/landing',
     '/product',
     '/en/product',
     '/ko/product',
