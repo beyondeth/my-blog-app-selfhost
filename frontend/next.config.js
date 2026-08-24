@@ -63,6 +63,7 @@ const configuredOrigins = [
   .filter(Boolean);
 
 const connectSources = new Set(["'self'", ...configuredOrigins]);
+connectSources.add('https://cdn.jsdelivr.net');
 for (const origin of configuredOrigins) {
   const parsed = new URL(origin);
   if (parsed.protocol === 'http:') connectSources.add(`ws://${parsed.host}`);
