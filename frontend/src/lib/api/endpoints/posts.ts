@@ -125,7 +125,11 @@ export class PostsAPI {
    */
   async updatePost(id: string, data: Partial<PostForm>): Promise<Post> {
     // FormData 대신 JSON으로 전송 (NestJS 파싱 문제 해결)
-    return this.client.patch<Post>(`/posts/${id}`, data, {
+    const payload = { ...data };
+    // thumbnail은 응답 전용 URL이며, 수정 API는 thumbnailImageId만 허용한다.
+    delete payload.thumbnail;
+
+    return this.client.patch<Post>(`/posts/${id}`, payload, {
       headers: {
         'Content-Type': 'application/json',
       },
