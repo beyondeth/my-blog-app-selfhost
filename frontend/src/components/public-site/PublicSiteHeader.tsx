@@ -19,7 +19,7 @@ type DropdownKey = 'useCases' | null;
 function isActivePath(pathname: string, href: string) {
   const normalizedPathname = stripLocalePrefix(pathname);
   const [basePath] = href.split('#');
-  if (basePath === '/product' || basePath === '/pricing' || basePath === '/docs') {
+  if (basePath === '/landing' || basePath === '/pricing' || basePath === '/docs') {
     return normalizedPathname === basePath;
   }
   return normalizedPathname.startsWith(basePath);
@@ -81,7 +81,7 @@ export default function PublicSiteHeader() {
             <div className="hidden lg:block w-10 h-10" aria-hidden="true" />
           )}
 
-          <Link href={href('/product')} className="flex shrink-0 items-center space-x-2">
+          <Link href={href('/landing')} className="flex shrink-0 items-center space-x-2">
             <div className="flex min-h-[36px] min-w-[36px] items-center justify-center md:min-h-[48px] md:min-w-[48px]">
               <Image
                 src="/assets/logo.svg"
@@ -102,9 +102,9 @@ export default function PublicSiteHeader() {
 
           <nav className="hidden items-center gap-1.5 md:flex">
             <Link
-              href={href('/product#features')}
+              href={href('/landing#foundation')}
               className={`rounded-full px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
-                isActivePath(pathname || '/', '/product#features')
+                isActivePath(pathname || '/', '/landing#foundation')
                   ? 'bg-white/80 text-[#111827] shadow-[inset_0_0_0_1px_rgba(16,24,40,0.07)] dark:bg-white/10 dark:text-white dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
                   : 'text-[#526477] hover:bg-white/70 hover:text-[#111827] dark:text-[#A9B8C8] dark:hover:bg-white/8 dark:hover:text-white'
               }`}
@@ -202,7 +202,7 @@ export default function PublicSiteHeader() {
       {mobileOpen ? (
         <div className="border-t border-[#E6ECF3] bg-white px-4 py-4 md:hidden dark:border-[#1E2B39] dark:bg-[#0E141B]">
           <div className="space-y-2">
-            <Link href={href('/product#features')} className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
+            <Link href={href('/landing#foundation')} className="block rounded-2xl px-4 py-3 text-sm font-semibold text-[#101828] hover:bg-[#F5F8FC] dark:text-white dark:hover:bg-[#162231]">
               {t('publicSite.header.features')}
             </Link>
             <div className="rounded-2xl border border-[#E6ECF3] p-3 dark:border-[#223244]">

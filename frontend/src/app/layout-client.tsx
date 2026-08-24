@@ -60,7 +60,7 @@ export default function LayoutClient({ children, initialLocale }: LayoutClientPr
     let newShouldHide = false;
     let newIsLanding = false;
 
-    if (pathname === '/landing') {
+    if (normalizedPathname === '/landing') {
       // 랜딩페이지 - 헤더만 표시, 사이드바 제거
       newShouldHide = false;
       newIsLanding = true;
@@ -102,7 +102,7 @@ export default function LayoutClient({ children, initialLocale }: LayoutClientPr
     // 의존성 배열에서 상태 제거하여 이중 실행 방지
     setShouldHideLayout(prev => prev !== newShouldHide ? newShouldHide : prev);
     setIsLandingPage(prev => prev !== newIsLanding ? newIsLanding : prev);
-  }, [pathname]);
+  }, [normalizedPathname, pathname]);
 
   return (
     <LocaleProvider locale={locale}>

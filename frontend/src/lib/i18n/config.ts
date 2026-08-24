@@ -7,6 +7,7 @@ export const LOCALE_COOKIE_NAME = 'cb_locale';
 export const LOCALE_HEADER_NAME = 'x-codebase-locale';
 
 const LOCALIZED_ROUTE_PATTERNS = [
+  /^\/landing(?:\/|$)/,
   /^\/product(?:\/|$)/,
 ];
 
