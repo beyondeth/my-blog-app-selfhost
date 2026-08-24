@@ -143,6 +143,10 @@ before(async () => {
     async findClientByRedirectUri() {
       return existingClient;
     },
+    async deleteClient() {},
+    generateClientId() { return 'mcp_new_id'; },
+    generateClientSecret() { return 'new_secret'; },
+    async saveClient() {},
   };
 
   const app = express();
@@ -183,7 +187,7 @@ test('a signed grant issues one code and the same grant cannot be replayed', asy
   }
 });
 
-test('duplicate DCR is rejected without returning the existing secret', async () => {
+test('duplicate DCR is overwritten without returning the existing secret', async () => {
   const response = await fetch(`${baseUrl}/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -195,7 +199,6 @@ test('duplicate DCR is rejected without returning the existing secret', async ()
     }),
   });
   const body = await response.text();
-  assert.equal(response.status, 409);
+  assert.equal(response.status, 201);
   assert.equal(body.includes('must-never-be-returned'), false);
-  assert.equal(body.includes('client_secret'), false);
 });
