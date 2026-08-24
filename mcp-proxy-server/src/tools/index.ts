@@ -38,8 +38,8 @@ export interface ToolContext {
     user: { id: string; username: string; email: string };
     blog: { id: string; name: string; slug: string };
   };
-  apiKey: string | null;     // API Key 인증 시 사용 (Backend 인증용)
-  oauthToken?: string;       // OAuth 인증 시 사용 (Claude 커스텀 커넥터용)
+  apiKey: string | null; // API Key 인증 시 사용 (Backend 인증용)
+  oauthToken?: string; // OAuth 인증 시 사용 (Claude 커스텀 커넥터용)
   metricsService: MetricsService; // 메트릭 서비스 (도구 호출 추적용)
   config: {
     MCP_BASE_URL: string;
@@ -58,7 +58,7 @@ export interface ToolContext {
  */
 export async function registerAllTools(
   mcpServer: McpServer,
-  context: ToolContext
+  context: ToolContext,
 ): Promise<void> {
   // Initialize 핸들러
   mcpServer.setRequestHandler(InitializeRequestSchema, async () => {
@@ -70,9 +70,9 @@ export async function registerAllTools(
         prompts: { listChanged: true },
       },
       serverInfo: {
-        name: 'codebase-blog-mcp',
+        name: 'aigory-mcp',
         version: '8.0.0',
-        title: 'Codebase.blog MCP Server',
+        title: 'Aigory MCP Server',
         websiteUrl: context.config.PUBLIC_SITE_URL,
       },
       instructions: MCP_SERVER_INSTRUCTIONS,
@@ -95,17 +95,21 @@ export async function registerAllTools(
     const { name, arguments: args } = request.params;
     const toolName = name as ToolName;
 
-    logger.debug({
-      tool: toolName,
-      userId: context.userData.userId.substring(0, 8),
-      blogSlug: context.userData.blog.slug,
-    }, '🔧 Tool called');
+    logger.debug(
+      {
+        tool: toolName,
+        userId: context.userData.userId.substring(0, 8),
+        blogSlug: context.userData.blog.slug,
+      },
+      '🔧 Tool called',
+    );
 
     const handlers: Record<ToolName, (toolArgs: any) => Promise<any>> = {
       check_auth: async () => handleCheckAuth(context),
       get_writing_style_guide: async (toolArgs) =>
         handleGetWritingStyleGuide((toolArgs || {}) as any, context),
-      create_post: async (toolArgs) => handleCreatePost((toolArgs || {}) as any, context),
+      create_post: async (toolArgs) =>
+        handleCreatePost((toolArgs || {}) as any, context),
       get_image_upload_url: async (toolArgs) =>
         handleGetImageUploadUrl((toolArgs || {}) as any, context),
       finalize_uploaded_image: async (toolArgs) =>
@@ -127,7 +131,7 @@ export async function registerAllTools(
                 availableTools: TOOL_CATALOG.map((tool) => tool.name),
               },
               null,
-              2
+              2,
             ),
           },
         ],
@@ -151,11 +155,14 @@ export async function registerAllTools(
   // Prompts 등록
   await registerPrompts(mcpServer);
 
-  logger.info({
-    toolCount: tools.length,
-    tools: tools.map((t) => t.name),
-    userId: context.userData.userId.substring(0, 8),
-  }, '✅ Tools registered');
+  logger.info(
+    {
+      toolCount: tools.length,
+      tools: tools.map((t) => t.name),
+      userId: context.userData.userId.substring(0, 8),
+    },
+    '✅ Tools registered',
+  );
 }
 
 /**
@@ -217,9 +224,12 @@ async function registerPrompts(mcpServer: McpServer): Promise<void> {
     };
   });
 
-  logger.debug({
-    promptCount: prompts.length,
-  }, '✅ Prompts registered');
+  logger.debug(
+    {
+      promptCount: prompts.length,
+    },
+    '✅ Prompts registered',
+  );
 }
 
 /**
@@ -232,11 +242,14 @@ async function registerPrompts(mcpServer: McpServer): Promise<void> {
 async function handleCheckAuth(context: ToolContext): Promise<any> {
   const authMode = context.oauthToken ? 'OAuth 2.1' : 'API Key';
 
-  logger.info({
-    userId: context.userData.userId.substring(0, 8),
-    blogSlug: context.userData.blog.slug,
-    authMode,
-  }, '🔐 Authentication check');
+  logger.info(
+    {
+      userId: context.userData.userId.substring(0, 8),
+      blogSlug: context.userData.blog.slug,
+      authMode,
+    },
+    '🔐 Authentication check',
+  );
 
   return {
     content: [
@@ -256,26 +269,32 @@ async function handleCheckAuth(context: ToolContext): Promise<any> {
  */
 async function handleGetWritingStyleGuide(
   args: { style?: string; customMarkdown?: string },
-  context: ToolContext
+  context: ToolContext,
 ): Promise<any> {
   const styleService = new WritingStyleService();
   let styleData;
 
   // 우선순위 1: 사용자 제공 커스텀 마크다운 (최우선)
   if (args.customMarkdown) {
-    logger.info({
-      userId: context.userData.userId.substring(0, 8),
-      source: 'custom-markdown',
-    }, '📖 Using user-provided custom markdown style');
+    logger.info(
+      {
+        userId: context.userData.userId.substring(0, 8),
+        source: 'custom-markdown',
+      },
+      '📖 Using user-provided custom markdown style',
+    );
     styleData = await styleService.parseRawMarkdown(args.customMarkdown);
   } else {
     // 우선순위 2: 프리셋 스타일 (플래그 없으면 default)
     const style = args.style || 'default';
-    logger.info({
-      style,
-      userId: context.userData.userId.substring(0, 8),
-      source: 'preset',
-    }, '📖 Writing style guide retrieved');
+    logger.info(
+      {
+        style,
+        userId: context.userData.userId.substring(0, 8),
+        source: 'preset',
+      },
+      '📖 Writing style guide retrieved',
+    );
     styleData = await styleService.loadAndParseStyle(style);
   }
 
@@ -307,21 +326,25 @@ async function handleCreatePost(
     content_markdown: string;
     tags?: string[];
     category?: string;
-    writingStyle?: string;
+    attachedFileIds?: string[];
+    thumbnailImageId?: string;
   },
-  context: ToolContext
+  context: ToolContext,
 ): Promise<any> {
   try {
     // 태그 10개 제한
     const tags = args.tags ? args.tags.slice(0, 10) : [];
 
-    logger.debug({
-      title: args.title,
-      contentLength: args.content_markdown.length,
-      tagCount: tags.length,
-      userId: context.userData.userId.substring(0, 8),
-      blogSlug: context.userData.blog.slug,
-    }, '📝 Creating post...');
+    logger.debug(
+      {
+        title: args.title,
+        contentLength: args.content_markdown.length,
+        tagCount: tags.length,
+        userId: context.userData.userId.substring(0, 8),
+        blogSlug: context.userData.blog.slug,
+      },
+      '📝 Creating post...',
+    );
 
     // Backend MCP API 호출 (포스트 생성)
     // API Key 또는 OAuth 토큰 인증
@@ -334,11 +357,13 @@ async function handleCreatePost(
         content_markdown: args.content_markdown, // 원본 마크다운
         tags,
         category: args.category,
+        attachedFileIds: args.attachedFileIds,
+        thumbnailImageId: args.thumbnailImageId,
       },
       {
         headers,
         timeout: 30000,
-      }
+      },
     );
 
     // Backend MCP 엔드포인트는 Fast Path 응답 (status 202)
@@ -351,17 +376,23 @@ async function handleCreatePost(
       incrementPostsCreated(
         context.userData.keyId,
         context.config.BACKEND_BASE_URL,
-        context.config.MCP_SHARED_SECRET
+        context.config.MCP_SHARED_SECRET,
       ).catch((err) => {
-        logger.warn({ error: err.message }, '⚠️ Failed to increment postsCreated');
+        logger.warn(
+          { error: err.message },
+          '⚠️ Failed to increment postsCreated',
+        );
       });
     }
 
-    logger.info({
-      postId: post.id.substring(0, 8),
-      slug: post.slug,
-      userId: context.userData.userId.substring(0, 8),
-    }, '✅ Post created (Fast Path)');
+    logger.info(
+      {
+        postId: post.id.substring(0, 8),
+        slug: post.slug,
+        userId: context.userData.userId.substring(0, 8),
+      },
+      '✅ Post created (Fast Path)',
+    );
 
     return {
       content: [
@@ -379,11 +410,14 @@ ${post._meta ? `\n_Processing in background: ${post._meta.processingTime || 'ong
       ],
     };
   } catch (error: any) {
-    logger.error({
-      error: error.message,
-      userId: context.userData.userId.substring(0, 8),
-      title: args.title,
-    }, '❌ Failed to create post');
+    logger.error(
+      {
+        error: error.message,
+        userId: context.userData.userId.substring(0, 8),
+        title: args.title,
+      },
+      '❌ Failed to create post',
+    );
 
     // 에러 메시지 포맷팅
     let errorMessage = 'Failed to create post';
@@ -417,14 +451,26 @@ function buildBackendAuthHeaders(context: ToolContext): Record<string, string> {
 }
 
 async function handleGetImageUploadUrl(
-  args: { mimeType?: string; fileSize?: number },
-  context: ToolContext
+  args: { mimeType: string; fileSize: number },
+  context: ToolContext,
 ): Promise<any> {
   const backendUrl = context.config.BACKEND_BASE_URL || 'http://localhost:3000';
-  const mimeType = args.mimeType || 'image/png';
-  const fileSize = args.fileSize || 1024 * 1024;
-  const extension = mimeType.split('/')[1] || 'png';
-  const fileName = `generated-${Date.now()}.${extension}`;
+  const mimeType = args.mimeType;
+  const fileSize = args.fileSize;
+
+  if (
+    mimeType !== 'image/webp' ||
+    !Number.isSafeInteger(fileSize) ||
+    fileSize < 1 ||
+    fileSize > 10 * 1024 * 1024
+  ) {
+    return imageToolError(
+      'mimeType must be image/webp and fileSize must be an integer from 1 to 10485760',
+      '/api/v1/mcp/files/upload-url',
+    );
+  }
+
+  const fileName = `generated-${Date.now()}.webp`;
 
   try {
     const response = await axios.post(
@@ -437,7 +483,7 @@ async function handleGetImageUploadUrl(
       },
       {
         headers: buildBackendAuthHeaders(context),
-      }
+      },
     );
 
     return {
@@ -447,11 +493,15 @@ async function handleGetImageUploadUrl(
           text: JSON.stringify(
             {
               uploadUrl: response.data.uploadUrl,
+              tempId: response.data.tempId,
               fileKey: response.data.fileKey,
+              fileName: response.data.fileName,
+              mimeType: response.data.mimeType,
+              fileSize: response.data.fileSize,
               instructions: `Run locally: curl -X PUT -H "Content-Type: ${mimeType}" -T <path_to_file> "${response.data.uploadUrl}"`,
             },
             null,
-            2
+            2,
           ),
         },
       ],
@@ -472,7 +522,7 @@ async function handleGetImageUploadUrl(
                 "Image upload URL request failed. Stop retrying image upload and continue with text-only 'create_post'.",
             },
             null,
-            2
+            2,
           ),
         },
       ],
@@ -481,48 +531,47 @@ async function handleGetImageUploadUrl(
 }
 
 async function handleFinalizeUploadedImage(
-  args: { fileKey?: string; mimeType?: string; fileSize?: number },
-  context: ToolContext
+  args: {
+    tempId: string;
+    fileKey: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+  },
+  context: ToolContext,
 ): Promise<any> {
-  if (!args.fileKey) {
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              status: 'failed',
-              error: 'fileKey is required',
-              instruction:
-                "Missing fileKey. Stop image finalization and continue with text-only 'create_post'.",
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
+  if (
+    !args.tempId ||
+    !args.fileKey ||
+    !args.fileName ||
+    args.mimeType !== 'image/webp' ||
+    !Number.isSafeInteger(args.fileSize) ||
+    args.fileSize < 1 ||
+    args.fileSize > 10 * 1024 * 1024
+  ) {
+    return imageToolError(
+      'tempId, fileKey, fileName, image/webp mimeType, and a positive integer fileSize are required',
+      '/api/v1/mcp/files/upload-complete',
+    );
   }
 
   const backendUrl = context.config.BACKEND_BASE_URL || 'http://localhost:3000';
-  const fileUrl = `${context.config.BACKEND_PUBLIC_URL.replace(/\/$/, '')}/api/v1/files/proxy/${encodeURI(args.fileKey)}`;
-  const mimeType = args.mimeType || 'image/png';
-  const fileSize = args.fileSize || 0;
 
   try {
-    await axios.post(
+    const response = await axios.post(
       `${backendUrl}/api/v1/mcp/files/upload-complete`,
       {
+        tempId: args.tempId,
         fileKey: args.fileKey,
-        fileUrl,
-        fileName: args.fileKey,
-        mimeType,
-        fileSize,
+        fileUrl: args.fileKey,
+        fileName: args.fileName,
+        mimeType: args.mimeType,
+        fileSize: args.fileSize,
+        fileType: 'image',
       },
       {
         headers: buildBackendAuthHeaders(context),
-      }
+      },
     );
 
     return {
@@ -532,11 +581,12 @@ async function handleFinalizeUploadedImage(
           text: JSON.stringify(
             {
               success: true,
-              publicUrl: fileUrl,
-              descriptor: `![Generated Image](${fileUrl})`,
+              fileId: response.data.fileId,
+              publicUrl: response.data.publicUrl,
+              descriptor: response.data.descriptor,
             },
             null,
-            2
+            2,
           ),
         },
       ],
@@ -557,12 +607,34 @@ async function handleFinalizeUploadedImage(
                 "Image finalization failed. Stop retrying and continue with text-only 'create_post'.",
             },
             null,
-            2
+            2,
           ),
         },
       ],
     };
   }
+}
+
+function imageToolError(error: string, endpoint: string): any {
+  return {
+    isError: true,
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          {
+            status: 'failed',
+            endpoint,
+            error,
+            instruction:
+              "Stop retrying image upload and continue with text-only 'create_post'.",
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
 }
 
 /**
@@ -571,7 +643,7 @@ async function handleFinalizeUploadedImage(
 async function incrementPostsCreated(
   keyId: string,
   backendUrl: string,
-  sharedSecret?: string
+  sharedSecret?: string,
 ): Promise<void> {
   const headers: Record<string, string> = {};
   if (sharedSecret) {
@@ -581,6 +653,6 @@ async function incrementPostsCreated(
   await axios.post(
     `${backendUrl}/api/v1/mcp/keys/${keyId}/increment-posts`,
     {},
-    { timeout: 3000, headers }
+    { timeout: 3000, headers },
   );
 }

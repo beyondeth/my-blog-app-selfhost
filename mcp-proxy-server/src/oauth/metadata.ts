@@ -99,7 +99,8 @@ router.get('/oauth-authorization-server', (req, res) => {
     scopes_supported: [
       'mcp:tools',      // MCP 도구 사용 권한
       'mcp:read',       // 읽기 전용
-      'mcp:write',      // 쓰기 권한 (포스트 생성)
+      'mcp:write',      // 쓰기 권한
+      'mcp:create',     // 게시물 생성 권한 (자동 포스팅)
     ],
 
     // PKCE 지원 (필수)

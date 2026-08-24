@@ -2,43 +2,52 @@
   "name": "mcp-proxy-server",
   "version": "1.0.0",
   "description": "",
+  "private": true,
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --exec npx tsx src/index.ts",
     "clean": "rm -rf dist",
+    "test:oauth": "NODE_ENV=development BACKEND_BASE_URL=http://localhost:3000 BACKEND_API_URL=http://localhost:3000/api/v1 BACKEND_PUBLIC_URL=http://localhost:3000 MCP_BASE_URL=http://localhost:3002 MCP_SHARED_SECRET=test-mcp-shared-secret-with-enough-entropy node --import tsx --test src/oauth/oauth-security.spec.ts",
+    "test:config": "node --import tsx --test src/config/env.validation.spec.ts",
     "verify:tool-parity": "node scripts/verify-tool-parity.mjs"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
+  "pnpm": {
+    "overrides": {
+      "path-to-regexp": "8.4.2",
+      "qs": "6.15.3"
+    }
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.20.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "axios": "^1.19.0",
+    "dotenv": "^17.2.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "ioredis": "^5.8.0",
+    "pino": "^9.11.0",
+    "prom-client": "^15.1.3",
+    "redis": "^5.8.2",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/express-rate-limit": "^6.0.2",
     "@types/node": "^24.5.2",
     "@types/pino": "^7.0.5",
-    "axios": "^1.12.2",
-    "dotenv": "^17.2.2",
-    "express": "^5.1.0",
-    "express-rate-limit": "^8.1.0",
-    "ioredis": "^5.8.0",
-    "nodemon": "^3.1.10",
-    "pino": "^9.11.0",
-    "pino-pretty": "^13.1.1",
-    "prom-client": "^15.1.3",
-    "redis": "^5.8.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.2",
-    "zod": "^4.1.11"
-  },
-  "devDependencies": {
     "@types/node-fetch": "^2.6.13",
     "@types/uuid": "^11.0.0",
     "chalk": "^5.6.2",
     "node-fetch": "^3.3.2",
+    "nodemon": "^3.1.10",
+    "pino-pretty": "^13.1.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
     "tsx": "^4.20.6",
     "uuid": "^13.0.0"
   }

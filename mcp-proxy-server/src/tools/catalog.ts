@@ -69,8 +69,8 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
   },
   {
     name: 'create_post',
-    description: 'Create and publish a new blog post to codebase.blog.',
-    discoveryDescription: 'Create and publish blog posts to codebase.blog',
+    description: 'Create and publish a new blog post to aigory.com.',
+    discoveryDescription: 'Create and publish blog posts to aigory.com',
     inputSchema: {
       type: 'object',
       properties: {
@@ -92,11 +92,15 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
           description:
             'Category (required) - Select exactly 1 category that best describes the post content',
         },
-        writingStyle: {
+        attachedFileIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Finalized file IDs to attach to the post. Include thumbnailImageId here as well.',
+        },
+        thumbnailImageId: {
           type: 'string',
-          enum: WRITING_STYLE_PRESETS,
-          default: 'default',
-          description: 'Writing style preset',
+          description: 'Finalized file ID to use as the post cover image',
         },
       },
       required: ['title', 'content_markdown', 'category'],
@@ -105,32 +109,45 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
   {
     name: 'get_image_upload_url',
     description:
-      'Step 1: Request an S3 Presigned URL to upload a local file. Returns uploadUrl and fileKey. You must use curl to upload provided file to the uploadUrl.',
+      'Step 1: Request a signed presigned URL for one WebP image. Returns uploadUrl, tempId, fileKey, fileName, mimeType, and fileSize. PUT exactly those bytes to uploadUrl.',
     discoveryDescription: 'Get image upload URL (step 1 of image upload)',
     inputSchema: {
       type: 'object',
       properties: {
-        mimeType: { type: 'string', default: 'image/png' },
-        fileSize: { type: 'number' },
+        mimeType: {
+          type: 'string',
+          enum: ['image/webp'],
+          default: 'image/webp',
+        },
+        fileSize: { type: 'number', minimum: 1, maximum: 10485760 },
       },
+      required: ['mimeType', 'fileSize'],
     },
   },
   {
     name: 'finalize_uploaded_image',
     description:
-      'Step 2: Notify server that the file has been uploaded via curl asynchronously.',
+      'Step 2: Finalize the uploaded WebP using every value returned by get_image_upload_url. Returns fileId, publicUrl, and a file descriptor.',
     discoveryDescription: 'Finalize uploaded image (step 2 of image upload)',
     inputSchema: {
       type: 'object',
       properties: {
+        tempId: {
+          type: 'string',
+          description: 'Signed upload intent returned by get_image_upload_url',
+        },
         fileKey: {
           type: 'string',
           description: 'Returned from get_image_upload_url',
         },
-        mimeType: { type: 'string' },
-        fileSize: { type: 'number' },
+        fileName: {
+          type: 'string',
+          description: 'Returned from get_image_upload_url',
+        },
+        mimeType: { type: 'string', enum: ['image/webp'] },
+        fileSize: { type: 'number', minimum: 1, maximum: 10485760 },
       },
-      required: ['fileKey'],
+      required: ['tempId', 'fileKey', 'fileName', 'mimeType', 'fileSize'],
     },
   },
 ];
@@ -145,7 +162,7 @@ export function getDiscoveryTools(): Array<{
   }));
 }
 
-export const MCP_SERVER_INSTRUCTIONS = `# Codebase.blog Auto-posting MCP Server
+export const MCP_SERVER_INSTRUCTIONS = `# Aigory Auto-posting MCP Server
 
 ## Workflow
 
